@@ -10,6 +10,10 @@ This is the work we know about, read from the code as it stands. None of it has 
 - **Weather for the sun and skin tools.** Sun Budget and Skin Forecast have no weather source yet and show a dash (`App/Prism/Features/Tools/ToolWeather.swift`). The Environment card's Open-Meteo reader could feed them.
 - **Pages marked "not wired".** A few destinations open a placeholder that says so, among them parts of Ask, training sessions and visit results. Search for `NotWiredPage(` to find them.
 
+## In progress
+
+- An Android version is in development.
+
 ## Also open
 
 - Push notifications. The `devices.push_token` column is waiting for APNs.
@@ -17,5 +21,5 @@ This is the work we know about, read from the code as it stands. None of it has 
 ## Not in this build
 
 - An Apple Watch app.
-- Android and a web version.
+- A web version.
 - Medical features. Prism is a wellness app and makes no diagnostic or treatment claims.

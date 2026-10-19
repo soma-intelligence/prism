@@ -35,14 +35,14 @@ Competitor cells come from each company's own site, help centre, privacy policy 
 | Platforms: iPhone | Yes | Yes [^a7] | Yes [^o9] | Yes [^b8] |
 | Platforms: Mac | Yes (builds for macOS) | No Health app [^a7] | No (not listed on its App Store page) [^o9] | Runs as an iPhone app only [^b8] |
 | Platforms: Vision Pro | Yes (builds for visionOS) | Mindfulness only [^a7] | Yes (listed) [^o9] | Not mentioned on its App Store page [^b8] |
-| Platforms: Android | No | No. Apple lists none [^a7] | Yes [^o9] | No [^b8] |
+| Platforms: Android | In development | No. Apple lists none [^a7] | Yes [^o9] | No [^b8] |
 | Platforms: web | No | No. Apple lists none [^a7] | A web app exists, its future unconfirmed [^o9] | No [^b8] |
 | Export of raw data | Yes. One ZIP of JSON files, plus one NDJSON file per Apple Health metric | Yes. XML [^a8] | Yes. CSV, by request, without membership [^o10] | No self serve export found. Copy by email request [^b3] |
 
 ## Where Prism falls short
 
 - No sensor of its own. An Oura Ring or an Apple Watch measures the body. Prism only reads what such devices write to Apple Health.
-- No Android and no web version. Oura has an Android app and a web app (the web app's future is unconfirmed) [^o9].
+- No Android release yet, though an Android version is in development, and no web version. Oura has an Android app and a web app (the web app's future is unconfirmed) [^o9].
 - No Apple Watch app in the public build. Apple Health, Oura and Bevel all list one [^a2][^o9][^b8].
 - No clinical validation. Apple lists watch features such as an ECG app and sleep apnea notifications [^a2]. Prism has no such features and makes no such claims.
 - A new project. Oura, Apple and Bevel have years of user feedback, support teams and large user bases. Prism has none of that yet.

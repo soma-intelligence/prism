@@ -42,10 +42,10 @@ Checked on 2026-10-18. Every competitor cell is sourced in the [full comparison]
 | Blood test import | Yes, read on the device | Health Records from some US providers | $99 Quest panel (US, members), PDF uploads rolling out | Pro only |
 | AI assistant | Needs a cloud account, off in the build as shipped | No | Oura Advisor, in membership | Bevel Intelligence, Pro |
 | Mac and Vision Pro | Both build, but Apple Health data there hasn't been checked by hand | No Mac app, Vision Pro for mindfulness only | Vision Pro listed, Mac not listed | Mac as an iPhone app only, Vision Pro not mentioned |
-| Android or web | No | No | Android, and a web app whose future is unconfirmed | No |
+| Android or web | Web: no. Android: in development | No | Android, and a web app whose future is unconfirmed | No |
 | Raw data export | ZIP of JSON and NDJSON | XML | CSV, by request | By email request |
 
-Where Prism falls short: it has no sensor of its own, so its scores are only as good as what your devices write to Apple Health. It has no clinical validation, no Apple Watch app in this build, no Android or web version, and it's a new project without the years of feedback the others have.
+Where Prism falls short: it has no sensor of its own, so its scores are only as good as what your devices write to Apple Health. It has no clinical validation, no Apple Watch app in this build, no web version, no Android release yet (an Android version is in development), and it's a new project without the years of feedback the others have.
 
 ## Your data
 
