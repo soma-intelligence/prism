@@ -79,6 +79,8 @@ These cover code, comments, Markdown, commit messages, pull request text and eve
 
 `StyleGuardTests` enforces both rules in `App/`. The build workflow also scans every tracked `.md`, `.yml`, `.yaml`, `.json` and `.swift` file in the repository for em and en dashes, and every Markdown file, outside code fences, for a hyphen used as a dash.
 
+GitHub's hosted macOS runners don't have Xcode 27 yet. Until they do, the app and package jobs skip with a notice and pass, while the repository checks above still run on every pull request. Build and run the tests locally before you open one, and paste the test summary in the pull request.
+
 ## Privacy
 
 If your change sends anything new off the device, or adds a field to a request that already does, update [PRIVACY.md](PRIVACY.md) in the same pull request. Never commit real health data, in tests, fixtures, screenshots or issues.
