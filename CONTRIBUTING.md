@@ -58,7 +58,7 @@ A change is done when the app builds for iOS, macOS and visionOS and every suite
 
 ## Design system rules
 
-[CLAUDE.md](CLAUDE.md) holds the full list. The ones reviewers check first:
+[AGENTS.md](AGENTS.md) holds the full list. The ones reviewers check first:
 
 - Every colour, size, duration and font comes from `SomaTheme`. No literal colours, hard-coded point sizes or `Font.system(...)` in a view.
 - Fonts go through `.somaFont(_:)`. `TypographyGuardTests` fails on `.font(spec.font)`, a hand written `.tracking` or `.kerning`, or a font design named at a call site.

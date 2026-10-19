@@ -1,4 +1,4 @@
-# CLAUDE.md: Prism
+# AGENTS.md: Prism
 
 Guidance for coding agents, and for people, working in this repository.
 

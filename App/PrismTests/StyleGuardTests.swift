@@ -6,7 +6,7 @@
 import Foundation
 import Testing
 
-/// Enforces the writing rules in `CLAUDE.md`.
+/// Enforces the writing rules in the agent guide.
 ///
 /// A rule that lives only in a document is a rule that drifts. These walk the
 /// repository so a dash cannot reach a commit, whoever or whatever wrote it.
@@ -71,20 +71,24 @@ struct StyleGuardTests {
         return String(line[marker.upperBound...])
     }
 
-    @Test("CLAUDE.md exists and states the rule")
+    @Test("The agent guide exists and states the rule")
     func ruleIsWrittenDown() throws {
-        let claude = try #require(Self.claudeFile, "no CLAUDE.md beside the project or one folder up")
-        let text = try String(contentsOf: claude, encoding: .utf8)
+        let guide = try #require(Self.rulesFile, "no agent guide beside the project or one folder up")
+        let text = try String(contentsOf: guide, encoding: .utf8)
         #expect(text.contains("Writing rules"))
         #expect(text.contains("StyleGuardTests"))
     }
 
+    /// The file names the agent guide may have, in the order they are tried.
+    /// The public export rewrites this line to `AGENTS.md` alone.
+    static let guideNames = ["AGENTS.md"]
+
     /// Where the rules are written: beside the Xcode project here, one folder
     /// up in the public repository, where the project sits in `App/`. Never
     /// further, so a stray file above the repository cannot stand in for it.
-    static var claudeFile: URL? {
+    static var rulesFile: URL? {
         [root, root.deletingLastPathComponent()]
-            .map { $0.appendingPathComponent("CLAUDE.md") }
+            .flatMap { folder in guideNames.map { folder.appendingPathComponent($0) } }
             .first { FileManager.default.fileExists(atPath: $0.path) }
     }
 

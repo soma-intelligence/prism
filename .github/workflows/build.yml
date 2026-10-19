@@ -29,11 +29,11 @@ jobs:
         run: |
           status=0
           if git ls-files -z '*.md' '*.yml' '*.yaml' '*.json' '*.swift' | xargs -0 grep -nP '\x{2014}|\x{2013}'; then
-            echo "Em dash or en dash found (see CLAUDE.md, Writing rules)."
+            echo "Em dash or en dash found (see AGENTS.md, Writing rules)."
             status=1
           fi
           if git ls-files -z '*.md' | xargs -0 perl -ne 'if (/^```/) { $f = !$f; next } print "$ARGV:$.: $_" if !$f && /[a-zA-Z,\)] [-] [a-z]/; if (eof) { close ARGV; $f = 0 }' | grep .; then
-            echo "Hyphen used as a dash found (see CLAUDE.md, Writing rules)."
+            echo "Hyphen used as a dash found (see AGENTS.md, Writing rules)."
             status=1
           fi
           exit $status

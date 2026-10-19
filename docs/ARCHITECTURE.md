@@ -84,4 +84,4 @@ Local data lives in SwiftData and in each store's files in the app container. No
 
 ## Tests and guards
 
-`App/PrismTests` holds the unit tests and three guards that walk the source: `StyleGuardTests` (the writing rules in `CLAUDE.md`), `GlassGuardTests` (no direct glass calls) and `TypographyGuardTests` (fonts only through `.somaFont`). Each package has its own tests, run with `swift test`. The commands are in [CONTRIBUTING.md](../CONTRIBUTING.md).
+`App/PrismTests` holds the unit tests and three guards that walk the source: `StyleGuardTests` (the writing rules in `AGENTS.md`), `GlassGuardTests` (no direct glass calls) and `TypographyGuardTests` (fonts only through `.somaFont`). Each package has its own tests, run with `swift test`. The commands are in [CONTRIBUTING.md](../CONTRIBUTING.md).
