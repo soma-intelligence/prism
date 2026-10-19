@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security problem
+    url: https://github.com/soma-intelligence/prism/blob/main/SECURITY.md
+    about: Please report security problems privately to security@somalabs.me, as SECURITY.md describes, not in a public issue.

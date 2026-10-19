@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xmlns:media="http://search.yahoo.com/mrss/">
+  <title>Example Atom Health Feed</title>
+  <link href="https://news.example.org/" />
+  <updated>2026-10-02T10:00:00Z</updated>
+  <id>urn:uuid:feed</id>
+  <entry>
+    <title type="html">Hydration and focus &amp;mdash; a pilot study</title>
+    <link rel="alternate" type="text/html" href="/2026/10/hydration-focus" />
+    <link rel="enclosure" type="image/jpeg" href="https://news.example.org/img/large.jpg" />
+    <id>urn:uuid:1</id>
+    <published>2026-10-02T09:00:00Z</published>
+    <updated>2026-10-02T10:00:00Z</updated>
+    <summary type="html">&lt;p&gt;A pilot study of 40 students looked at water intake and attention tests.&lt;/p&gt;</summary>
+    <content type="html">&lt;p&gt;FULL ARTICLE TEXT THAT MUST NEVER BE USED&lt;/p&gt;</content>
+    <category term="nutrition" />
+    <media:thumbnail url="https://news.example.org/img/thumb.jpg" />
+  </entry>
+  <entry>
+    <title>No date entry</title>
+    <link href="https://news.example.org/2026/10/no-date" />
+    <id>urn:uuid:2</id>
+    <summary>Undated.</summary>
+  </entry>
+</feed>

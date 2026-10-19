@@ -1,0 +1,10 @@
+// Prism build settings. Committed.
+//
+// Defaults first; Signing.xcconfig (git ignored, copy Signing.example.xcconfig)
+// overrides them for your own team and bundle id. Cloud.xcconfig points the app
+// at Soma cloud; replace its two values to use your own Supabase project.
+PRISM_BUNDLE_ID = Soma.Prism
+PRISM_DEVELOPMENT_TEAM =
+#include "Cloud.xcconfig"
+#include? "Signing.xcconfig"
+#include? "Supabase.xcconfig"

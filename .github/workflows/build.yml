@@ -1,0 +1,117 @@
+name: Build and test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Repository checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: No signing or Supabase config in the tree
+        run: |
+          found=$(git ls-files | grep -E '(^|/)(Signing|Supabase)\.xcconfig$' || true)
+          if [ -n "$found" ]; then
+            echo "These files are per developer and must not be committed:"
+            echo "$found"
+            exit 1
+          fi
+
+      - name: Writing rules
+        run: |
+          status=0
+          if git ls-files -z '*.md' '*.yml' '*.yaml' '*.json' '*.swift' | xargs -0 grep -nP '\x{2014}|\x{2013}'; then
+            echo "Em dash or en dash found (see CLAUDE.md, Writing rules)."
+            status=1
+          fi
+          if git ls-files -z '*.md' | xargs -0 perl -ne 'if (/^```/) { $f = !$f; next } print "$ARGV:$.: $_" if !$f && /[a-zA-Z,\)] [-] [a-z]/; if (eof) { close ARGV; $f = 0 }' | grep .; then
+            echo "Hyphen used as a dash found (see CLAUDE.md, Writing rules)."
+            status=1
+          fi
+          exit $status
+
+  app:
+    name: App on the iOS Simulator
+    needs: checks
+    # Prism needs Xcode 27 and the iOS 27 SDK. The step below selects it and fails clearly when the runner image lacks it.
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode 27
+        run: |
+          xcode=$(ls -d /Applications/Xcode_27*.app 2>/dev/null | sort -V | tail -n 1)
+          if [ -z "$xcode" ]; then
+            echo "Xcode 27 is not installed on this runner image."
+            ls -d /Applications/Xcode*.app
+            exit 1
+          fi
+          sudo xcode-select -s "$xcode/Contents/Developer"
+          xcodebuild -version
+
+      - name: Pick an iPhone simulator
+        run: |
+          udid=$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          devices = json.load(sys.stdin)["devices"]
+          ios = sorted((r for r in devices if "iOS-27" in r), reverse=True)
+          found = [d["udid"] for r in ios for d in devices[r] if d["name"].startswith("iPhone")]
+          print(found[0] if found else "")
+          ')
+          if [ -z "$udid" ]; then
+            echo "No iOS 27 iPhone simulator on this runner."
+            xcrun simctl list devices available
+            exit 1
+          fi
+          echo "SIMULATOR=$udid" >> "$GITHUB_ENV"
+
+      - name: Build for the iOS Simulator
+        run: |
+          xcodebuild build \
+            -project App/Prism.xcodeproj -scheme Prism \
+            -destination "platform=iOS Simulator,id=$SIMULATOR" \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: PrismTests
+        run: |
+          xcodebuild test \
+            -project App/Prism.xcodeproj -scheme Prism \
+            -destination "platform=iOS Simulator,id=$SIMULATOR" \
+            -only-testing:PrismTests \
+            -parallel-testing-enabled NO \
+            CODE_SIGNING_ALLOWED=NO
+
+  packages:
+    name: Packages
+    needs: checks
+    # Same requirement: Xcode 27.
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [Packages/SomaUI, Packages/WellnessKit, App/SomaWidgetKit]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode 27
+        run: |
+          xcode=$(ls -d /Applications/Xcode_27*.app 2>/dev/null | sort -V | tail -n 1)
+          if [ -z "$xcode" ]; then
+            echo "Xcode 27 is not installed on this runner image."
+            ls -d /Applications/Xcode*.app
+            exit 1
+          fi
+          sudo xcode-select -s "$xcode/Contents/Developer"
+          swift --version
+
+      - name: swift test
+        working-directory: ${{ matrix.package }}
+        run: swift test

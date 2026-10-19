@@ -1,0 +1,729 @@
+//
+//  TrackJournalView.swift
+//  Prism
+//
+
+import SwiftUI
+import SomaUI
+import HealthExportCore
+
+/// Track, Journal: the week, then the chosen day.
+/// A count and a ring for what is logged, a grid of things to add, the tags
+/// as grouped rows with a switch each, what Health measured as automatic
+/// rows, how the day felt on one scale, and two compact cards for what the
+/// tags have done to the body over the last two months.
+///
+/// The tags and the feeling are the person's own words, kept by
+/// ``JournalStore``. Everything set beside them is read from Apple Health; a
+/// value Health does not hold is a dash.
+struct TrackJournalView: View {
+    @Environment(\.somaTheme) private var theme
+    @Environment(HealthDashboard.self) private var health
+    @Environment(JournalStore.self) private var journal
+
+    @State private var selected = Calendar.current.startOfDay(for: .now)
+    @State private var measured = TrackBody()
+    @State private var totals = TrackDayTotals()
+    @State private var source: (any HealthSampleSource)?
+    @State private var opened: TrackRoute?
+
+    private let calendar = Calendar.current
+    private let log = TrackLogStore.shared
+
+    /// False lays the column out without its scroll view, for a render
+    /// check: an image renderer draws a scroll view as an empty box.
+    private let scrolls: Bool
+
+    init() { scrolls = true }
+
+    /// Starts from readings already in hand, for previews and render checks:
+    /// the page reads Health again when it appears.
+    init(measured: TrackBody, totals: TrackDayTotals, scrolls: Bool = true) {
+        _measured = State(initialValue: measured)
+        _totals = State(initialValue: totals)
+        self.scrolls = scrolls
+    }
+
+    var body: some View {
+        if scrolls {
+            ScrollView {
+                column
+                    // Exactly the scroll view's width: a card whose content
+                    // ran a point wider made the whole page pan sideways
+                    // under a finger.
+                    .containerRelativeFrame(.horizontal)
+                    .clipped()
+            }
+                .background(theme.colors.canvas.color.ignoresSafeArea())
+                .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+                .task { await load() }
+                .task(id: selected) { await readTotals() }
+                .refreshable {
+                    await load()
+                    await readTotals()
+                }
+        } else {
+            column.background(theme.colors.canvas.color)
+        }
+    }
+
+    private var column: some View {
+        let metrics = theme.metrics
+        let today = calendar.startOfDay(for: .now)
+        let days = loggedDays
+        let points = TrackJournal.feelPoints(days: days, body: measured, today: today, calendar: calendar)
+
+        return VStack(alignment: .leading, spacing: metrics.leadSpacing * 0.75) {
+            TrackWeekStrip(selected: $selected, today: today, calendar: calendar) { day in
+                !journal.day(day).isEmpty
+            }
+
+            entriesHeader
+
+            TrackAddToday()
+
+            tagSections
+
+            automaticSection
+
+            TrackFeelingRow(feeling: journal.day(selected).feeling) {
+                journal.setFeeling($0, on: selected)
+            }
+
+            TrackFeelMeasureCard(points: points, highlighted: selected, today: today, calendar: calendar)
+
+            TrackEffectsCard(
+                effects: TrackJournal.effects(
+                    tags: journal.tags, days: days, body: measured, today: today, calendar: calendar
+                )
+            )
+
+            copyButton
+        }
+        .padding(.horizontal, metrics.pagePadding)
+        .padding(.top, metrics.cardSpacing)
+        .padding(.bottom, metrics.pagePadding)
+        .frame(maxWidth: metrics.pageMaxWidth, alignment: .leading)
+        .frame(maxWidth: .infinity)
+    }
+
+    private var loggedDays: [Date: JournalDay] {
+        Dictionary(journal.loggedDays.map { ($0.date, $0.day) }, uniquingKeysWith: { first, _ in first })
+    }
+
+    // MARK: Entries header
+
+    /// What the chosen day holds: tags, a feeling, and what was added from
+    /// the grid (drinks, meals, doses).
+    private var entryCount: Int {
+        let entry = journal.day(selected)
+        return entry.tags.count + entry.declined.count + (entry.feeling == nil ? 0 : 1)
+            + log.drinks(on: selected).count + log.meals(on: selected).count + log.doses(on: selected).count
+    }
+
+    private var entriesHeader: some View {
+        let metrics = theme.metrics
+        let type = theme.typography
+        let colors = theme.colors
+        let count = entryCount
+        // The ring fills as the journal itself does: the tags on offer and
+        // the feeling are the day's questions.
+        let day = journal.day(selected)
+        let questions = max(1, journal.offeredTags.count + 1)
+        let answered = journal.offeredTags.filter { day.answer($0.id) != nil }.count + (day.feeling == nil ? 0 : 1)
+
+        return HStack(alignment: .center, spacing: metrics.cardSpacing) {
+            VStack(alignment: .leading, spacing: metrics.scoreLabelSpacing) {
+                Text(entriesTitle)
+                    .somaFont(type.title)
+                    .foregroundStyle(colors.inkPrimary.color)
+                    .accessibilityAddTraits(.isHeader)
+                Text(count == 1 ? "1 entry" : "\(count) entries")
+                    .somaFont(type.caption)
+                    .monospacedDigit()
+                    .foregroundStyle(colors.inkSecondary.color)
+            }
+            Spacer(minLength: metrics.cardSpacing)
+            SomaProgressRing(fraction: Double(answered) / Double(questions)) {
+                Text("\(count)")
+                    .somaFont(type.rowValue)
+                    .foregroundStyle(colors.inkPrimary.color)
+            }
+            .accessibilityElement()
+            .accessibilityLabel(Text("\(answered) of \(questions) answered"))
+        }
+        .padding(.top, metrics.scoreLabelSpacing)
+    }
+
+    private var entriesTitle: String {
+        if calendar.isDateInToday(selected) { return "Today\u{2019}s entries" }
+        if calendar.isDateInYesterday(selected) { return "Yesterday" }
+        return selected.formatted(.dateTime.weekday(.wide))
+    }
+
+    // MARK: Tags
+
+    /// A row of the tag list: a yes or no question, or an amount the day
+    /// counts (drinks, caffeine) that opens where it is logged.
+    private enum HabitItem: Identifiable {
+        case tag(JournalTag)
+        case quantity(TrackJournalQuantity)
+
+        var id: String {
+            switch self {
+            case .tag(let tag): "tag.\(tag.id)"
+            case .quantity(let quantity): "quantity.\(quantity.rawValue)"
+            }
+        }
+    }
+
+    private var tagSections: some View {
+        let metrics = theme.metrics
+        let entry = journal.day(selected)
+        let grouped = Dictionary(grouping: journal.offeredTags) { TrackTagStyle.of($0.id).section }
+        let quantities = Dictionary(grouping: TrackJournalQuantity.allCases, by: \.section)
+        let sections = TrackTagStyle.Section.allCases.filter { grouped[$0] != nil || quantities[$0] != nil }
+
+        return VStack(alignment: .leading, spacing: metrics.leadSpacing * 0.6) {
+            ForEach(sections) { section in
+                let tags = grouped[section] ?? []
+                let items = (quantities[section] ?? []).map(HabitItem.quantity) + tags.map(HabitItem.tag)
+                let answered = tags.filter { entry.answer($0.id) != nil }.count
+                VStack(alignment: .leading, spacing: metrics.journalSectionHeadingSpacing) {
+                    HStack(alignment: .firstTextBaseline) {
+                        sectionHeading(section.title)
+                        Spacer(minLength: metrics.cardSpacing)
+                        if !tags.isEmpty {
+                            Text("\(answered) of \(tags.count)")
+                                .somaFont(theme.typography.caption)
+                                .monospacedDigit()
+                                .foregroundStyle(answered == tags.count ? section.hue.color : theme.colors.inkSecondary.color)
+                        }
+                    }
+                    .padding(.horizontal, metrics.scoreLabelSpacing)
+                    SomaHabitStack(items) { item in
+                        habitRow(item)
+                    }
+                }
+            }
+        }
+        .trackEntrySheet(item: $opened)
+    }
+
+    @ViewBuilder
+    private func habitRow(_ item: HabitItem) -> some View {
+        switch item {
+        case .tag(let tag):
+            let style = TrackTagStyle.of(tag.id)
+            SomaHabitRow(
+                symbol: style.symbol,
+                title: tag.title,
+                hue: style.hue,
+                answer: Binding(
+                    get: { journal.day(selected).answer(tag.id) },
+                    set: { journal.answer(tag.id, $0, on: selected) }
+                )
+            )
+        case .quantity(let quantity):
+            let amount = quantity.amount(on: selected, log: log)
+            SomaHabitRow(symbol: quantity.symbol, title: quantity.title, hue: quantity.hue,
+                         value: amount.value, unit: amount.unit) {
+                opened = quantity.route
+            }
+        }
+    }
+
+    /// A section's name over its cards, such as Daytime or Evening: small, in
+    /// the secondary ink.
+    private func sectionHeading(_ title: String) -> some View {
+        Text(title)
+            .somaFont(theme.typography.caption)
+            .foregroundStyle(theme.colors.inkSecondary.color)
+            .accessibilityAddTraits(.isHeader)
+    }
+
+    // MARK: Automatic
+
+    private struct AutoRow: Identifiable {
+        var id: String { title }
+        var title: String
+        var symbol: String
+        var hue: SomaHealthHue
+        var detail: String?
+        var mark: SomaHabitMark.State
+    }
+
+    /// What Health measured on the chosen day, each against its goal: met is
+    /// a check, short of it is a ring part filled, nothing is a dash.
+    private var autoRows: [AutoRow] {
+        typealias Goal = TrackDayTotals.Goal
+        func mark(_ value: Double?, goal: Double) -> SomaHabitMark.State {
+            guard let value else { return .missing }
+            return value >= goal ? .met : .progress(value / goal)
+        }
+        let slept = measured.nightAsleep[selected]
+        let variability = measured.dayVariability[selected]
+        let usual = measured.usualVariability
+
+        return [
+            AutoRow(title: "7 h of sleep", symbol: "bed.double.fill", hue: .sleep,
+                    detail: slept.map(TrackJournalFormat.hours), mark: mark(slept, goal: Goal.sleepHours)),
+            AutoRow(title: "8,000 steps", symbol: "figure.walk", hue: .activity,
+                    detail: totals.steps.map(TrackFormat.whole), mark: mark(totals.steps, goal: Goal.steps)),
+            AutoRow(title: "30 min outdoors", symbol: "sun.max.fill", hue: .mobility,
+                    detail: totals.daylightMinutes.map { "\(TrackFormat.whole($0)) min" },
+                    mark: mark(totals.daylightMinutes, goal: Goal.daylightMinutes)),
+            AutoRow(title: "30 min exercise", symbol: "figure.run", hue: .nutrition,
+                    detail: totals.exerciseMinutes.map { "\(TrackFormat.whole($0)) min" },
+                    mark: mark(totals.exerciseMinutes, goal: Goal.exerciseMinutes)),
+            AutoRow(title: "HRV at usual", symbol: "waveform.path.ecg", hue: .mind,
+                    detail: variability.map { "\(TrackFormat.whole($0)) ms" },
+                    mark: usual.map { mark(variability, goal: $0) } ?? .missing),
+        ]
+    }
+
+    private var automaticSection: some View {
+        let metrics = theme.metrics
+        return VStack(alignment: .leading, spacing: metrics.journalSectionHeadingSpacing) {
+            sectionHeading("Automatic")
+                .padding(.leading, metrics.scoreLabelSpacing)
+            SomaHabitStack(autoRows) { row in
+                SomaHabitRow(symbol: row.symbol, title: row.title, detail: row.detail,
+                             hue: row.hue, mark: row.mark)
+            }
+        }
+    }
+
+    // MARK: Copy
+
+    @ViewBuilder
+    private var copyButton: some View {
+        if let yesterday = calendar.date(byAdding: .day, value: -1, to: selected) {
+            let before = journal.day(yesterday)
+            let answered = journal.day(selected).tags.union(journal.day(selected).declined)
+            if !before.tags.union(before.declined).subtracting(answered).isEmpty {
+                SomaActionButton("Copy answers from the day before", role: .secondary) {
+                    journal.copyTags(from: yesterday, to: selected)
+                }
+            }
+        }
+    }
+
+    // MARK: Loading
+
+    private func load() async {
+        guard let source = await health.prepare([]) else {
+            self.source = nil
+            measured = TrackBody()
+            return
+        }
+        self.source = source
+        let inputs = await TrackInputs.read(from: source, now: .now, calendar: calendar)
+        measured = TrackBody.make(from: inputs, calendar: calendar)
+    }
+
+    private func readTotals() async {
+        let source: (any HealthSampleSource)?
+        if let known = self.source {
+            source = known
+        } else {
+            source = await health.prepare([])
+        }
+        guard let source else {
+            totals = TrackDayTotals()
+            return
+        }
+        totals = await TrackDayTotals.read(from: source, day: selected, now: .now, calendar: calendar)
+    }
+}
+
+/// What the Journal counts rather than asks, set among the tags with an
+/// amount and an arrow: the day's drinks and its caffeine, both read from
+/// what was poured on the drink sheet, which the row opens.
+enum TrackJournalQuantity: String, CaseIterable {
+    case caffeine, drinks
+
+    var title: String {
+        switch self {
+        case .caffeine: "Caffeine"
+        case .drinks: "Drinks"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .caffeine: "cup.and.saucer.fill"
+        case .drinks: "drop.fill"
+        }
+    }
+
+    var section: TrackTagStyle.Section { .daytime }
+
+    var hue: SomaHealthHue {
+        switch self {
+        case .caffeine: section.hue
+        case .drinks: .medications
+        }
+    }
+
+    var route: TrackRoute {
+        switch self {
+        case .caffeine: .drink(.coffee)
+        case .drinks: .drink(.water)
+        }
+    }
+
+    /// The day's amount and its unit. Nothing logged is a nil value, which
+    /// the row draws as a dash before the unit.
+    @MainActor
+    func amount(on day: Date, log: TrackLogStore) -> (value: String?, unit: String) {
+        switch self {
+        case .caffeine:
+            return (log.caffeineMg(on: day).map(TrackFormat.whole), "mg")
+        case .drinks:
+            return TrackJournalFormat.volume(log.waterMl(on: day))
+        }
+    }
+}
+
+/// Numbers the Journal's rows set.
+enum TrackJournalFormat {
+    /// Hours and minutes: "7 h 24".
+    static func hours(_ hours: Double) -> String {
+        let minutes = Int((hours * 60).rounded())
+        let rest = minutes % 60
+        return rest == 0 ? "\(minutes / 60) h" : "\(minutes / 60) h \(String(format: "%02d", rest))"
+    }
+
+    /// Millilitres under a litre, litres from there: "750" ml, "1.5" L. Nil
+    /// stays nil, in millilitres.
+    static func volume(_ ml: Double?) -> (value: String?, unit: String) {
+        guard let ml else { return (nil, "ml") }
+        if ml < 1000 { return (TrackFormat.whole(ml), "ml") }
+        return ((ml / 1000).formatted(.number.precision(.fractionLength(0...1))), "L")
+    }
+}
+
+// MARK: - Week strip
+
+/// Monday to Sunday of the chosen week. The chosen day sits in a raised tile
+/// with the accent dot; a grey dot marks a day that holds entries. A swipe
+/// moves a week, never past this one.
+private struct TrackWeekStrip: View {
+    @Binding var selected: Date
+    let today: Date
+    let calendar: Calendar
+    let hasEntries: (Date) -> Bool
+
+    @Environment(\.somaTheme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        let days = TrackWeek.days(containing: selected, calendar: calendar)
+
+        HStack(spacing: 0) {
+            ForEach(days, id: \.self) { day in
+                dayButton(day)
+            }
+        }
+        .contentShape(.rect)
+        .gesture(
+            DragGesture(minimumDistance: 24)
+                .onEnded { value in
+                    guard abs(value.translation.width) > abs(value.translation.height) else { return }
+                    move(weeks: value.translation.width > 0 ? -1 : 1)
+                }
+        )
+        .accessibilityElement(children: .contain)
+        .accessibilityAdjustableAction { direction in
+            switch direction {
+            case .increment: move(weeks: 1)
+            case .decrement: move(weeks: -1)
+            @unknown default: break
+            }
+        }
+    }
+
+    private func move(weeks: Int) {
+        let target = TrackWeek.shift(selected, weeks: weeks, today: today, calendar: calendar)
+        guard target != selected else { return }
+        if reduceMotion {
+            selected = target
+        } else {
+            withAnimation(theme.motion.selection) { selected = target }
+        }
+    }
+
+    private func dayButton(_ day: Date) -> some View {
+        let metrics = theme.metrics
+        let type = theme.typography
+        let colors = theme.colors
+        let isSelected = calendar.isDate(day, inSameDayAs: selected)
+        let isFuture = TrackWeek.isFuture(day, today: today, calendar: calendar)
+        // The accent rides the chosen day's letter and number; the tile is
+        // the tonal step.
+        let ink = isFuture ? colors.inkSecondary.color.opacity(0.5) : (isSelected ? colors.accent.color : colors.inkSecondary.color)
+        let number = isFuture ? colors.inkSecondary.color.opacity(0.5) : (isSelected ? colors.accent.color : colors.inkPrimary.color)
+
+        return Button {
+            selected = day
+        } label: {
+            VStack(spacing: metrics.scoreLabelSpacing * 2) {
+                Text(TrackWeek.letter(day, calendar: calendar))
+                    .somaFont(type.tabLabel)
+                    .foregroundStyle(ink)
+                Text(day.formatted(.dateTime.day()))
+                    .somaFont(type.body)
+                    .monospacedDigit()
+                    .foregroundStyle(number)
+                Circle()
+                    .fill(isSelected ? colors.accent.color : colors.inkSecondary.color)
+                    .frame(width: metrics.aspectDotSize, height: metrics.aspectDotSize)
+                    .opacity(isSelected || (!isFuture && hasEntries(day)) ? 1 : 0)
+            }
+            .padding(.vertical, metrics.cardSpacing * 0.75)
+            .frame(maxWidth: .infinity)
+            .background {
+                if isSelected {
+                    RoundedRectangle(cornerRadius: metrics.browseGroupCornerRadius, style: .continuous)
+                        .fill(colors.surface.color)
+                }
+            }
+            .contentShape(.rect)
+        }
+        .buttonStyle(.somaGlassPressDim)
+        .disabled(isFuture)
+        .accessibilityLabel(Text(day.formatted(.dateTime.weekday(.wide).day().month(.wide))))
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+}
+
+
+// MARK: - How you felt
+
+/// The day's feeling on one row of seven coloured stops. The chosen stop's
+/// name sits beside the label, in its own colour.
+private struct TrackFeelingRow: View {
+    let feeling: Int?
+    let set: (Int?) -> Void
+
+    @Environment(\.somaTheme) private var theme
+
+    var body: some View {
+        let metrics = theme.metrics
+        let colors = theme.colors
+
+        SomaCard {
+            VStack(alignment: .leading, spacing: metrics.scoreLabelSpacing * 2) {
+                HStack(alignment: .firstTextBaseline) {
+                    TrackEyebrow("How you felt")
+                    Spacer(minLength: metrics.cardSpacing)
+                    Text(feeling.map { TrackJournal.feelingLabels[$0] } ?? "-")
+                        .somaFont(theme.typography.caption)
+                        .foregroundStyle(feeling.map { SomaFeelingScale.color($0, theme: theme) } ?? colors.inkSecondary.color)
+                }
+                SomaFeelingScale(
+                    value: Binding(get: { feeling }, set: { set($0) }),
+                    names: TrackJournal.feelingLabels
+                )
+            }
+        }
+    }
+}
+
+// MARK: - Feel and measure
+
+/// The last three weeks as a strip, one column a day: a bar up or down from
+/// the line by how far the day's variability sat from the usual, coloured by
+/// how the day felt. A filled bar is a day the two agreed; an outlined one, a
+/// day they parted.
+private struct TrackFeelMeasureCard: View {
+    let points: [TrackFeelPoint]
+    let highlighted: Date
+    let today: Date
+    let calendar: Calendar
+
+    @Environment(\.somaTheme) private var theme
+
+    var body: some View {
+        let metrics = theme.metrics
+        let type = theme.typography
+        let colors = theme.colors
+        let enough = points.count >= TrackJournal.feelMinimum
+        let agreed = points.filter(\.agrees).count
+
+        SomaCard {
+            VStack(alignment: .leading, spacing: metrics.cardSpacing) {
+                HStack(alignment: .firstTextBaseline, spacing: metrics.scoreLabelSpacing * 3) {
+                    TrackEyebrow("Feel and measure")
+                    Spacer(minLength: metrics.cardSpacing)
+                    Text(enough ? "\(agreed)/\(points.count)" : "-")
+                        .somaFont(type.metricCompact)
+                        .monospacedDigit()
+                        .foregroundStyle(enough ? colors.statusNormal.color : colors.inkSecondary.color)
+                    Text(enough ? "agree" : "\(points.count) of \(TrackJournal.feelMinimum) days")
+                        .somaFont(type.caption)
+                        .foregroundStyle(colors.inkSecondary.color)
+                }
+                strip
+            }
+        }
+    }
+
+    private var strip: some View {
+        let metrics = theme.metrics
+        let colors = theme.colors
+        let byDay = Dictionary(points.map { ($0.day, $0) }, uniquingKeysWith: { first, _ in first })
+        let days = (0..<TrackJournal.feelDays).reversed().compactMap {
+            calendar.date(byAdding: .day, value: -$0, to: today)
+        }
+        let largest = points.map { abs($0.deviation) }.max() ?? 0
+        let range = max(10, (largest / 5).rounded(.up) * 5)
+        let height = metrics.journalTileHeight
+
+        return VStack(spacing: metrics.scoreLabelSpacing * 2) {
+            GeometryReader { proxy in
+                let slot = proxy.size.width / CGFloat(days.count)
+                let bar = max(2, slot * 0.55)
+                let mid = proxy.size.height / 2
+
+                ZStack(alignment: .topLeading) {
+                    Rectangle()
+                        .fill(colors.inkPrimary.color.opacity(metrics.browseSeparatorOpacity))
+                        .frame(width: proxy.size.width, height: 0.5)
+                        .offset(y: mid)
+
+                    ForEach(Array(days.enumerated()), id: \.element) { index, day in
+                        let x = slot * (CGFloat(index) + 0.5)
+                        let isHighlighted = calendar.isDate(day, inSameDayAs: highlighted)
+                        if let point = byDay[day] {
+                            let hue = SomaFeelingScale.color(point.feeling, theme: theme)
+                            let length = max(bar, CGFloat(abs(point.deviation) / range) * (mid - bar / 2))
+                            let shape = RoundedRectangle(cornerRadius: bar / 2, style: .continuous)
+                            Group {
+                                if point.agrees {
+                                    shape.fill(hue)
+                                } else {
+                                    shape.strokeBorder(hue, lineWidth: 1.5)
+                                }
+                            }
+                            .frame(width: bar, height: length)
+                            .position(x: x, y: point.deviation >= 0 ? mid - length / 2 : mid + length / 2)
+                        } else {
+                            Circle()
+                                .fill(colors.surfaceRecessed.color)
+                                .frame(width: metrics.aspectDotSize, height: metrics.aspectDotSize)
+                                .position(x: x, y: mid)
+                        }
+                        if isHighlighted {
+                            Circle()
+                                .fill(colors.accent.color)
+                                .frame(width: metrics.aspectDotSize, height: metrics.aspectDotSize)
+                                .position(x: x, y: proxy.size.height - metrics.aspectDotSize / 2)
+                        }
+                    }
+                }
+            }
+            .frame(height: height)
+
+            HStack {
+                Image(systemName: "arrow.up")
+                Text("HRV")
+                Spacer()
+                Text("\(TrackJournal.feelDays) days")
+            }
+            .somaFont(theme.typography.tabLabel)
+            .foregroundStyle(colors.inkSecondary.color)
+            .accessibilityHidden(true)
+        }
+        .accessibilityElement()
+        .accessibilityLabel(Text("\(points.filter(\.agrees).count) of \(points.count) days, feeling and body agreed."))
+    }
+}
+
+// MARK: - What your tags do
+
+/// Each tag's move on the reading it lands on, as a signed number over a
+/// small centred bar: green for the better, red for a cost.
+private struct TrackEffectsCard: View {
+    let effects: [TrackTagEffect]
+
+    @Environment(\.somaTheme) private var theme
+
+    var body: some View {
+        let metrics = theme.metrics
+        let type = theme.typography
+        let colors = theme.colors
+
+        SomaCard {
+            VStack(alignment: .leading, spacing: metrics.cardSpacing) {
+                HStack(alignment: .firstTextBaseline) {
+                    TrackEyebrow("What your tags do")
+                    Spacer(minLength: metrics.cardSpacing)
+                    Text("\(TrackJournal.effectDays) d")
+                        .somaFont(type.caption)
+                        .foregroundStyle(colors.inkSecondary.color)
+                }
+
+                if effects.isEmpty {
+                    Text("-")
+                        .somaFont(type.metricCompact)
+                        .foregroundStyle(colors.inkSecondary.color)
+                } else {
+                    ForEach(Array(effects.enumerated()), id: \.element.id) { index, effect in
+                        if index > 0 { TrackHairline() }
+                        row(effect)
+                    }
+                }
+            }
+        }
+    }
+
+    private func row(_ effect: TrackTagEffect) -> some View {
+        let metrics = theme.metrics
+        let type = theme.typography
+        let colors = theme.colors
+        let style = TrackTagStyle.of(effect.id)
+        // No move, or one that rounds to nothing, stays in the ink.
+        let tone = effect.fraction == nil || effect.valueText.hasPrefix("0")
+            ? colors.inkSecondary.color
+            : (effect.isCost ? colors.statusAlert.color : colors.statusNormal.color)
+
+        return HStack(alignment: .center, spacing: metrics.cardSpacing) {
+            SomaGlyphDisc(symbol: style.symbol, hue: style.hue)
+            VStack(alignment: .leading, spacing: metrics.scoreLabelSpacing) {
+                Text(effect.title)
+                    .somaFont(type.body)
+                    .foregroundStyle(colors.inkPrimary.color)
+                    .lineLimit(1)
+                Text(effect.reading.name)
+                    .somaFont(type.tabLabel)
+                    .foregroundStyle(colors.inkSecondary.color)
+                    .lineLimit(1)
+            }
+            .layoutPriority(1)
+            Spacer(minLength: metrics.scoreLabelSpacing)
+            VStack(alignment: .trailing, spacing: metrics.scoreLabelSpacing * 2) {
+                Text(effect.valueText)
+                    .somaFont(type.rowValue)
+                    .foregroundStyle(tone)
+                    .lineLimit(1)
+                    .fixedSize()
+                SomaEffectBar(fraction: effect.fraction, isCost: effect.isCost)
+                    .frame(width: metrics.aspectChartWidth * 0.6)
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(Text("\(effect.title), \(effect.reading.name), \(effect.valueText). \(effect.detailText)"))
+    }
+}
+
+#if DEBUG
+#Preview("Journal") {
+    NavigationStack {
+        TrackJournalView()
+    }
+    .environment(HealthDashboard())
+    .environment(JournalStore(url: nil))
+}
+#endif

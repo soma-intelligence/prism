@@ -1,0 +1,10 @@
+.DS_Store
+.build/
+.build-ios/
+build/
+.swiftpm/
+*.xcodeproj
+DerivedData/
+
+# Task board (local tracking only; never commit)
+TASK.md

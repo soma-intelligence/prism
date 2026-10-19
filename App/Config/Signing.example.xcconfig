@@ -1,0 +1,9 @@
+// Copy to Signing.xcconfig (git ignored) and fill in.
+//
+// Your own Apple developer team and a bundle id that team can register. The
+// widget extension takes the same id with ".SomaWidgets" added. The app group in
+// the entitlements files (group.Soma.Prism) belongs to Soma: change it to a group
+// you own before you run on a Mac or a device.
+PRISM_BUNDLE_ID = com.example.Prism
+// The ten character team id, from developer.apple.com, Membership details.
+PRISM_DEVELOPMENT_TEAM = ABCDE12345

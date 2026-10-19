@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:media="http://search.yahoo.com/mrss/">
+	<channel>
+		<title>Health &amp; Medicine News -- ScienceDaily</title>
+		<link>https://www.sciencedaily.com/news/health_medicine/</link>
+		<description>Fixture modeled on the ScienceDaily feed shape (synthetic text).</description>
+		<item>
+			<title>Evening light linked to later sleep in a small study</title>
+			<link>https://www.sciencedaily.com/releases/2026/10/261002000001.htm?utm_source=rss&amp;utm_medium=feed</link>
+			<description>Researchers followed 120 adults for two weeks and found that brighter evening light was linked with falling asleep later. The team says the result needs confirming in larger groups.</description>
+			<pubDate>Fri, 02 Oct 2026 09:46:53 EDT</pubDate>
+			<guid isPermaLink="true">https://www.sciencedaily.com/releases/2026/10/261002000001.htm</guid>
+		</item>
+		<item>
+			<title>Walking breaks &amp; blood sugar: what a lab trial saw</title>
+			<link>http://www.sciencedaily.com/releases/2026/10/261001000002.htm#top</link>
+			<description>Short walking breaks every half hour lowered after-meal blood sugar in 30 volunteers compared with sitting.</description>
+			<pubDate>Thu, 01 Oct 2026 08:00:00 EDT</pubDate>
+			<guid isPermaLink="true">https://www.sciencedaily.com/releases/2026/10/261001000002.htm</guid>
+		</item>
+		<item>
+			<title>A video roundup that is not a release</title>
+			<link>https://www.sciencedaily.com/videos/2026/10/roundup.htm</link>
+			<description>Not a release.</description>
+			<pubDate>Thu, 01 Oct 2026 07:00:00 EDT</pubDate>
+		</item>
+		<item>
+			<title>An old story</title>
+			<link>https://www.sciencedaily.com/releases/2026/06/260601000003.htm</link>
+			<description>From June.</description>
+			<pubDate>Mon, 01 Jun 2026 07:00:00 EDT</pubDate>
+		</item>
+		<item>
+			<title></title>
+			<link>https://www.sciencedaily.com/releases/2026/10/no-title.htm</link>
+			<pubDate>Thu, 01 Oct 2026 07:00:00 EDT</pubDate>
+		</item>
+	</channel>
+</rss>

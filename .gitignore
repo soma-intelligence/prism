@@ -1,0 +1,30 @@
+# macOS
+.DS_Store
+
+# Xcode
+build/
+DerivedData/
+*.xcuserstate
+*.xcuserdatad
+xcuserdata/
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# Playgrounds
+timeline.xctimeline
+playground.xcworkspace
+
+# Your own signing identity and Supabase project, per developer
+App/Config/Signing.xcconfig
+App/Config/Supabase.xcconfig
+
+# Supabase CLI local state
+supabase/.temp/
+supabase/.branches/

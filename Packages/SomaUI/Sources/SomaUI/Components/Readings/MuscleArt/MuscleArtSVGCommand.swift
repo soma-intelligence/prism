@@ -1,0 +1,26 @@
+//
+//  MuscleArtSVGCommand.swift
+//  SomaUI (from MuscleMap)
+//
+//  Copyright © 2026 Melih Colpan. All rights reserved.
+//  Licensed under the MIT License.
+//
+//  Vendored into SomaUI from MuscleMap (https://github.com/melihcolpan/MuscleMap)
+//  under its MIT License, see LICENSE-MuscleMap.txt beside this file.
+//  Soma changes: types renamed with a MuscleArt prefix and kept internal; otherwise unchanged.
+//
+
+import Foundation
+
+enum MuscleArtSVGCommand {
+    case moveTo(x: CGFloat, y: CGFloat, relative: Bool)
+    case lineTo(x: CGFloat, y: CGFloat, relative: Bool)
+    case horizontalLineTo(x: CGFloat, relative: Bool)
+    case verticalLineTo(y: CGFloat, relative: Bool)
+    case curveTo(x1: CGFloat, y1: CGFloat, x2: CGFloat, y2: CGFloat, x: CGFloat, y: CGFloat, relative: Bool)
+    case smoothCurveTo(x2: CGFloat, y2: CGFloat, x: CGFloat, y: CGFloat, relative: Bool)
+    case quadraticCurveTo(x1: CGFloat, y1: CGFloat, x: CGFloat, y: CGFloat, relative: Bool)
+    case smoothQuadraticCurveTo(x: CGFloat, y: CGFloat, relative: Bool)
+    case arcTo(rx: CGFloat, ry: CGFloat, angle: CGFloat, largeArc: Bool, sweep: Bool, x: CGFloat, y: CGFloat, relative: Bool)
+    case closePath
+}

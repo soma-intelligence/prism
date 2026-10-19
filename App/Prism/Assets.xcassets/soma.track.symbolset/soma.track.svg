@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="3300" height="2200">
+ <!--glyph: "soma.track", point size: 100.0, template writer version: "hand"-->
+ <g id="Notes">
+  <rect height="2200" id="artboard" style="fill:white;opacity:1" width="3300" x="0" y="0"/>
+  <line style="fill:none;stroke:black;opacity:1;stroke-width:0.5;" x1="263" x2="3036" y1="292" y2="292"/>
+  <text style="stroke:none;fill:black;font-family:sans-serif;font-size:13;font-weight:bold;" transform="matrix(1 0 0 1 263 322)">Weight/Scale Variations</text>
+  <text id="template-version" style="stroke:none;fill:black;font-family:sans-serif;font-size:13;text-anchor:end;" transform="matrix(1 0 0 1 3036 1933)">Template v.3.0</text>
+  <text style="stroke:none;fill:black;font-family:sans-serif;font-size:13;" transform="matrix(1 0 0 1 263 1953)">Track: a tally of five drawn by hand. From Figma 19 Proposals, Kit swatch soma.track.</text>
+ </g>
+ <g id="Guides">
+  <line id="Baseline-S" style="fill:none;stroke:#27AAE1;opacity:1;stroke-width:0.5;" x1="263" x2="3036" y1="696" y2="696"/>
+  <line id="Capline-S" style="fill:none;stroke:#27AAE1;opacity:1;stroke-width:0.5;" x1="263" x2="3036" y1="625.541" y2="625.541"/>
+  <line id="Baseline-M" style="fill:none;stroke:#27AAE1;opacity:1;stroke-width:0.5;" x1="263" x2="3036" y1="1126" y2="1126"/>
+  <line id="Capline-M" style="fill:none;stroke:#27AAE1;opacity:1;stroke-width:0.5;" x1="263" x2="3036" y1="1055.54" y2="1055.54"/>
+  <line id="Baseline-L" style="fill:none;stroke:#27AAE1;opacity:1;stroke-width:0.5;" x1="263" x2="3036" y1="1556" y2="1556"/>
+  <line id="Capline-L" style="fill:none;stroke:#27AAE1;opacity:1;stroke-width:0.5;" x1="263" x2="3036" y1="1485.54" y2="1485.54"/>
+  <line id="left-margin-Regular-M" style="fill:none;stroke:#00AEEF;stroke-width:0.5;opacity:1.0;" x1="1400.00" x2="1400.00" y1="1030.79" y2="1150.12"/>
+  <line id="right-margin-Regular-M" style="fill:none;stroke:#00AEEF;stroke-width:0.5;opacity:1.0;" x1="1490.85" x2="1490.85" y1="1030.79" y2="1150.12"/>
+ </g>
+ <g id="Symbols">
+  <g id="Regular-M" transform="matrix(1 0 0 1 1400.00 1126)">
+   <path d="M 21.985 -65.480 C 24.000 -65.393 25.567 -63.690 25.481 -61.676 L 24.087 -29.087 L 32.200 -32.867 L 33.470 -61.989 C 33.557 -64.005 35.264 -65.568 37.279 -65.480 C 39.292 -65.391 40.856 -63.689 40.769 -61.676 L 39.661 -36.343 L 47.774 -40.124 L 48.711 -61.989 C 48.798 -64.004 50.501 -65.565 52.515 -65.480 C 54.530 -65.394 56.096 -63.691 56.010 -61.676 L 55.235 -43.595 L 63.363 -47.381 L 64.000 -61.989 C 64.087 -64.004 65.794 -65.567 67.808 -65.480 C 69.823 -65.392 71.386 -63.690 71.299 -61.676 L 70.824 -50.857 L 77.652 -54.034 C 79.481 -54.884 81.652 -54.093 82.503 -52.265 C 83.354 -50.437 82.562 -48.265 80.734 -47.414 L 70.467 -42.635 L 68.960 -8.010 C 68.871 -5.997 67.169 -4.433 65.155 -4.520 C 63.141 -4.609 61.578 -6.315 61.665 -8.329 L 63.006 -39.159 L 54.883 -35.378 L 53.718 -8.015 C 53.632 -6.001 51.929 -4.434 49.914 -4.520 C 47.901 -4.607 46.339 -6.311 46.423 -8.325 L 47.427 -31.907 L 39.305 -28.121 L 38.430 -8.010 C 38.341 -5.997 36.638 -4.434 34.625 -4.520 C 32.611 -4.608 31.048 -6.314 31.135 -8.329 L 31.843 -24.645 L 23.735 -20.869 L 23.188 -8.015 C 23.102 -6.001 21.398 -4.435 19.384 -4.520 C 17.370 -4.607 15.809 -6.310 15.894 -8.325 L 16.279 -17.398 L 13.193 -15.957 C 11.364 -15.106 9.194 -15.898 8.342 -17.726 C 7.491 -19.554 8.283 -21.725 10.111 -22.576 L 16.626 -25.615 L 18.181 -61.989 C 18.268 -64.004 19.971 -65.566 21.985 -65.480 Z"/>
+  </g>
+ </g>
+</svg>

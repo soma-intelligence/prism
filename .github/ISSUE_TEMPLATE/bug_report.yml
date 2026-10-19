@@ -1,0 +1,68 @@
+name: Bug report
+description: Something in Prism doesn't work as it should.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Please don't paste health data: no Apple Health exports, readings, lab results or screenshots that show your own numbers. Simulated data is fine. Security problems go to security@somalabs.me, as SECURITY.md describes, never here.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you saw, and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open Longevity, Body
+        2. Tap ...
+        3. See ...
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Device
+      placeholder: iPhone 18 Pro, iPad Air, MacBook Pro, Vision Pro, or a simulator
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: OS version
+      placeholder: iOS 27.0
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: App version
+      description: The version line at the foot of Settings. For a build from source, the `soma_ios` commit in EXPORT.json, or your own commit if you changed the code.
+    validations:
+      required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Account
+      options:
+        - No account (local mode)
+        - Signed in to Soma cloud
+        - Signed in to a self hosted project
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Anything that helps, with personal and health details removed.
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy
+      options:
+        - label: This report holds no real health data and no personal details.
+          required: true

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"
+	xmlns:content="http://purl.org/rss/1.0/modules/content/"
+	xmlns:dc="http://purl.org/dc/elements/1.1/">
+<channel>
+	<title>ACSM</title>
+	<link>https://acsm.org</link>
+	<description>Fixture modeled on a WordPress feed (synthetic text).</description>
+	<item>
+		<title>Science Spotlight &#124; Late September 2026</title>
+		<link>https://acsm.org/science-spotlight-late-september-2026/</link>
+		<dc:creator><![CDATA[Staff]]></dc:creator>
+		<pubDate>Tue, 22 Sep 2026 15:51:45 +0000</pubDate>
+		<category><![CDATA[Member Exclusive]]></category>
+		<category><![CDATA[physical activity]]></category>
+		<guid isPermaLink="false">https://acsm.org/?p=1</guid>
+		<description><![CDATA[<p>Members only roundup &#8230;</p>]]></description>
+		<content:encoded><![CDATA[<p>FULL ARTICLE TEXT THAT MUST NEVER BE USED</p>]]></content:encoded>
+	</item>
+	<item>
+		<title>Strength Training Basics for Older Adults</title>
+		<link>https://acsm.org/strength-training-basics-older-adults/</link>
+		<dc:creator><![CDATA[Staff]]></dc:creator>
+		<pubDate>Mon, 21 Sep 2026 12:00:00 +0000</pubDate>
+		<category><![CDATA[Hot Topic]]></category>
+		<category><![CDATA[aging]]></category>
+		<guid isPermaLink="false">https://acsm.org/?p=2</guid>
+		<description><![CDATA[<p>An overview of how <strong>resistance training</strong> fits into activity guidelines for adults over 65.</p>
+<p>The post <a href="https://acsm.org/x/">Strength Training</a> appeared first on <a href="https://acsm.org">ACSM</a>.</p>]]></description>
+		<content:encoded><![CDATA[<p>FULL ARTICLE TEXT THAT MUST NEVER BE USED</p>]]></content:encoded>
+	</item>
+</channel>
+</rss>

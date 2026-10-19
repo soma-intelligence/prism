@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:media="http://search.yahoo.com/mrss/">
+<channel>
+<title>CDC Online Newsroom</title>
+<link>https://www.cdc.gov/media/index.html</link>
+<description>Fixture modeled on the CDC newsroom feed shape (synthetic text).</description>
+<pubDate>Sat, 21 Nov 2015 04:09:00 GMT</pubDate>
+<item>
+<title>New Data on Physical Activity Among Adults</title>
+<description>Learn what the latest survey says about how many adults meet activity guidelines.</description>
+<link>https://tools.cdc.gov/api/embed/downloader/download.asp?m=132608&amp;c=900001</link>
+<guid isPermaLink="true">https://tools.cdc.gov/api/embed/downloader/download.asp?m=132608&amp;c=900001&amp;_=ABC</guid>
+<pubDate>Tue, 22 Sep 2026 08:00:00 GMT</pubDate>
+<category>CDC Newsroom</category>
+<media:content url="https://www.cdc.gov/media/media/images/2024/09/cdc-logo.jpg" type="image/jpeg" height="408" width="680" />
+</item>
+<item>
+<title>Sleep Duration Survey Results</title>
+<description>Sleep Duration Survey Results</description>
+<link>https://tools.cdc.gov/api/embed/downloader/download.asp?m=132608&amp;c=900002</link>
+<pubDate>Mon, 21 Sep 2026 16:00:00 GMT</pubDate>
+<category>CDC Newsroom</category>
+<category>What&#39;s New</category>
+<enclosure url="https://www.cdc.gov/media/images/sleep-survey.png" type="image/png" length="1000" />
+</item>
+</channel>
+</rss>

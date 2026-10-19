@@ -1,0 +1,16 @@
+# One entry per line: <path relative to the repository root>:<trimmed source line>
+# Each entry needs a justification comment on the line above it.
+# Health throws for a date of birth never entered and for one not shared, and the
+# two cannot be told apart: both read as nothing, which the screen shows as a dash.
+Sources/HealthExportHealthKit/HealthKitSampleSource.swift:guard let components = try? store.dateOfBirthComponents() else { return nil }
+# An anchor that no longer decodes reads the type from its start: a resend, which
+# the ingest deduplicates, rather than a type that never uploads again.
+# No anchor file is a first run; a corrupt one costs a resend, deduplicated by the ingest.
+# A volume without data protection (a Mac running the tests) refuses the class; the
+# files are still written, and on a phone each write also asks for it.
+# An outbox directory that cannot be listed holds nothing this run can send.
+# A confirmed part that fails to delete is sent again next run and deduplicated.
+# Setting a refused part aside is best effort: if the move fails the part stays
+# queued and is refused again, which is logged each time.
+# A size that cannot be read counts as zero in a status figure, never in a decision
+# that loses data: the cap only pauses reading.

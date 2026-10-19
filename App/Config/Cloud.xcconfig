@@ -1,0 +1,10 @@
+// Points Prism at Soma cloud. Committed, written by the export.
+//
+// Both values are public by design: row level security is what protects the
+// data. To use your own Supabase project, replace them here or set them in
+// Supabase.xcconfig (git ignored), which is read after this file. With an empty
+// key the app runs with no account, everything on the phone.
+// "//" starts a comment in an xcconfig, so the address is written with an
+// empty $() between the slashes; Xcode joins it back to https://...
+SOMA_SUPABASE_URL = https:/$()/qnysyehawitnlcnccyop.supabase.co
+SOMA_SUPABASE_PUBLISHABLE_KEY =
