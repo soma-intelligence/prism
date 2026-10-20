@@ -242,6 +242,7 @@ private struct EnvironmentLevelRow: View {
                 Text(verbatim: value.map { "\(measure.format($0)) dB" } ?? "-")
                     .somaFont(type.rowValue)
                     .foregroundStyle(value == nil ? colors.inkSecondary.color : colors.inkPrimary.color)
+                    .somaRollingNumber(value.map(measure.format))
             }
             SomaScaleBar(scale: measure.scale, value: value, style: .level, limit: measure.limit)
         }
@@ -399,6 +400,7 @@ private struct EnvironmentBedroomFact: View {
             Text(verbatim: value ?? "-")
                 .somaFont(theme.typography.rowValue)
                 .foregroundStyle(value == nil ? colors.inkSecondary.color : colors.inkPrimary.color)
+                .somaRollingNumber(value)
             Text(label)
                 .somaFont(theme.typography.caption)
                 .foregroundStyle(colors.inkSecondary.color)
@@ -496,6 +498,7 @@ struct EnvironmentValue: View {
             Text(verbatim: text ?? "-")
                 .somaFont(theme.typography.metric)
                 .foregroundStyle(text == nil ? colors.inkSecondary.color : (tint ?? colors.inkPrimary.color))
+                .somaRollingNumber(text)
             if text != nil, !unit.isEmpty {
                 Text(verbatim: unit)
                     .somaFont(theme.typography.caption)
@@ -524,6 +527,7 @@ private struct EnvironmentFigure: View {
                 Text(verbatim: value ?? "-")
                     .somaFont(theme.typography.rowValue)
                     .foregroundStyle(value == nil ? colors.inkSecondary.color : colors.inkPrimary.color)
+                    .somaRollingNumber(value)
                 if let unit, value != nil {
                     Text(verbatim: unit)
                         .somaFont(theme.typography.caption)

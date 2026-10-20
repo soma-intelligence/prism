@@ -7,7 +7,7 @@ import SwiftUI
 
 /// One muscle group read off the last month of sessions: how rested it is,
 /// when it last worked, and when it should read rested again.
-public struct SomaMuscleReading: Sendable, Equatable, Identifiable {
+public struct SomaMuscleReading: Sendable, Equatable, Identifiable, Codable {
     public let group: SomaMuscleGroup
     public let state: SomaMuscleState
     /// The end of the last session that worked it; nil when none did.

@@ -39,6 +39,8 @@ enum AccountDeletion {
             throw Failure.server(String(describing: SupabaseServices.remoteError(error)))
         }
         await account.signOut()
+        // The numbers Longevity kept to open on go with the account.
+        LongevitySnapshotStore.shared.clear()
         do {
             try WellnessSession.eraseLocalData(userID: UserID(user.id))
         } catch {

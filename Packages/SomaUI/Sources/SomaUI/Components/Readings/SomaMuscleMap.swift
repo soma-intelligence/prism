@@ -12,7 +12,7 @@ public enum SomaMuscle: String, CaseIterable, Sendable, Hashable {
 }
 
 /// How rested a muscle is.
-public enum SomaMuscleState: Sendable, Hashable {
+public enum SomaMuscleState: Sendable, Hashable, Codable {
     case recovered, fatigued, depleted
     /// Nothing recorded: drawn in the body's own grey.
     case none
@@ -45,7 +45,7 @@ public enum SomaMuscleState: Sendable, Hashable {
 
 /// The six groups a session is read into, each a set of the muscles the map
 /// draws.
-public enum SomaMuscleGroup: String, CaseIterable, Sendable, Hashable, Identifiable {
+public enum SomaMuscleGroup: String, CaseIterable, Sendable, Hashable, Identifiable, Codable {
     case chest, shoulders, arms, core, back, legs
 
     public var id: String { rawValue }

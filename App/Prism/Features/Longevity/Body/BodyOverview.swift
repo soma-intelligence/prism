@@ -76,7 +76,7 @@ struct BodyOverviewInputs: Sendable, Equatable {
 }
 
 /// The Overview's words and numbers.
-struct BodyOverview: Equatable {
+struct BodyOverview: Equatable, Codable {
     var eyebrow: String?
     var headline: String
     var reason: String

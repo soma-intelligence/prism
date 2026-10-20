@@ -121,6 +121,7 @@ private struct EnvironmentConditionTile: View {
                 Text(verbatim: value ?? "-")
                     .somaFont(theme.typography.rowValue)
                     .foregroundStyle(value == nil ? colors.inkSecondary.color : colors.inkPrimary.color)
+                    .somaRollingNumber(value)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
                 Text(verbatim: label)
@@ -339,6 +340,7 @@ private struct EnvironmentSleepPlaceRow: View {
                 .foregroundStyle(colors.inkSecondary.color)
             Text(verbatim: place.score.map { "\(Int($0.rounded()))" } ?? "-")
                 .somaFont(theme.typography.rowValue)
+                .somaRollingNumber(place.score.map { "\(Int($0.rounded()))" })
                 .foregroundStyle(place.score == nil ? colors.inkSecondary.color : tint)
                 .frame(minWidth: 28, alignment: .trailing)
         }

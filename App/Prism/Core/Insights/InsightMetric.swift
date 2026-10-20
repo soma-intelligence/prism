@@ -10,7 +10,7 @@
 import Foundation
 
 /// Which way a metric is better.
-enum InsightPreference: Sendable, Equatable {
+enum InsightPreference: Sendable, Equatable, Codable {
     /// More is better: HRV, VO2 max, steps.
     case higher
     /// Less is better: resting heart rate, body fat.

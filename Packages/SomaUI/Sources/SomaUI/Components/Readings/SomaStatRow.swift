@@ -106,6 +106,7 @@ struct SomaStatView: View {
                     Text(value ?? "-")
                         .somaFont(type.metric)
                         .foregroundStyle(colors.inkPrimary.color)
+                        .somaRollingNumber(value)
                     if let unit, value != nil {
                         Text(unit)
                             .somaFont(type.caption)

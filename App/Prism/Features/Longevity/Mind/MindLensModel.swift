@@ -55,7 +55,7 @@ enum MindZone: Int, CaseIterable, Identifiable, Sendable {
 }
 
 /// One half hour on today's stress line.
-struct MindStressSample: Equatable, Sendable, Identifiable {
+struct MindStressSample: Equatable, Sendable, Identifiable, Codable {
     var start: Date
     /// 0 to 100.
     var value: Double
@@ -65,7 +65,7 @@ struct MindStressSample: Equatable, Sendable, Identifiable {
 }
 
 /// One day on the mood strip: how it felt, and the words named for it.
-struct MindMoodDay: Equatable, Sendable, Identifiable {
+struct MindMoodDay: Equatable, Sendable, Identifiable, Codable {
     var day: Date
     /// Apple's scale, -1 to 1. Nil when nothing was logged.
     var valence: Double?
@@ -108,7 +108,7 @@ nonisolated enum MindQuickMood {
 
 /// Everything the Mind lens draws, read once: plain values, so the lens
 /// renders from a fixture as well as from Health.
-struct MindLensModel: Equatable, Sendable {
+struct MindLensModel: Equatable, Sendable, Codable {
     var now: Date
     var dayStart: Date
 

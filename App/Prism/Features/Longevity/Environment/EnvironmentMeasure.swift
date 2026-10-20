@@ -224,7 +224,7 @@ struct EnvironmentBedroom: Equatable {
 }
 
 /// One place slept in over the last thirty days, for the Sleep places map.
-struct EnvironmentSleepPlace: Identifiable, Equatable {
+struct EnvironmentSleepPlace: Identifiable, Equatable, Codable {
     var id: String
     var name: String
     var latitude: Double

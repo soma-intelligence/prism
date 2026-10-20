@@ -10,7 +10,7 @@ import SomaUI
 /// One reading the Body lens lists:
 /// its latest value, the last thirty days as a line, where it sits, and what
 /// that means (``Insight``).
-struct BodyBiomarker: Identifiable, Equatable, Sendable {
+struct BodyBiomarker: Identifiable, Equatable, Sendable, Codable {
     /// How the status under the name is worked out.
     enum Judgement: Sendable {
         /// Against a band: the healthy zone where the metric has one, else the
@@ -22,7 +22,7 @@ struct BodyBiomarker: Identifiable, Equatable, Sendable {
         case direction
     }
 
-    enum Status: Equatable, Sendable {
+    enum Status: Equatable, Sendable, Codable {
         case normal, above, below
         case increasing, decreasing, stabilizing
         case none
@@ -45,7 +45,7 @@ struct BodyBiomarker: Identifiable, Equatable, Sendable {
 }
 
 /// The readings the Body lens shows and how each is formatted.
-enum BodyBiomarkerSpec: String, CaseIterable, Sendable {
+enum BodyBiomarkerSpec: String, CaseIterable, Sendable, Codable, CodingKeyRepresentable {
     // Heart and fitness tiles.
     case vo2Max, restingHeartRate, heartRateVariabilitySDNN, heartRateRecoveryOneMinute, walkingHeartRateAverage
     // Movement tiles.

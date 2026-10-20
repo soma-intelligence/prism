@@ -26,7 +26,15 @@ struct LongevityMindView: View {
     @State private var inputs: MindInputs?
     @State private var stress: [MindStressDay]?
     @State private var today: ScoreDetailInputs?
-    @State private var moods: [MindMoodEntry] = []
+    /// What's on this phone, so today's logged mood shows from the first
+    /// frame; Apple Health's State of Mind joins it once read.
+    @State private var moods: [MindMoodEntry] = MindStore.shared.moods
+    /// What the lens drew the last time, kept on the device, so it opens on
+    /// its numbers rather than on dashes (``LongevitySnapshotStore``).
+    @State private var kept = LongevitySnapshotStore.shared.mind
+    /// True once every read of this opening has landed: the lens then
+    /// draws them, the numbers rolling from the kept ones.
+    @State private var landed = false
     @State private var isBreathing = false
     @State private var sheet: MindEntryCards.Sheet?
     @State private var quickMood: SomaMood?
@@ -37,20 +45,14 @@ struct LongevityMindView: View {
 
     var body: some View {
         let calendar = Calendar.current
-        let base = inputs ?? MindInputs(now: Date())
-        let inner = MindInnerSpace.make(from: base, scores: health.scores, calendar: calendar)
-        let model = MindLensModel.make(
-            inner: inner,
-            stress: today.map { ScorePages.stress(health.scores, $0, calendar: calendar) },
-            heatmap: MindHeatmap.make(stress ?? [], calendar: calendar),
-            moods: moods,
-            feelings: feelings(calendar: calendar),
-            now: base.now,
-            calendar: calendar
-        )
+        let live = liveModel(calendar: calendar)
+        // Before the reads land, the kept lens; with none kept (a first
+        // launch), the reads as they come.
+        let shown = LongevityShown(kept: kept, fresh: landed || kept == nil ? live : nil)
 
         MindLensContent(
-            model: model,
+            model: shown.value ?? live,
+            updated: shown.updated(now: Date()),
             status: health.status,
             latestMood: MindQuickMood.latestToday(moods, now: Date(), calendar: calendar),
             onStat: open,
@@ -60,6 +62,10 @@ struct LongevityMindView: View {
         )
         .refreshable { await load(force: true) }
         .task { await load(force: false) }
+        .onChange(of: live) { _, model in
+            // A mood logged, or the scores read again: kept for next time.
+            if landed { LongevitySnapshotStore.shared.save(mind: model) }
+        }
         .sheet(isPresented: $isBreathing) { MindBreatheSession() }
         .sheet(item: $quickMood, onDismiss: { Task { await loadMoods() } }) { mood in
             MindEntryGate { MindMoodLogSheet(start: mood) }
@@ -97,26 +103,55 @@ struct LongevityMindView: View {
         return result
     }
 
+    /// The lens as the reads on hand draw it.
+    private func liveModel(calendar: Calendar) -> MindLensModel {
+        let base = inputs ?? MindInputs(now: Date())
+        let inner = MindInnerSpace.make(from: base, scores: health.scores, calendar: calendar)
+        return MindLensModel.make(
+            inner: inner,
+            stress: today.map { ScorePages.stress(health.scores, $0, calendar: calendar) },
+            heatmap: MindHeatmap.make(stress ?? [], calendar: calendar),
+            moods: moods,
+            feelings: feelings(calendar: calendar),
+            now: base.now,
+            calendar: calendar
+        )
+    }
+
+    /// Reads everything, then shows it at once, the numbers rolling from
+    /// the kept ones, and keeps it for the next opening. With nothing kept,
+    /// each read shows as it lands.
     private func load(force: Bool) async {
         if !force, inputs != nil { return }
+        let progressive = kept == nil && !landed
         if today == nil { today = ScoreInputsCache.shared.value(for: Self.todayParts) }
         async let scoresRead: Void = health.loadScores(force: force)
         async let moodsRead: Void = loadMoods()
         let read = await MindLoad.inputs(health)
-        inputs = read
-        await loadToday(force: force)
+        if progressive { inputs = read }
+        let todayRead = await readToday(force: force)
+        if progressive, let todayRead { today = todayRead }
         await scoresRead
         await moodsRead
-        stress = await MindLoad.stress(health, inputs: read)
+        let stressRead = await MindLoad.stress(health, inputs: read)
+        withAnimation(reduceMotion ? nil : theme.motion.numberRoll) {
+            inputs = read
+            if let todayRead { today = todayRead }
+            stress = stressRead
+            landed = true
+        }
+        LongevitySnapshotStore.shared.save(mind: liveModel(calendar: .current))
     }
 
-    private func loadToday(force: Bool) async {
+    /// Today's heart, sleep and steps for the stress line: the shared read
+    /// while it is fresh, else a new one. Nil when nothing new was read.
+    private func readToday(force: Bool) async -> ScoreDetailInputs? {
         let parts = Self.todayParts
-        if !force, ScoreInputsCache.shared.isFresh(parts) { return }
-        guard let source = await health.prepare(ScoreDetailInputs.metrics(for: parts)) else { return }
+        if !force, ScoreInputsCache.shared.isFresh(parts) { return nil }
+        guard let source = await health.prepare(ScoreDetailInputs.metrics(for: parts)) else { return nil }
         let read = await ScoreDetailInputs.read(parts, from: source, now: Date(), calendar: .current)
-        today = read
         ScoreInputsCache.shared.store(read, for: parts)
+        return read
     }
 
     private func loadMoods() async {
@@ -124,6 +159,9 @@ struct LongevityMindView: View {
         let start = calendar.date(byAdding: .day, value: -MindLensModel.moodDays, to: calendar.startOfDay(for: Date())) ?? Date()
         moods = await MindJourneyLoad.moods(since: start, store: .shared)
     }
+
+    @Environment(\.somaTheme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     nonisolated static func whole(_ value: Double) -> String {
         Int(value.rounded()).formatted()
@@ -134,6 +172,8 @@ struct LongevityMindView: View {
 /// a fixture renders it as well as Health does.
 struct MindLensContent: View {
     let model: MindLensModel
+    /// When the kept numbers on screen were read, while they are old.
+    var updated: Date?
     var status: HealthDashboard.Status = .ready
     var latestMood: MindMoodEntry?
     var onStat: (SomaStat) -> Void = { _ in }
@@ -145,8 +185,8 @@ struct MindLensContent: View {
 
     var body: some View {
         ScrollView {
-            MindLensStack(model: model, status: status, latestMood: latestMood, onStat: onStat, onBreathe: onBreathe,
-                          onEntry: onEntry, onMood: onMood)
+            MindLensStack(model: model, updated: updated, status: status, latestMood: latestMood, onStat: onStat,
+                          onBreathe: onBreathe, onEntry: onEntry, onMood: onMood)
         }
         .aspectWash(.mind)
     }
@@ -155,6 +195,7 @@ struct MindLensContent: View {
 /// The lens's column, apart from its scroll view so a render draws it whole.
 struct MindLensStack: View {
     let model: MindLensModel
+    var updated: Date?
     var status: HealthDashboard.Status = .ready
     var latestMood: MindMoodEntry?
     var onStat: (SomaStat) -> Void = { _ in }
@@ -168,12 +209,18 @@ struct MindLensStack: View {
         let metrics = theme.metrics
 
         VStack(alignment: .leading, spacing: metrics.leadSpacing) {
+            if let updated {
+                SomaUpdatedNote(updated)
+                    .padding(.top, metrics.heroTopPadding)
+                    .transition(.opacity)
+            }
+
             SomaStatRow([
                 SomaStat("HRV", value: model.hrv.map(MindLensFormat.whole), unit: "ms", trend: model.hrvTrend),
                 SomaStat("Resting HR", value: model.resting.map(MindLensFormat.whole), unit: "bpm", trend: model.restingTrend),
                 SomaStat("Mindful", value: model.mindfulToday.map(MindLensFormat.whole), unit: "min"),
             ], onSelect: onStat)
-            .padding(.top, metrics.heroTopPadding)
+            .padding(.top, updated == nil ? metrics.heroTopPadding : 0)
 
             MindSection("Stress", route: ScoreRoute.stress) {
                 SomaCard {

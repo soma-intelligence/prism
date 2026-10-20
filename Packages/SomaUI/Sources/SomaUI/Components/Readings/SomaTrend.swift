@@ -71,6 +71,9 @@ public enum SomaCueTone: Sendable, Equatable {
 /// grey, a fill that fades to nothing at the foot, and the latest value as a
 /// dot in the full hue. Days without a reading are skipped, never drawn as
 /// zero.
+///
+/// New values morph the line and the band into place on the theme's chart
+/// spring rather than redrawing them; under Reduce Motion they swap.
 public struct SomaSparkline: View {
     private let values: [Double?]
     private let tint: Color?
@@ -78,6 +81,7 @@ public struct SomaSparkline: View {
     private let filled: Bool
 
     @Environment(\.somaTheme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// - Parameter filled: the soft fill under the line; false draws the
     ///   line alone.
@@ -89,74 +93,152 @@ public struct SomaSparkline: View {
     }
 
     public var body: some View {
+        let shape = SomaSparkShape.make(values, band: band, samples: theme.metrics.sparkSamples)
+        SomaSparkPlot(shape: shape, tint: tint, filled: filled)
+            .animation(reduceMotion ? nil : theme.motion.chartMorph, value: shape)
+            .accessibilityHidden(true)
+    }
+}
+
+/// A sparkline's shape as shares of its frame, apart from any size, so it
+/// can be interpolated from one set of values to the next.
+struct SomaSparkShape: Equatable, Sendable {
+    /// The line's heights, 0 at the foot and 1 at the top, evenly spaced
+    /// across the width. Empty with fewer than two readings.
+    var samples: [Double]
+    /// The usual band's foot and top, as shares; equal when there is none.
+    var bandLow: Double
+    var bandHigh: Double
+    var hasBand: Bool
+    /// One reading alone: drawn as its dot at the latest end.
+    var isSingle: Bool
+
+    /// - Parameter samples: how many points the line is drawn with; the
+    ///   same for every sparkline, so any two interpolate point for point.
+    static func make(_ values: [Double?], band: ClosedRange<Double>?, samples count: Int) -> SomaSparkShape {
+        // A trend this small reads as one continuous line: a week with two
+        // readings would otherwise be two stray strokes.
+        let numbers = values.compactMap { $0 }
+        guard numbers.count > 1 else {
+            return SomaSparkShape(samples: [], bandLow: 0, bandHigh: 0, hasBand: false, isSingle: numbers.count == 1)
+        }
+        let all = numbers + (band.map { [$0.lowerBound, $0.upperBound] } ?? [])
+        let low = all.min() ?? 0
+        let high = all.max() ?? 1
+        let pad = max((high - low) * 0.14, abs(high) * 0.002, 0.0001)
+        let domain = (low - pad)...(high + pad)
+        let curve = SomaChartMath.curve(numbers.map { Optional($0) }, domain: domain, count: count)
+        return SomaSparkShape(
+            samples: curve.samples,
+            bandLow: band.map { SomaChartMath.height($0.lowerBound, in: domain) } ?? 0,
+            bandHigh: band.map { SomaChartMath.height($0.upperBound, in: domain) } ?? 0,
+            hasBand: band != nil,
+            isSingle: false
+        )
+    }
+}
+
+/// The drawing behind ``SomaSparkline``: the band, the fill, the line and
+/// the end dot are shapes over one ``SomaSparkShape``, so each is handed
+/// every step between two shapes.
+private struct SomaSparkPlot: View {
+    let shape: SomaSparkShape
+    let tint: Color?
+    let filled: Bool
+
+    @Environment(\.somaTheme) private var theme
+
+    var body: some View {
         let metrics = theme.metrics
         let colors = theme.colors
         let hue = tint ?? colors.inkPrimary.color
         let line = hue.mix(with: colors.inkSecondary.color, by: metrics.sparkLineMix)
-        let surface = colors.surface.color
         let ground = colors.inkPrimary.color.opacity(metrics.metricChartBandOpacity * 1.4)
         let dot = metrics.sparkEndDot
-        let stroke = metrics.sparkLine
-        let fillOpacity = metrics.metricChartFillOpacity
-        let samples = metrics.sparkSamples
-        // A trend this small reads as one continuous line: a week with two
-        // readings would otherwise be two stray strokes.
-        let known: [Double?] = values.compactMap { $0 }
-        let band = band
+        let inset = dot / 2 + 1
 
-        Canvas { context, size in
-            let numbers = known.compactMap { $0 }
-            guard numbers.count > 1 else {
+        ZStack {
+            if shape.isSingle {
                 // One reading: its dot alone, at the latest end.
-                if !numbers.isEmpty {
-                    let centre = CGPoint(x: size.width - dot, y: size.height / 2)
-                    context.fill(Path(ellipseIn: CGRect(x: centre.x - dot / 2, y: centre.y - dot / 2, width: dot, height: dot)), with: .color(hue))
+                GeometryReader { proxy in
+                    Circle()
+                        .fill(hue)
+                        .frame(width: dot, height: dot)
+                        .position(x: proxy.size.width - dot, y: proxy.size.height / 2)
                 }
-                return
-            }
-            let all = numbers + (band.map { [$0.lowerBound, $0.upperBound] } ?? [])
-            let low = all.min() ?? 0
-            let high = all.max() ?? 1
-            let pad = max((high - low) * 0.14, abs(high) * 0.002, 0.0001)
-            let domain = (low - pad)...(high + pad)
-            let inset = dot / 2 + 1
-            let plot = CGRect(origin: .zero, size: size).insetBy(dx: inset, dy: inset)
-            func y(_ share: Double) -> CGFloat { plot.maxY - plot.height * CGFloat(share) }
-
-            if let band {
-                let top = y(SomaChartMath.height(band.upperBound, in: domain))
-                let bottom = y(SomaChartMath.height(band.lowerBound, in: domain))
-                let rect = CGRect(x: 0, y: min(top, bottom), width: size.width, height: max(abs(bottom - top), 2))
-                context.fill(Path(roundedRect: rect, cornerRadius: min(rect.height / 2, 3)), with: .color(ground))
-            }
-
-            let curve = SomaChartMath.curve(known, domain: domain, count: samples)
-            guard curve.samples.count > 1 else { return }
-            let points = curve.samples.enumerated().map { index, share -> CGPoint in
-                let along = Double(index) / Double(curve.samples.count - 1)
-                return CGPoint(x: plot.minX + plot.width * CGFloat(along), y: y(share))
-            }
-            var path = Path()
-            path.addLines(points)
-            if filled, let first = points.first, let last = points.last {
-                var area = path
-                area.addLine(to: CGPoint(x: last.x, y: size.height))
-                area.addLine(to: CGPoint(x: first.x, y: size.height))
-                area.closeSubpath()
-                let top = points.map(\.y).min() ?? 0
-                context.fill(area, with: .linearGradient(
-                    Gradient(colors: [hue.opacity(fillOpacity), hue.opacity(0)]),
-                    startPoint: CGPoint(x: 0, y: top), endPoint: CGPoint(x: 0, y: size.height)
-                ))
-            }
-            context.stroke(path, with: .color(line), style: StrokeStyle(lineWidth: stroke, lineCap: .round, lineJoin: .round))
-            if let last = points.last {
-                let rect = CGRect(x: last.x - dot / 2, y: last.y - dot / 2, width: dot, height: dot)
-                context.fill(Path(ellipseIn: rect.insetBy(dx: -1.5, dy: -1.5)), with: .color(surface))
-                context.fill(Path(ellipseIn: rect), with: .color(hue))
+            } else if shape.samples.count > 1 {
+                if shape.hasBand {
+                    SomaSparkPath(shape: shape, part: .band, inset: inset)
+                        .fill(ground)
+                }
+                if filled {
+                    SomaSparkPath(shape: shape, part: .area, inset: inset)
+                        .fill(LinearGradient(colors: [hue.opacity(metrics.metricChartFillOpacity), hue.opacity(0)],
+                                             startPoint: .top, endPoint: .bottom))
+                }
+                SomaSparkPath(shape: shape, part: .line, inset: inset)
+                    .stroke(line, style: StrokeStyle(lineWidth: metrics.sparkLine, lineCap: .round, lineJoin: .round))
+                SomaSparkPath(shape: shape, part: .end(dot + 3), inset: inset)
+                    .fill(colors.surface.color)
+                SomaSparkPath(shape: shape, part: .end(dot), inset: inset)
+                    .fill(hue)
             }
         }
-        .accessibilityHidden(true)
+    }
+}
+
+/// One part of a sparkline, drawn from its shape. Its samples and band
+/// interpolate, so it morphs.
+private struct SomaSparkPath: Shape {
+    enum Part {
+        case band, area, line
+        /// The latest value's dot, this wide.
+        case end(CGFloat)
+    }
+
+    var shape: SomaSparkShape
+    let part: Part
+    let inset: CGFloat
+
+    var animatableData: AnimatablePair<SomaAnimatableVector, AnimatablePair<Double, Double>> {
+        get { AnimatablePair(SomaAnimatableVector(shape.samples), AnimatablePair(shape.bandLow, shape.bandHigh)) }
+        set {
+            shape.samples = newValue.first.values
+            shape.bandLow = newValue.second.first
+            shape.bandHigh = newValue.second.second
+        }
+    }
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        guard shape.samples.count > 1 else { return path }
+        let plot = rect.insetBy(dx: inset, dy: inset)
+        func y(_ share: Double) -> CGFloat { plot.maxY - plot.height * CGFloat(share) }
+        let points = shape.samples.enumerated().map { index, share -> CGPoint in
+            let along = Double(index) / Double(shape.samples.count - 1)
+            return CGPoint(x: plot.minX + plot.width * CGFloat(along), y: y(share))
+        }
+        switch part {
+        case .band:
+            let top = y(shape.bandHigh)
+            let bottom = y(shape.bandLow)
+            let band = CGRect(x: rect.minX, y: min(top, bottom), width: rect.width, height: max(abs(bottom - top), 2))
+            path.addRoundedRect(in: band, cornerSize: CGSize(width: min(band.height / 2, 3), height: min(band.height / 2, 3)))
+        case .line:
+            path.addLines(points)
+        case .area:
+            path.addLines(points)
+            if let first = points.first, let last = points.last {
+                path.addLine(to: CGPoint(x: last.x, y: rect.maxY))
+                path.addLine(to: CGPoint(x: first.x, y: rect.maxY))
+                path.closeSubpath()
+            }
+        case .end(let side):
+            if let last = points.last {
+                path.addEllipse(in: CGRect(x: last.x - side / 2, y: last.y - side / 2, width: side, height: side))
+            }
+        }
+        return path
     }
 }
 
@@ -212,6 +294,7 @@ public struct SomaTrendRow: View {
                     }
                     Text(value ?? "-")
                         .foregroundStyle(colors.inkPrimary.color)
+                        .somaRollingNumber(value)
                 }
                 .somaFont(theme.typography.caption)
                 .lineLimit(1)
@@ -297,6 +380,7 @@ public struct SomaTrendTile: View {
                 Text(value ?? "-")
                     .somaFont(theme.typography.metricCompact)
                     .foregroundStyle(colors.inkPrimary.color)
+                    .somaRollingNumber(value)
                 if let unit, value != nil {
                     Text(unit)
                         .somaFont(theme.typography.caption)

@@ -13,7 +13,7 @@ import Foundation
 /// (owner, 2026-10-03). Thirty days back come with today, so the detail
 /// sheets can chart temperature, UV and air quality, and the Sleep card can
 /// read the outdoor temperature of last night.
-nonisolated struct EnvironmentConditions: Sendable, Equatable {
+nonisolated struct EnvironmentConditions: Sendable, Equatable, Codable {
     var temperature: Double?
     var humidity: Double?
     var uv: Double?

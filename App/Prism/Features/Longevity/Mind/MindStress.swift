@@ -75,7 +75,7 @@ enum MindStress {
 
 /// When stress peaks: minutes of peak by weekday and by two hour block,
 /// from 08:00 to 22:00.
-struct MindHeatmap: Equatable, Sendable {
+struct MindHeatmap: Equatable, Sendable, Codable {
     static let firstHour = 8
     static let blockHours = 2
     static let columns = 7

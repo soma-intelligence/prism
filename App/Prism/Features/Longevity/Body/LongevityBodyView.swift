@@ -24,16 +24,30 @@ struct LongevityBodyView: View {
     @Environment(HealthDashboard.self) private var health
     @Environment(\.somaTheme) private var theme
 
-    @State private var page = BodyOverview.make(from: BodyOverviewInputs(now: .now))
-    @State private var sex: BodyFitnessAge.Sex = .unknown
-    /// Empty until the first read lands.
-    @State private var markers: [BodyBiomarkerSpec: BodyBiomarker] = [:]
+    /// What the lens drew the last time, kept on the device, so it opens on
+    /// its numbers rather than on dashes (``LongevitySnapshotStore``).
+    @State private var kept = LongevitySnapshotStore.shared.body
+    /// This opening's read, once it lands. The numbers roll to it.
+    @State private var fresh: BodyLensSnapshot?
+
+    private var shown: LongevityShown<BodyLensSnapshot> { LongevityShown(kept: kept, fresh: fresh) }
+    private var lens: BodyLensSnapshot { shown.value ?? .empty() }
+    private var page: BodyOverview { lens.page }
+    private var sex: BodyFitnessAge.Sex { lens.sex }
+    private var markers: [BodyBiomarkerSpec: BodyBiomarker] { lens.markers }
 
     var body: some View {
         let metrics = theme.metrics
+        let updated = shown.updated(now: .now)
 
         ScrollView {
             VStack(alignment: .leading, spacing: metrics.leadSpacing) {
+                if let updated {
+                    SomaUpdatedNote(updated)
+                        .padding(.top, metrics.heroTopPadding)
+                        .transition(.opacity)
+                }
+
                 // Three numbers, no line under them (owner, 2026-10-03), each a
                 // door to its page.
                 SomaStatRow([
@@ -48,7 +62,7 @@ struct LongevityBodyView: View {
                 ]) { stat in
                     openStat(stat)
                 }
-                .padding(.top, metrics.heroTopPadding)
+                .padding(.top, updated == nil ? metrics.heroTopPadding : 0)
 
                 BodySection("Heart and fitness") {
                     BodyTileGrid {
@@ -76,7 +90,7 @@ struct LongevityBodyView: View {
                     .transition(.opacity)
                 }
 
-                BodyMapCard()
+                SomaMuscleFreshness(lens.muscles)
 
                 BodySection("Biomarkers") {
                     VStack(spacing: metrics.cardSpacing) {
@@ -105,8 +119,6 @@ struct LongevityBodyView: View {
             .frame(maxWidth: .infinity)
         }
         .aspectWash(.body)
-        .animation(reduceMotion ? nil : theme.motion.chartFade, value: markers.isEmpty)
-        .onAppear { show(BodyLensCache.shared.fresh(for: health)) }
         .task { await load(force: false) }
         .refreshable { await load(force: true) }
     }
@@ -175,16 +187,32 @@ struct LongevityBodyView: View {
         InsightEngine.sortedBySeverity(specs) { markers[$0]?.insight.severity ?? 0 }
     }
 
-    /// Reads Health, or takes the read kept from the last minute.
+    /// Reads Health, or takes the read kept from the last minute, with the
+    /// last month of workouts for muscle freshness; then rolls the numbers
+    /// on screen to it and keeps it for the next opening. Nothing changes
+    /// when Health could not be read: the kept numbers stay.
     private func load(force: Bool) async {
-        show(await BodyLensCache.shared.read(health: health, force: force))
+        async let read = BodyLensCache.shared.read(health: health, force: force)
+        let muscles = await muscleReadings()
+        guard let read = await read else { return }
+        let snapshot = BodyLensSnapshot(
+            page: BodyOverview.make(from: read.inputs),
+            sex: read.inputs.sex,
+            markers: read.markers,
+            muscles: muscles ?? lens.muscles
+        )
+        withAnimation(reduceMotion ? nil : theme.motion.numberRoll) { fresh = snapshot }
+        LongevitySnapshotStore.shared.save(body: snapshot)
     }
 
-    private func show(_ read: BodyLensRead?) {
-        guard let read else { return }
-        page = BodyOverview.make(from: read.inputs)
-        sex = read.inputs.sex
-        markers = read.markers
+    /// Muscle freshness from the last month of workouts. Nil when Health
+    /// could not be read.
+    private func muscleReadings() async -> [SomaMuscleReading]? {
+#if DEBUG
+        if EnvironmentReport.usesPreview { return MuscleFreshness.preview }
+#endif
+        guard let history = await health.fitnessHistory(days: Int(MuscleFreshness.days)) else { return nil }
+        return MuscleFreshness.readings(history.workouts, now: .now)
     }
 }
 
@@ -259,29 +287,6 @@ private struct BodySection<Content: View>: View {
                 .accessibilityAddTraits(.isHeader)
             content
         }
-    }
-}
-
-/// Muscle freshness from the last month of workouts (``MuscleFreshness``):
-/// the body front and back in calm tones, a legend that counts the states,
-/// the six groups as pills; a tap on a muscle or a pill says when that group
-/// last worked and when it is fresh again.
-private struct BodyMapCard: View {
-    @Environment(HealthDashboard.self) private var health
-    @State private var readings = MuscleFreshness.readings([], now: .now)
-
-    var body: some View {
-        SomaMuscleFreshness(readings)
-            .task {
-#if DEBUG
-                if EnvironmentReport.usesPreview {
-                    readings = MuscleFreshness.preview
-                    return
-                }
-#endif
-                guard let history = await health.fitnessHistory(days: Int(MuscleFreshness.days)) else { return }
-                readings = MuscleFreshness.readings(history.workouts, now: .now)
-            }
     }
 }
 

@@ -17,7 +17,7 @@ import Foundation
 /// read against, and without a sex the two curves are averaged, as the
 /// profile promises for "Other, or prefer not to say".
 nonisolated enum BodyFitnessAge {
-    enum Sex: Sendable, Equatable {
+    enum Sex: Sendable, Equatable, Codable {
         case female, male, unknown
     }
 
@@ -62,7 +62,7 @@ nonisolated enum BodyFitnessAge {
 
     /// What the Fitness age stat shows: the age and how it sits against
     /// yours, or what it is waiting for.
-    struct Stat: Equatable, Sendable {
+    struct Stat: Equatable, Sendable, Codable {
         var value: String?
         /// A few words under the value, or under the dash when it waits.
         var cue: String?

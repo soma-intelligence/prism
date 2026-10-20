@@ -18,6 +18,12 @@ public extension SomaPreviewSamples {
     /// The usual range for that rate.
     static let breathingBand: ClosedRange<Double> = 17.0...18.2
 
+    /// A kept read and the fresh one after it, for a number rolling
+    /// between them: HRV in milliseconds.
+    static let rollingValues: [Double] = [58, 64]
+    /// When a kept read was taken, old enough for the updated note.
+    static var keptReadAt: Date { .now.addingTimeInterval(-3 * 3_600) }
+
     /// One night, 23:34 to 06:39, in stages: 15 min awake, 1 h 50 REM,
     /// 4 h 16 core and 45 min deep, the awake moments short, as a watch sees them.
     static let night: [SomaStageRun] = {

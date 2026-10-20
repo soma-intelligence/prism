@@ -8,9 +8,9 @@ import Foundation
 /// The days of this year laid out as a grid: one column a week, one row a
 /// weekday, Monday first whatever the locale's first weekday. Trends draws its
 /// active days on it and Environment its days outside.
-struct PulseYearGrid: Equatable {
+struct PulseYearGrid: Equatable, Codable {
     /// One cell of the grid.
-    enum Cell: Equatable {
+    enum Cell: Equatable, Codable {
         /// Before the first of January or after today: not drawn.
         case outside
         /// A day of the year Health holds nothing for.
@@ -18,7 +18,7 @@ struct PulseYearGrid: Equatable {
         case value(Double)
     }
 
-    struct MonthLabel: Equatable {
+    struct MonthLabel: Equatable, Codable {
         var column: Int
         var label: String
     }

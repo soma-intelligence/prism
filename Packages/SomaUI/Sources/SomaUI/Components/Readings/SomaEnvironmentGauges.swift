@@ -226,6 +226,7 @@ public struct SomaThermometerPill: View {
             Text(verbatim: now.map(Self.degrees) ?? "-")
                 .somaFont(theme.typography.metricCompact)
                 .foregroundStyle(now == nil ? colors.inkSecondary.color : colors.inkPrimary.color)
+                .somaRollingNumber(now.map(Self.degrees))
                 .frame(minWidth: 44, alignment: .leading)
 
             VStack(spacing: 5) {
@@ -260,8 +261,10 @@ public struct SomaThermometerPill: View {
 
                 HStack {
                     Text(verbatim: "L \(low.map(Self.degrees) ?? "-")")
+                        .somaRollingNumber(low.map(Self.degrees))
                     Spacer(minLength: 0)
                     Text(verbatim: "H \(high.map(Self.degrees) ?? "-")")
+                        .somaRollingNumber(high.map(Self.degrees))
                 }
                 .somaFont(theme.typography.captionValue)
                 .foregroundStyle(colors.inkSecondary.color)
@@ -309,6 +312,7 @@ public struct SomaWeatherPill: View {
                 Text(verbatim: value ?? "-")
                     .somaFont(theme.typography.body)
                     .foregroundStyle(colors.inkPrimary.color)
+                    .somaRollingNumber(value)
                 Text(verbatim: place ?? "-")
                     .somaFont(theme.typography.caption)
                     .foregroundStyle(colors.inkSecondary.color)

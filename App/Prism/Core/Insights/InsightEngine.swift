@@ -11,13 +11,13 @@
 import Foundation
 
 /// What one metric's days mean today.
-struct Insight: Equatable, Sendable {
-    enum Position: Sendable, Equatable { case within, above, below }
-    enum Direction: Sendable, Equatable { case rising, falling, steady }
+struct Insight: Equatable, Sendable, Codable {
+    enum Position: Sendable, Equatable, Codable { case within, above, below }
+    enum Direction: Sendable, Equatable, Codable { case rising, falling, steady }
     /// How the cue reads: good news, something to watch, or neither.
-    enum Tone: Sendable, Equatable { case good, watch, neutral }
+    enum Tone: Sendable, Equatable, Codable { case good, watch, neutral }
     /// What the cue names, so a surface can drop one it already says.
-    enum CueKind: Sendable, Equatable {
+    enum CueKind: Sendable, Equatable, Codable {
         /// "Highest in 30 days".
         case extreme
         /// "3 days rising".

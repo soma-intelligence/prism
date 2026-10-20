@@ -53,7 +53,7 @@ struct MindStressDayChart: View {
             Text(sample.map { MindLensFormat.whole($0.value) } ?? "-")
                 .somaFont(type.metric)
                 .foregroundStyle(colors.inkPrimary.color)
-                .contentTransition(.numericText())
+                .somaRollingNumber(sample.map { MindLensFormat.whole($0.value) })
             if let sample {
                 Text(sample.zone.title)
                     .somaFont(type.callout)
@@ -78,69 +78,58 @@ struct MindStressDayChart: View {
         let selected = selected
         let ticks: [Double] = [0, ScorePages.stressBands.moderate, ScorePages.stressBands.high, 100]
         let zones = MindZone.allCases.map { (range: $0.range, color: $0.color) }
-        let gradient = Self.gradient
-        let washGradient = Self.gradient(opacity: SomaPen(theme).fillOpacity * 1.6, fades: true)
+        let pen = SomaPen(theme)
+        let inset = theme.metrics.chartPlotInset
+        let slots = MindStressSlots(samples, dayStart: dayStart)
+        let line = LinearGradient(gradient: Self.gradient, startPoint: .bottom, endPoint: .top)
+        let wash = LinearGradient(gradient: Self.gradient(opacity: pen.fillOpacity * 1.6, fades: true),
+                                  startPoint: .bottom, endPoint: .top)
 
-        return Canvas { context, size in
-            let pen = SomaPen(theme)
-            let inset = theme.metrics.chartPlotInset
-            let plot = CGRect(origin: .zero, size: size).insetBy(dx: inset, dy: inset)
-            func y(_ value: Double) -> CGFloat { plot.maxY - plot.height * CGFloat(value / 100) }
-            func x(_ date: Date) -> CGFloat {
-                let middle = date.addingTimeInterval(15 * 60).timeIntervalSince(dayStart)
-                return plot.minX + plot.width * CGFloat(min(max(middle / Self.day, 0), 1))
-            }
-
+        return ZStack {
             // The zones, faint, behind everything.
-            for zone in zones {
-                let band = CGRect(x: 0, y: y(zone.range.upperBound), width: size.width,
-                                  height: y(zone.range.lowerBound) - y(zone.range.upperBound))
-                context.fill(Path(band), with: .color(zone.color.opacity(pen.bandOpacity * 0.45)))
-            }
-            for tick in ticks {
-                pen.gridline(context, y: y(tick), to: size.width)
-            }
-
-            let shading = GraphicsContext.Shading.linearGradient(
-                gradient, startPoint: CGPoint(x: 0, y: y(0)), endPoint: CGPoint(x: 0, y: y(100))
-            )
-            let wash = GraphicsContext.Shading.linearGradient(
-                washGradient, startPoint: CGPoint(x: 0, y: y(0)), endPoint: CGPoint(x: 0, y: y(100))
-            )
-
-            for run in Self.runs(samples) {
-                let points = run.map { CGPoint(x: x($0.start), y: y($0.value)) }
-                guard let first = points.first, let last = points.last else { continue }
-                if points.count == 1 {
-                    context.fill(Path(ellipseIn: CGRect(x: first.x - pen.point / 2, y: first.y - pen.point / 2,
-                                                        width: pen.point, height: pen.point)), with: shading)
-                    continue
+            Canvas { context, size in
+                let plot = CGRect(origin: .zero, size: size).insetBy(dx: inset, dy: inset)
+                func y(_ value: Double) -> CGFloat { plot.maxY - plot.height * CGFloat(value / 100) }
+                for zone in zones {
+                    let band = CGRect(x: 0, y: y(zone.range.upperBound), width: size.width,
+                                      height: y(zone.range.lowerBound) - y(zone.range.upperBound))
+                    context.fill(Path(band), with: .color(zone.color.opacity(pen.bandOpacity * 0.45)))
                 }
-                var line = Path()
-                line.move(to: first)
-                for point in points.dropFirst() { line.addLine(to: point) }
-
-                var area = line
-                area.addLine(to: CGPoint(x: last.x, y: y(0)))
-                area.addLine(to: CGPoint(x: first.x, y: y(0)))
-                area.closeSubpath()
-                context.fill(area, with: wash)
-                context.stroke(line, with: shading,
-                               style: StrokeStyle(lineWidth: pen.stroke * 1.4, lineCap: .round, lineJoin: .round))
+                for tick in ticks {
+                    pen.gridline(context, y: y(tick), to: size.width)
+                }
             }
 
-            if let latest = samples.last, selected == nil {
-                pen.ring(context, at: CGPoint(x: x(latest.start), y: y(latest.value)), color: latest.zone.color)
+            // The line and the light under it morph from one read to the next.
+            Group {
+                MindStressLineShape(slots: slots, part: .area).fill(wash)
+                MindStressLineShape(slots: slots, part: .line)
+                    .stroke(line, style: StrokeStyle(lineWidth: pen.stroke * 1.4, lineCap: .round, lineJoin: .round))
+                MindStressLineShape(slots: slots, part: .dots(pen.point)).fill(line)
             }
-            if let selected {
-                let point = CGPoint(x: x(selected.start), y: y(selected.value))
-                pen.vertical(context, x: point.x, height: size.height, color: pen.inkSecondary)
-                let outer = pen.ring * 1.3
-                context.fill(Path(ellipseIn: CGRect(x: point.x - outer / 2, y: point.y - outer / 2, width: outer, height: outer)),
-                             with: .color(pen.surface))
-                let inner = pen.ring
-                context.fill(Path(ellipseIn: CGRect(x: point.x - inner / 2, y: point.y - inner / 2, width: inner, height: inner)),
-                             with: .color(selected.zone.color))
+            .padding(inset)
+            .animation(reduceMotion ? nil : theme.motion.chartMorph, value: slots)
+
+            Canvas { context, size in
+                let plot = CGRect(origin: .zero, size: size).insetBy(dx: inset, dy: inset)
+                func y(_ value: Double) -> CGFloat { plot.maxY - plot.height * CGFloat(value / 100) }
+                func x(_ date: Date) -> CGFloat {
+                    let middle = date.addingTimeInterval(15 * 60).timeIntervalSince(dayStart)
+                    return plot.minX + plot.width * CGFloat(min(max(middle / Self.day, 0), 1))
+                }
+                if let latest = samples.last, selected == nil {
+                    pen.ring(context, at: CGPoint(x: x(latest.start), y: y(latest.value)), color: latest.zone.color)
+                }
+                if let selected {
+                    let point = CGPoint(x: x(selected.start), y: y(selected.value))
+                    pen.vertical(context, x: point.x, height: size.height, color: pen.inkSecondary)
+                    let outer = pen.ring * 1.3
+                    context.fill(Path(ellipseIn: CGRect(x: point.x - outer / 2, y: point.y - outer / 2, width: outer, height: outer)),
+                                 with: .color(pen.surface))
+                    let inner = pen.ring
+                    context.fill(Path(ellipseIn: CGRect(x: point.x - inner / 2, y: point.y - inner / 2, width: inner, height: inner)),
+                                 with: .color(selected.zone.color))
+                }
             }
         }
         .overlay {
@@ -222,19 +211,6 @@ struct MindStressDayChart: View {
 
     // MARK: Arithmetic
 
-    /// The samples cut where a reading is missing.
-    static func runs(_ samples: [MindStressSample]) -> [[MindStressSample]] {
-        var runs: [[MindStressSample]] = []
-        for sample in samples.sorted(by: { $0.start < $1.start }) {
-            if let last = runs.last?.last, sample.start.timeIntervalSince(last.start) < gap {
-                runs[runs.count - 1].append(sample)
-            } else {
-                runs.append([sample])
-            }
-        }
-        return runs
-    }
-
     /// The zones up the plot, from the foot (0) to the top (100), with a
     /// short blend at each border so the line turns colour as it crosses.
     static var gradient: Gradient { gradient(opacity: 1) }
@@ -258,6 +234,106 @@ struct MindStressDayChart: View {
             stop(.high, high + blend),
             stop(.high, 1),
         ])
+    }
+}
+
+/// Today's stress on a fixed grid of half hours from midnight, as shares of
+/// the plot's height: the same length every day, so one day's line
+/// interpolates into the next point for point. A half hour with no reading
+/// carries its nearest neighbour's height, so a line growing into it rises
+/// from where it was rather than from the foot.
+struct MindStressSlots: Equatable, Sendable {
+    /// Enough half hours for the longest day a clock change makes.
+    static let count = 50
+
+    var heights: [Double]
+    /// Which half hours hold a reading. Not interpolated: a reading that
+    /// arrives shows at once, at its neighbour's height, and settles.
+    var present: [Bool]
+
+    init(heights: [Double], present: [Bool]) {
+        self.heights = heights
+        self.present = present
+    }
+
+    init(_ samples: [MindStressSample], dayStart: Date) {
+        var heights = [Double?](repeating: nil, count: Self.count)
+        for sample in samples {
+            let slot = Int((sample.start.timeIntervalSince(dayStart) / 1_800).rounded())
+            guard heights.indices.contains(slot) else { continue }
+            heights[slot] = min(max(sample.value / 100, 0), 1)
+        }
+        present = heights.map { $0 != nil }
+        let known = heights.indices.filter { heights[$0] != nil }
+        self.heights = heights.indices.map { index in
+            if let height = heights[index] { return height }
+            guard let nearest = known.min(by: { abs($0 - index) < abs($1 - index) }) else { return 0 }
+            return heights[nearest] ?? 0
+        }
+    }
+
+    /// Where half hour `slot` sits across the day, as a share of the width:
+    /// its middle, as the line has always drawn it.
+    static func x(_ slot: Int) -> Double {
+        min((Double(slot) * 1_800 + 900) / (24 * 3_600), 1)
+    }
+
+    /// The half hours that hold readings, cut where one is missing.
+    var runs: [[Int]] {
+        var runs: [[Int]] = []
+        for slot in present.indices where present[slot] {
+            if let last = runs.last?.last, last == slot - 1 {
+                runs[runs.count - 1].append(slot)
+            } else {
+                runs.append([slot])
+            }
+        }
+        return runs
+    }
+}
+
+/// One part of today's stress line, drawn from its slots: the line, the
+/// light under it, or the lone half hours as dots. The heights interpolate.
+struct MindStressLineShape: Shape {
+    enum Part {
+        case line, area
+        /// A reading with no neighbour, as a dot this wide.
+        case dots(CGFloat)
+    }
+
+    var slots: MindStressSlots
+    let part: Part
+
+    var animatableData: SomaAnimatableVector {
+        get { SomaAnimatableVector(slots.heights) }
+        set { slots.heights = newValue.values }
+    }
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        func point(_ slot: Int) -> CGPoint {
+            let height = slots.heights.indices.contains(slot) ? slots.heights[slot] : 0
+            return CGPoint(x: rect.minX + rect.width * MindStressSlots.x(slot), y: rect.maxY - rect.height * height)
+        }
+        for run in slots.runs {
+            let points = run.map(point)
+            guard let first = points.first, let last = points.last else { continue }
+            switch part {
+            case .dots(let side):
+                if points.count == 1 {
+                    path.addEllipse(in: CGRect(x: first.x - side / 2, y: first.y - side / 2, width: side, height: side))
+                }
+            case .line:
+                if points.count > 1 { path.addLines(points) }
+            case .area:
+                guard points.count > 1 else { continue }
+                path.addLines(points)
+                path.addLine(to: CGPoint(x: last.x, y: rect.maxY))
+                path.addLine(to: CGPoint(x: first.x, y: rect.maxY))
+                path.closeSubpath()
+            }
+        }
+        return path
     }
 }
 
@@ -297,10 +373,12 @@ struct MindStressZones: View {
                     Text(minutes == nil ? "-" : "\(Int((share * 100).rounded()))%")
                         .somaFont(type.captionValue)
                         .foregroundStyle(colors.inkPrimary.color)
+                        .somaRollingNumber(minutes == nil ? nil : "\(Int((share * 100).rounded()))%")
                         .frame(width: metrics.miniOrbDiameter * 0.8, alignment: .trailing)
                     Text(minutes == nil ? "-" : MindLensFormat.duration(spent))
                         .somaFont(type.captionValue)
                         .foregroundStyle(colors.inkSecondary.color)
+                        .somaRollingNumber(minutes == nil ? nil : MindLensFormat.duration(spent))
                         .frame(width: metrics.miniOrbDiameter, alignment: .trailing)
                 }
                 .padding(.horizontal, metrics.cardPadding)

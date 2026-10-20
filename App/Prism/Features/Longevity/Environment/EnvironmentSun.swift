@@ -12,7 +12,7 @@ import Foundation
 /// degree. Without one, the sun's path is drawn with a dash at each end.
 nonisolated enum EnvironmentSun {
     /// A rounded place: about eleven kilometres, enough for the sun.
-    struct Place: Sendable, Equatable {
+    struct Place: Sendable, Equatable, Codable {
         var latitude: Double
         var longitude: Double
         /// The city's name when the place came from the Weather page.

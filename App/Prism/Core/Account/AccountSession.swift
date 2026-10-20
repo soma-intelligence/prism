@@ -166,6 +166,8 @@ final class AccountSession {
         await CloudSync.shared.stop()
         await backend?.signOut()
         state = settings == nil ? .unavailable : .signedOut
+        // Whoever signs in next never opens on these numbers.
+        LongevitySnapshotStore.shared.clear()
     }
 
     // MARK: Changes from the client

@@ -152,6 +152,8 @@ final class MindStore {
         corrections = [:]
         forecasts = [:]
         save()
+        // Longevity's Mind lens kept the mood strip to open on: it goes too.
+        LongevitySnapshotStore.shared.clearMind()
     }
 
     private func save() {

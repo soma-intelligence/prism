@@ -6,7 +6,7 @@
 import SwiftUI
 
 /// Which way a value moved against the one it is compared with.
-public enum SomaTrend: Sendable, Equatable {
+public enum SomaTrend: Sendable, Equatable, Codable {
     case up
     case down
 }

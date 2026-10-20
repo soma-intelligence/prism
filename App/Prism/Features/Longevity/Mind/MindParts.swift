@@ -87,7 +87,7 @@ struct MindEnergyPoint: Equatable, Sendable {
 }
 
 /// One day of mindful minutes on the week's bars.
-struct MindBar: Equatable, Sendable, Identifiable {
+struct MindBar: Equatable, Sendable, Identifiable, Codable {
     var day: Date
     var letter: String
     /// Nil when Health holds no mindful session at all: not measured.

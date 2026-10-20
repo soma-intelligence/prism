@@ -12,7 +12,7 @@ import HealthExportCore
 /// Environment carries no score and no aspect. Every number is one the watch
 /// recorded; air, UV, weather, sunset and the bedroom have no source yet and
 /// stay nil, which the views draw as a dash.
-struct EnvironmentReport: Equatable {
+struct EnvironmentReport: Equatable, Codable {
     var headline: String
     var reason: String
 

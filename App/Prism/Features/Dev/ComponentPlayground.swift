@@ -29,6 +29,7 @@ struct ComponentPlayground: View {
     @State private var mood: SomaMood? = .good
     @State private var journalAnswers: [String: Bool] = SomaPreviewSamples.journalQuestions.reduce(into: [:]) { $0[$1.id] = $1.answer }
     @State private var moodFeeling: Int? = SomaPreviewSamples.feeling
+    @State private var rollingIndex = 0
 
     var body: some View {
         ScrollView {
@@ -190,6 +191,19 @@ struct ComponentPlayground: View {
 
                 entry("SomaScoreRow") {
                     SomaScoreRow(SomaPreviewSamples.scores) { orbAspect = $0 }
+                }
+
+                entry("somaRollingNumber, SomaSparkline morph, SomaUpdatedNote") {
+                    let value = SomaPreviewSamples.rollingValues[rollingIndex]
+                    VStack(alignment: .leading, spacing: 16) {
+                        SomaUpdatedNote(SomaPreviewSamples.keptReadAt)
+                        SomaStatRow([SomaStat("HRV", value: value.formatted(), unit: "ms")]) { _ in
+                            rollingIndex = (rollingIndex + 1) % SomaPreviewSamples.rollingValues.count
+                        }
+                        SomaSparkline(rollingIndex == 0 ? SomaPreviewSamples.breathing : SomaPreviewSamples.breathing.reversed(),
+                                      band: SomaPreviewSamples.breathingBand)
+                            .frame(height: theme.metrics.chartSparkHeight)
+                    }
                 }
 
                 entry("SomaMoveRow") {
