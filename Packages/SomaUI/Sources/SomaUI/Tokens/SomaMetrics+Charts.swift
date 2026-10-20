@@ -25,6 +25,13 @@ public extension SomaMetrics {
     var chartCompactPlotHeight: CGFloat { 110 }
     /// A sparkline in a trend row or tile.
     var chartSparkHeight: CGFloat { 36 }
+    /// A sparkline's stroke, the dot that ends it on the latest value, the
+    /// points its curve is drawn through, and how far its line is softened
+    /// toward the secondary ink (the dot keeps the full hue).
+    var sparkLine: CGFloat { 1.75 }
+    var sparkEndDot: CGFloat { 7 }
+    var sparkSamples: Int { 48 }
+    var sparkLineMix: Double { 0.3 }
     /// Room kept round the plot so a dot on the edge is never clipped.
     var chartPlotInset: CGFloat { 6 }
     /// Gap between the plot and its labels.

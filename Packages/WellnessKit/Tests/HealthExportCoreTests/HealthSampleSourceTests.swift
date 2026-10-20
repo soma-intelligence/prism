@@ -72,6 +72,37 @@ struct HealthSampleSourceTests {
         #expect(heart?.unit == .countPerMinute)
     }
 
+    @Test("Daily totals read one sum a day, each spanning its day, the last ending now")
+    func dailyTotalsByDay() async throws {
+        var source = StubSource()
+        source.totals[steps.identifier] = 5_000
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/Los_Angeles")!
+        let now = calendar.date(from: DateComponents(year: 2026, month: 10, day: 19, hour: 15))!
+        let from = calendar.date(byAdding: .day, value: -2, to: now)!
+
+        let days = try await source.dailyTotals(steps, from: from, to: now, calendar: calendar)
+        #expect(days.count == 3)
+        #expect(days.map(\.value) == [5_000, 5_000, 5_000])
+        #expect(days.first?.start == calendar.startOfDay(for: from))
+        #expect(days.last?.end == now)
+        for day in days {
+            #expect(calendar.isDate(day.start, inSameDayAs: day.end.addingTimeInterval(-1)))
+        }
+
+        await #expect(throws: HealthReadError.unsupportedQuery(restingHeartRate.identifier)) {
+            _ = try await source.dailyTotals(restingHeartRate, from: from, to: now, calendar: calendar)
+        }
+    }
+
+    @Test("A day with nothing recorded is left out, never read as zero")
+    func dailyTotalsSkipEmptyDays() async throws {
+        let source = StubSource()
+        let now = Date()
+        let days = try await source.dailyTotals(steps, from: now.addingTimeInterval(-3 * 86_400), to: now, calendar: .current)
+        #expect(days.isEmpty)
+    }
+
     @Test("Summing a discrete metric is refused rather than silently wrong")
     func discreteCannotBeTotalled() async {
         let source = StubSource()

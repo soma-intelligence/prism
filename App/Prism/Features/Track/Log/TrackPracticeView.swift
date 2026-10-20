@@ -55,7 +55,7 @@ struct TrackPracticeView: View {
             HStack(spacing: metrics.aspectDotSpacing * 2) {
                 ForEach(0..<Self.wanted, id: \.self) { index in
                     Circle()
-                        .fill(index < count ? theme.aspects[.mind].identity.color : colors.surface.color)
+                        .fill(index < count ? SomaTrackTone.sage.color : colors.surface.color)
                         .frame(width: metrics.aspectDotSize * 1.6, height: metrics.aspectDotSize * 1.6)
                 }
             }

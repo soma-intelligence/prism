@@ -65,7 +65,7 @@ struct WeightPage: View {
         guard !weights.isEmpty else { return "Weigh in here or with a scale that writes to Health, and the trend starts on the second morning." }
         guard let twelve else { return "Twelve weeks of weigh-ins show the trend beneath the day to day." }
         let direction = twelve < 0 ? "Down" : "Up"
-        return "\(direction) \(LabMath.format(abs(twelve), decimals: 1) ?? "") kg in 12 weeks. A Soma visit can show whether it was lean mass or fat."
+        return "\(direction) \(LabMath.format(abs(twelve), decimals: 1) ?? "") kg in 12 weeks. Body fat and lean mass from a smart scale show which one moved."
     }
 
     private func load() async {
@@ -158,8 +158,8 @@ struct BloodPressurePage: View {
 
 // MARK: - Lean body mass
 
-/// Lean body mass: Health's readings over the year, its share of your
-/// weight, and the pod's map by region, which waits for the first visit.
+/// Lean body mass: Health's readings over the year and its share of your
+/// weight.
 struct LeanMassPage: View {
     @Environment(HealthDashboard.self) private var health
 
@@ -181,12 +181,11 @@ struct LeanMassPage: View {
                 return base + ", \(LabMath.format(abs(change), decimals: 1) ?? "") \(change > 0 ? "more" : "less") than on \(first.date.labDay)."
             } ?? "No lean mass yet.",
             reason: latest == nil
-                ? "A smart scale that writes to Health gives a first number; a Soma visit measures it by region."
-                : "From Health. A Soma visit shows where it sits, arm by arm and leg by leg.",
+                ? "A smart scale that writes to Health gives a first number."
+                : "From Health, as your scale wrote it.",
             stats: [
                 SomaStat("Lean mass", value: latest.flatMap { LabMath.format($0.value, decimals: 1) }, unit: "kg"),
                 SomaStat("Of weight", value: share.flatMap { LabMath.format($0, decimals: 0) }, unit: "%"),
-                SomaStat("Grip", value: nil, unit: "kg"),
             ]
         ) {
             SomaChartCard(
@@ -197,9 +196,6 @@ struct LeanMassPage: View {
             ) {
                 if lean.count >= 2 { LabLineChart(points: lean) }
             }
-            SomaChartCard(eyebrow: "By region", value: nil, unit: "kg lean", note: "Comes from a Soma visit.") {
-                BodySilhouette()
-            }
             if !lean.isEmpty {
                 LabRowGroup(heading: "Reading by reading", rows: lean.suffix(5).reversed().map { point in
                     LabRow(point.date.labDay, detail: "\(LabMath.format(point.value, decimals: 1) ?? "-") kg")
@@ -208,7 +204,6 @@ struct LeanMassPage: View {
             LabLogCard(eyebrow: "Log", title: "From a scale or a scan",
                        detail: "Written to Health, where the scale’s own readings land too.", actionTitle: "Log lean mass",
                        aspect: .body) { isLogging = true }
-            LabRowGroup(rows: [LabRow("Soma visit", route: .visit)])
         }
         .navigationTitle("Lean Body Mass")
         .task { await load() }

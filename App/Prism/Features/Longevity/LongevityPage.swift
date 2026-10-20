@@ -5,6 +5,7 @@
 
 import SwiftUI
 import SomaUI
+import HealthExportCore
 
 /// The lenses of the Longevity tab.
 enum LongevitySection: PageSection {
@@ -25,7 +26,7 @@ enum LongevitySection: PageSection {
 /// you, each read over the long run.
 ///
 /// The day lives on Pulse and what you log lives on Track. This tab holds the
-/// slow readings: the pod's visits, the blood panel, every Health reading, and
+/// slow readings: what your wearables read, the lab results you add, and
 /// the environment, which carries no score because it describes what
 /// surrounds you rather than you.
 struct LongevityPage: View {
@@ -67,6 +68,15 @@ struct LongevityPage: View {
             if let name = UserDefaults.standard.string(forKey: "longevity.section"),
                let section = LongevitySection.allCases.first(where: { "\($0)" == name }) {
                 router.longevitySection = section
+            }
+            // `-longevity.metric HKQuantityTypeIdentifierStepCount` (or a score's
+            // identifier) opens a metric's page over the lens, for screenshots.
+            if let identifier = UserDefaults.standard.string(forKey: "longevity.metric"), router.longevityPath.isEmpty {
+                if let metric = HealthMetricCatalog.metric(for: identifier) {
+                    router.longevityPath.append(VaultRoute.dataType(BodyDataType(metric)))
+                } else if let score = ScoreMetric.allCases.first(where: { $0.identifier == identifier }) {
+                    router.longevityPath.append(VaultRoute.score(score))
+                }
             }
         }
 #endif

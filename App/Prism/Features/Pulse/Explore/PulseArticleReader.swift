@@ -13,6 +13,8 @@ struct ArticleReader: View {
     let article: Article
     /// False only for a still render; see `ExploreScroll`.
     var scrolls = true
+    /// Where the read and the save are noted, on this device only.
+    var interest: ExploreInterest = .shared
 
     @Environment(\.somaTheme) private var theme
 
@@ -23,7 +25,7 @@ struct ArticleReader: View {
 
         ExploreScroll(scrolls: scrolls) {
             VStack(alignment: .leading, spacing: 0) {
-                SomaArticleCover(hue: article.topic.hue, symbol: article.topic.symbol, seed: article.slug,
+                SomaArticleCover(tone: article.topic.tone, mark: article.topic.mark, seed: article.slug,
                                  imageURL: article.coverImageURL, asset: article.photo?.asset, size: .reader)
                 if let photo = article.photo {
                     ArticlePhotoCredit(photo: photo)
@@ -79,6 +81,17 @@ struct ArticleReader: View {
 #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
 #endif
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                ArticleSaveButton(isSaved: interest.isSaved(article)) {
+                    interest.toggleSaved(article)
+                }
+            }
+        }
+        // Noted as the reader closes rather than as it opens: Explore holds
+        // its page while covered either way, and a read noted on the way
+        // out never reorders the cards under the zoom in.
+        .onDisappear { interest.noteRead(article) }
     }
 
     /// "Sleep · 4 min · 30 Sep 2026".
@@ -94,6 +107,25 @@ struct PulseArticleReader: View {
 
     var body: some View {
         ArticleReader(article: article.article)
+    }
+}
+
+/// Keeps the piece in Explore's "Saved" shelf, or takes it off. The mark
+/// fills when it is saved; on this device only.
+private struct ArticleSaveButton: View {
+    let isSaved: Bool
+    let toggle: () -> Void
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        Button(action: toggle) {
+            Image(systemName: isSaved ? "bookmark.fill" : "bookmark")
+                .contentTransition(reduceMotion ? .identity : .symbolEffect(.replace))
+        }
+        .accessibilityLabel(isSaved ? "Saved" : "Save")
+        .accessibilityHint(isSaved ? "Takes it off your saved pieces" : "Keeps it in Explore under Saved")
+        .sensoryFeedback(.selection, trigger: isSaved)
     }
 }
 

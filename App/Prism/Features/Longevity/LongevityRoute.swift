@@ -14,6 +14,6 @@ import Foundation
 enum LongevityRoute: Hashable {
     /// VO2 max, resting heart rate, recovery, zones and the latest run.
     case cardio
-    /// Lean mass, grip, strength sessions and the next session.
+    /// Lean mass, strength sessions and the next session.
     case strength
 }

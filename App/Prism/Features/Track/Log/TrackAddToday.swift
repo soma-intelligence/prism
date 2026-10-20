@@ -6,8 +6,8 @@
 import SwiftUI
 import SomaUI
 
-/// "Add to today", at the head of the Journal: a grid of tinted glyph tiles,
-/// four to a row, each opening one entry as a sheet, and under it what is
+/// "Add to today", at the head of the Journal: a grid of line glyph tiles,
+/// four to a row, in the order the person set in Customize, each opening one entry as a sheet, and under it what is
 /// already running or filling today (a fast, the day's glass) as rows that
 /// open their page.
 ///
@@ -27,41 +27,18 @@ struct TrackAddToday: View {
 
     private let log = TrackLogStore.shared
 
-    private struct Tile: Identifiable {
-        var id: String { title }
-        var title: String
-        var symbol: String
-        var hue: SomaHealthHue
-        var route: TrackRoute?
-    }
+    private let layout = TrackQuickAddLayout.shared
 
-    private var tiles: [Tile] {
-        [
-            Tile(title: "Drink", symbol: "drop.fill", hue: .medications, route: .drink(.water)),
-            Tile(title: "Meal", symbol: "fork.knife", hue: .nutrition, route: .food),
-            Tile(title: log.currentFast == nil ? "Fast" : "Fasting", symbol: "timer", hue: .mobility, route: .fasting),
-            Tile(title: "Mood", symbol: "face.smiling", hue: .symptoms, route: .moodNow),
-            Tile(title: "Weight", symbol: "scalemass.fill", hue: .body, route: .weight),
-            Tile(title: "Breathe", symbol: "wind", hue: .mind, route: .practice(.meditation)),
-            Tile(title: "Sauna", symbol: "flame.fill", hue: .vitals, route: .practice(.sauna)),
-            Tile(title: "Cold plunge", symbol: "snowflake", hue: .hearing, route: .practice(.coldPlunge)),
-            Tile(title: "Evening", symbol: "moon.stars.fill", hue: .sleep, route: .evening),
-            Tile(title: "Woke", symbol: "sunrise.fill", hue: .cycle, route: .wake),
-            Tile(title: "Supplement", symbol: "pills.fill", hue: .respiratory, route: .dose(nil)),
-            Tile(title: "Scan", symbol: "camera.viewfinder", hue: .heart, route: .cameraScan),
-            Tile(title: "Blood test", symbol: "drop.halffull", hue: .vitals, route: nil),
-            Tile(title: "Height", symbol: "ruler.fill", hue: .body, route: .height),
-        ]
-    }
-
-    /// Tiles shown while folded: two rows, the eighth slot is "More".
+    /// Tiles shown while folded: two rows, the eighth slot is "More". Eight
+    /// tiles or fewer show whole, with no More.
     private static let folded = 7
 
     var body: some View {
         let metrics = theme.metrics
-        let all = tiles
-        let shown = showsAll ? all : Array(all.prefix(Self.folded))
-        let slots = shown.map(Optional.some) + [nil]
+        let all = layout.shown
+        let folds = all.count > Self.folded + 1
+        let shown = folds && !showsAll ? Array(all.prefix(Self.folded)) : all
+        let slots = shown.map(Optional.some) + (folds ? [nil] : [])
         let rows = stride(from: 0, to: slots.count, by: 4).map { Array(slots[$0..<min($0 + 4, slots.count)]) }
 
         VStack(alignment: .leading, spacing: metrics.cardSpacing) {
@@ -73,7 +50,7 @@ struct TrackAddToday: View {
                         ForEach(0..<4, id: \.self) { column in
                             if column < rows[index].count {
                                 if let tile = rows[index][column] {
-                                    SomaGlyphTile(tile.title, symbol: tile.symbol, hue: tile.hue) {
+                                    SomaGlyphTile(title(tile), glyph: tile.glyph, tone: tile.tone) {
                                         if let route = tile.route { opened = route } else { opensBloodTest = true }
                                     }
                                 } else {
@@ -98,30 +75,15 @@ struct TrackAddToday: View {
         }
     }
 
+    private func title(_ tile: TrackQuickAdd) -> String {
+        tile == .fast && log.currentFast != nil ? "Fasting" : tile.title
+    }
+
     /// The last slot: opens the rest of the tiles, or folds them away.
     private var moreTile: some View {
-        let metrics = theme.metrics
-        let colors = theme.colors
-        return Button {
+        SomaGlyphTile(showsAll ? "Less" : "More", glyph: showsAll ? .less : .more, tone: nil) {
             if reduceMotion { showsAll.toggle() } else { withAnimation(theme.motion.selection) { showsAll.toggle() } }
-        } label: {
-            VStack(spacing: metrics.journalTileLabelSpacing) {
-                Image(systemName: showsAll ? "chevron.up" : "ellipsis")
-                    .font(.system(size: metrics.journalTileGlyph, weight: .semibold))
-                    .foregroundStyle(colors.inkPrimary.color)
-                    .frame(height: metrics.journalTileGlyph * 1.3)
-                Text(showsAll ? "Less" : "More")
-                    .somaFont(theme.typography.tabLabel)
-                    .foregroundStyle(colors.inkPrimary.color)
-            }
-            .frame(maxWidth: .infinity, minHeight: metrics.journalTileHeight)
-            .background(
-                RoundedRectangle(cornerRadius: metrics.journalTileCornerRadius, style: .continuous)
-                    .fill(colors.surface.color)
-            )
-            .contentShape(.rect)
         }
-        .buttonStyle(.somaGlassPress)
     }
 
     /// `-track.entry fasting` (or weight, height, scan, evening, mood, water,

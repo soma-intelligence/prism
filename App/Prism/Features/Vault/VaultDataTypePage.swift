@@ -2,23 +2,25 @@
 //  VaultDataTypePage.swift
 //  Prism
 //
-//  The page every metric opens on, from a Body tile, a Today row or the
-//  Vault: every reading the app holds for the metric, in the Health look,
-//  and no prose.
+//  The page every metric opens on, from a Body tile, a Today row, a
+//  category or the Vault: today's value and what it means, one chart over a
+//  chosen span against the person's usual, a few facts, and where the
+//  readings came from. The long words wait behind the info control.
 //
 
 import SwiftUI
 import SomaUI
 import HealthExportCore
 
-/// One data type, top to bottom: the latest value with where it stands and
-/// what it means; the other types of its category; the chart over a chosen
-/// span, with its band, paging and scrubbing; min, average and max; the
-/// change over 3 to 90 days; projections for body composition; then every
-/// record, the unit and the sources.
+/// One data type, top to bottom: the hero (when the number is from, the
+/// number, one line on what it means), the range picker, the chart with the
+/// usual band behind it, at most three facts, then the sources and the way
+/// into every reading. The category's other types sit in the title's menu;
+/// what the metric is and how its band is read sit in the info sheet.
 ///
-/// The math is in ``MetricDetailMath`` and the per metric choices in
-/// ``MetricProfile``; this view reads and lays out.
+/// The math is in ``MetricDetailMath``, the words in ``MetricPageWords`` and
+/// ``MetricAbout``, the per metric choices in ``MetricProfile``; this view
+/// reads and lays out.
 struct VaultDataTypePage: View {
     let subject: VaultSubject
 
@@ -27,114 +29,211 @@ struct VaultDataTypePage: View {
 
     @Environment(HealthDashboard.self) private var health
     @Environment(\.somaTheme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// The metric showing: the one opened, or a sibling switched to in place.
     @State private var current: VaultSubject?
     @State private var period: VaultPeriod?
-    /// Whole spans paged back from today.
-    @State private var page = 0
-    @State private var master: MetricMaster?
-    @State private var latest: HealthReading?
-    /// The hours of the day shown under D, which reads the store directly.
-    @State private var hours: [VaultPoint] = []
+    /// The year and today's hours, with the metric they were read for: a
+    /// sibling picked from the title shows a blank chart until its own data
+    /// lands, never the last metric's under its name.
+    @State private var read: VaultLoaded<VaultSubject, VaultMasterRead>?
     @State private var siblings: [VaultSubject] = []
-    @State private var origins: [VaultMasterReader.Origin] = []
+    /// The sources, with the metric and span they were read for.
+    @State private var sourcesRead: VaultLoaded<WindowKey, [VaultMasterReader.Origin]>?
+    @State private var showsInfo = false
 
     private var shown: VaultSubject { current ?? subject }
+    /// The year of the metric showing, nil until it is read.
+    private var master: MetricMaster? { read?.value(for: shown)?.master }
+    /// Today's hours, read straight from the store: the Day chart, and
+    /// whether the metric is read through the day at all.
+    private var hours: [VaultPoint] { read?.value(for: shown)?.hours ?? [] }
+    private var origins: [VaultMasterReader.Origin] {
+        sourcesRead?.value(for: WindowKey(subject: shown, period: span)) ?? []
+    }
     /// The HealthKit type behind the page, nil for a score.
     private var type: BodyDataType? { if case .health(let type) = shown { type } else { nil } }
     private var score: ScoreMetric? { if case .score(let score) = shown { score } else { nil } }
     private var identifier: String { type?.metric.identifier ?? score?.identifier ?? "" }
     private var profile: MetricProfile { score?.profile(health.scores) ?? MetricProfile.of(identifier) }
-    private var span: VaultPeriod { period ?? profile.period }
     private var calendar: Calendar { .current }
-    /// The category's hue: lines, bars and sparklines are never ink only.
+    /// The category's hue: the chart is never ink only.
     private var hue: SomaHealthHue {
         if let type { return BodyCategory.containing(type)?.hue ?? .other }
         return .sleep
     }
     private var isSleep: Bool { identifier == MetricProfile.sleep }
     private var isCount: Bool { type?.metric.kind == .category && !isSleep }
+    private var dayIsUseful: Bool { type != nil && !isSleep && !isCount && hours.filter { $0.value != nil }.count >= 3 }
+    private var offered: [VaultPeriod] { MetricPageWords.ranges(dayIsUseful: dayIsUseful) }
+    private var span: VaultPeriod {
+        if let period, offered.contains(period) { return period }
+        return MetricPageWords.opening(profile.period, offered: offered)
+    }
+    private var kind: MetricPageWords.Kind {
+        if score != nil { return .score }
+        if isSleep { return .night }
+        if profile.accumulates || isCount { return .total }
+        return .reading(manyADay: dayIsUseful)
+    }
+    private var title: String {
+        if let score { return score.title }
+        return MetricPageWords.title(identifier: identifier, fallback: shown.title)
+    }
 
     var body: some View {
         let metrics = theme.metrics
         let detail = self.detail
 
         ScrollView {
-            VStack(alignment: .leading, spacing: metrics.cardSpacing) {
-                VaultHero(
+            VStack(alignment: .leading, spacing: metrics.leadSpacing) {
+                SomaMetricHero(
+                    caption: detail.caption,
                     value: detail.heroValue,
                     unit: detail.unit,
-                    standing: detail.standing,
-                    legend: detail.legend,
-                    cue: detail.insight?.cue,
-                    tone: detail.insight?.tone ?? .neutral
+                    meaning: detail.meaning?.text,
+                    tone: detail.meaning?.tone ?? .neutral
                 )
 
-                if !siblings.isEmpty {
-                    VaultSiblingChips(types: siblings, selected: shown) { picked in
-                        current = picked
+                VStack(alignment: .leading, spacing: metrics.cardSpacing) {
+                    if offered.count > 1 {
+                        SomaSegmentedControl(
+                            segments: offered.map { SomaSegment(id: $0, title: LocalizedStringResource(stringLiteral: MetricPageWords.title($0))) },
+                            selection: Binding(get: { span }, set: { period = $0 })
+                        )
+                        .frame(maxWidth: .infinity)
                     }
+                    chart(detail)
                 }
 
-                Picker("Period", selection: Binding(get: { span }, set: { period = $0; page = 0 })) {
-                    ForEach(VaultPeriod.allCases) { period in
-                        Text(period.short).tag(period)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .padding(.top, metrics.cardSpacing)
-
-                VaultDetailChart(
-                    buckets: detail.buckets,
-                    hue: hue,
-                    period: span,
-                    chart: profile.chart,
-                    domain: detail.domain,
-                    format: format,
-                    canGoBack: canGoBack,
-                    canGoForward: page > 0,
-                    page: { page = max(0, page + $0) }
-                )
-
-                if let stats = detail.stats {
-                    SomaStatRow([
-                        SomaStat("Min", value: format(stats.minimum)),
-                        SomaStat("Average", value: format(stats.average)),
-                        SomaStat("Max", value: format(stats.maximum)),
-                    ])
-                    .padding(.top, metrics.cardSpacing)
+                if !detail.facts.isEmpty {
+                    SomaFactStrip(detail.facts)
                 }
 
-                if !detail.trends.isEmpty {
-                    VaultTrendsTable(rows: detail.trends, unit: detail.unit, last: detail.lastDate, hue: hue, format: format)
-                        .padding(.top, metrics.leadSpacing)
-                }
-
-                if !detail.projections.isEmpty {
-                    VaultProjections(rows: detail.projections, unit: detail.unit, format: format)
-                        .padding(.top, metrics.leadSpacing)
-                }
-
-                VaultOptions(type: type, unit: detail.unit, origins: origins)
-                    .padding(.top, metrics.leadSpacing)
+                sources
             }
             .padding(metrics.pagePadding)
             .frame(maxWidth: metrics.pageMaxWidth, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
         .background(theme.colors.canvas.color.ignoresSafeArea())
-        .navigationTitle(shown.title)
+        .navigationTitle(title)
 #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
 #endif
+        .toolbarTitleMenu {
+            if !siblings.isEmpty {
+                ForEach(siblings) { sibling in
+                    Button {
+                        current = sibling
+                    } label: {
+                        if sibling == shown {
+                            Label(siblingTitle(sibling), systemImage: "checkmark")
+                        } else {
+                            Text(siblingTitle(sibling))
+                        }
+                    }
+                }
+            }
+        }
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    showsInfo = true
+                } label: {
+                    Image(systemName: "info.circle")
+                }
+                .accessibilityLabel(Text("About \(title)"))
+            }
+        }
+        .sheet(isPresented: $showsInfo) {
+            SomaInfoSheet(title: title, sections: infoSections(detail))
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+        }
         .task(id: shown) { await loadMaster() }
-        .task(id: WindowKey(subject: shown, period: span, page: page)) { await loadWindow() }
+        .task(id: WindowKey(subject: shown, period: span)) { await loadSources() }
         .refreshable {
             await loadMaster()
-            await loadWindow()
+            await loadSources()
         }
+    }
+
+    // MARK: - Parts
+
+    @ViewBuilder
+    private func chart(_ detail: Detail) -> some View {
+        if master != nil {
+            SomaMetricChart(
+                buckets: detail.buckets,
+                style: chartStyle,
+                hue: hue,
+                domain: detail.domain,
+                bandLabels: detail.bandLabels,
+                summaryLabel: detail.summaryLabel,
+                summaryValue: detail.summaryValue,
+                unit: detail.unit
+            )
+            // A sibling is another metric: it draws in afresh rather than
+            // morphing out of the last one.
+            .id(shown)
+        } else {
+            Color.clear
+                .frame(height: theme.metrics.metricChartHeight + theme.metrics.leadSpacing * 2)
+        }
+    }
+
+    @ViewBuilder
+    private var sources: some View {
+        let listed = MetricPageWords.sources(origins)
+        if let type {
+            VStack(alignment: .leading, spacing: theme.metrics.cardSpacing) {
+                Text("Sources")
+                    .somaFont(theme.typography.eyebrow)
+                    .textCase(.uppercase)
+                    .foregroundStyle(theme.colors.inkSecondary.color)
+                    .accessibilityAddTraits(.isHeader)
+                SomaSourceList(listed) {
+                    NavigationLink(value: VaultRoute.allData(type)) {
+                        SomaBrowseRow(title: "All readings")
+                            .contentShape(.rect)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .animation(reduceMotion ? nil : theme.motion.chartFade, value: listed)
+            }
+            .padding(.top, theme.metrics.cardSpacing)
+        }
+    }
+
+    private var chartStyle: SomaMetricChartStyle {
+        switch profile.chart {
+        case .bars: .bars
+        case .line: .line
+        case .points: .points
+        case .bloodPressure: .ranges
+        }
+    }
+
+    private func siblingTitle(_ sibling: VaultSubject) -> String {
+        switch sibling {
+        case .health(let type): MetricPageWords.title(identifier: type.metric.identifier, fallback: type.title)
+        case .score(let score): score.title
+        }
+    }
+
+    private func infoSections(_ detail: Detail) -> [SomaInfoSection] {
+        MetricAbout.sections(
+            identifier: identifier,
+            title: title,
+            band: detail.band,
+            isReference: detail.isReference,
+            accumulates: profile.accumulates,
+            hasSources: type != nil,
+            unit: detail.unit,
+            format: format
+        )
     }
 
     // MARK: - What the page shows
@@ -142,29 +241,21 @@ struct VaultDataTypePage: View {
     private struct WindowKey: Hashable {
         var subject: VaultSubject
         var period: VaultPeriod
-        var page: Int
     }
 
     private struct Detail {
+        var caption: String?
         var heroValue: String?
         var unit: String?
-        var standing: MetricDetailMath.Standing?
-        var legend: String?
-        var insight: Insight?
-        var buckets: [MetricDetailMath.Bucket] = []
+        var meaning: MetricPageWords.Meaning?
+        var band: ClosedRange<Double>?
+        var isReference = false
+        var buckets: [SomaChartBucket] = []
         var domain: ClosedRange<Double> = 0...1
-        var stats: MetricDetailMath.Stats?
-        var trends: [MetricDetailMath.TrendRow] = []
-        var projections: [MetricDetailMath.Projection] = []
-        var lastDate: Date?
-    }
-
-    private var windowEnd: Date { span.shifted(.now, by: page, calendar: calendar) }
-
-    private var canGoBack: Bool {
-        guard let master else { return false }
-        let start = span.interval(endingAt: windowEnd, calendar: calendar).start
-        return start > master.date(at: 0, calendar: calendar)
+        var bandLabels: (low: String, high: String)?
+        var summaryLabel = ""
+        var summaryValue: String?
+        var facts: [SomaFact] = []
     }
 
     private var detail: Detail {
@@ -173,82 +264,111 @@ struct VaultDataTypePage: View {
         guard let master else { return detail }
 
         let band = MetricDetailMath.band(master.days, profile: profile)
-        let standing = MetricDetailMath.standing(master.days, profile: profile, todayOpen: profile.accumulates)
-        detail.standing = standing
-        if let range = standing.band {
-            detail.legend = "\(standing.isReference ? "Normal" : "Usual") \(format(range.lowerBound)) to \(format(range.upperBound))"
-        }
-        detail.heroValue = heroValue(master)
-        detail.insight = insight(master)
+        let standing = MetricDetailMath.standing(master.days, profile: profile)
+        let lastIndex = master.lastIndex
+        let lastDay = lastIndex.map { master.date(at: $0, calendar: calendar) }
+        let today = calendar.startOfDay(for: .now)
+        let todayOpen = profile.accumulates && lastDay.map { calendar.isDate($0, inSameDayAs: today) } == true
+        let value = lastIndex.flatMap { master.days[$0] }
+        let known = master.days.compactMap { $0 }.count
 
-        // The chart's buckets: hours of a day straight from the store, the
-        // rest folded from the daily year.
-        let buckets: [MetricDetailMath.Bucket]
-        if span == .day, type != nil {
-            let dayBand = master.index(of: windowEnd, calendar: calendar).flatMap { band?.range(at: $0) }
-            buckets = hours.map { MetricDetailMath.Bucket(interval: $0.interval, value: $0.value.map(scaled), band: dayBand) }
+        detail.band = standing.band
+        detail.isReference = standing.isReference
+        detail.caption = MetricPageWords.caption(for: lastDay, kind: kind, calendar: calendar)
+        detail.heroValue = heroValue(master)
+        detail.meaning = MetricPageWords.meaning(
+            value: value,
+            band: standing.band,
+            isReference: standing.isReference,
+            known: known,
+            todayOpen: todayOpen,
+            risingIsGood: profile.risingIsGood,
+            format: format,
+            unit: unitLabel
+        )
+
+        // The chart: hours of today straight from the store, the rest
+        // folded from the daily year.
+        let now = Date.now
+        let window = span.interval(endingAt: now, calendar: calendar)
+        let folded: [MetricDetailMath.Bucket]
+        if span == .day {
+            let dayBand = master.index(of: now, calendar: calendar).flatMap { band?.range(at: $0) }
+            // A total's usual is for a whole day; an hour has none.
+            folded = hours.map {
+                MetricDetailMath.Bucket(interval: $0.interval, value: $0.value.map(scaled), band: profile.accumulates ? nil : dayBand)
+            }
         } else {
-            buckets = MetricDetailMath.buckets(
-                master, band: band, intervals: span.buckets(endingAt: windowEnd, calendar: calendar), calendar: calendar
+            folded = MetricDetailMath.buckets(
+                master, band: band, intervals: span.buckets(endingAt: now, calendar: calendar), calendar: calendar
             )
         }
-        detail.buckets = buckets
-        let values = buckets.compactMap(\.value) + buckets.compactMap(\.secondary)
+        detail.buckets = folded.enumerated().map { index, bucket in
+            SomaChartBucket(
+                id: index,
+                value: bucket.value,
+                low: bucket.secondary,
+                band: bucket.band,
+                axisLabel: MetricPageWords.axisLabel(span, index: index, count: folded.count, start: bucket.interval.start, calendar: calendar),
+                readout: MetricPageWords.readout(span, interval: bucket.interval),
+                valueText: bucket.value.map { value in bucket.secondary.map { "\(format(value))/\(format($0))" } ?? format(value) }
+            )
+        }
+        let values = folded.compactMap(\.value) + folded.compactMap(\.secondary)
         detail.domain = MetricDetailMath.domain(
-            values: values, bands: buckets.compactMap(\.band), ceiling: profile.ceiling, zeroBased: profile.chart == .bars
+            values: values, bands: folded.compactMap(\.band), ceiling: profile.ceiling,
+            zeroBased: profile.chart == .bars
         )
-        detail.stats = MetricDetailMath.stats(buckets.map(\.value))
+        if let range = folded.compactMap(\.band).last {
+            detail.bandLabels = (format(range.lowerBound), format(range.upperBound))
+        }
+        detail.summaryLabel = MetricPageWords.summaryLabel(span, kind: kind, span: window, now: now, calendar: calendar)
+        let shownValues = folded.compactMap(\.value)
+        if !shownValues.isEmpty {
+            let summary = span == .day && profile.accumulates
+                ? shownValues.reduce(0, +)
+                : shownValues.reduce(0, +) / Double(shownValues.count)
+            detail.summaryValue = format(summary)
+        }
 
-        detail.trends = MetricDetailMath.trendRows(
-            master.days, risingIsGood: profile.risingIsGood, openDayTail: profile.accumulates ? 1 : 0
-        )
-        if profile.projects { detail.projections = MetricDetailMath.projections(master.days) }
-        detail.lastDate = master.lastIndex.map { master.date(at: $0, calendar: calendar) }
+        // At most three facts: the usual, the month against the one before,
+        // and either where body composition is heading or how many days sat
+        // in the band.
+        let openTail = todayOpen ? 1 : 0
+        var facts = [MetricPageWords.usualFact(band: standing.band, isReference: standing.isReference, format: format)]
+        if score?.isClock != true, let trend = MetricPageWords.trendFact(
+            days: master.days, openDayTail: openTail, risingIsGood: profile.risingIsGood,
+            accumulates: profile.accumulates, format: format
+        ) {
+            facts.append(trend)
+        }
+        if profile.projects, let projected = MetricPageWords.projectionFact(MetricDetailMath.projections(master.days), format: format, unit: unitLabel) {
+            facts.append(projected)
+        } else if let inBand = MetricPageWords.daysInBandFact(days: master.days, band: band, openDayTail: openTail) {
+            facts.append(inBand)
+        }
+        detail.facts = known == 0 ? [] : facts
         return detail
     }
 
-    /// The day's total for a sum, last night for sleep, systolic over
-    /// diastolic for pressure, else the latest record.
+    /// The latest day's value: the total so far for a sum, last night for
+    /// sleep, systolic over diastolic for pressure, else the day's mean, so
+    /// the number and its line are read against the same band.
     private func heroValue(_ master: MetricMaster) -> String? {
+        guard let index = master.lastIndex, let value = master.days[index] else { return nil }
         if let secondary = master.secondary {
-            guard let index = master.lastIndex, let high = master.days[index], let low = secondary[index] else { return nil }
-            return "\(format(high))/\(format(low))"
+            guard let low = secondary[index] else { return format(value) }
+            return "\(format(value))/\(format(low))"
         }
-        if isSleep || isCount || profile.accumulates {
-            return master.days.last.flatMap { $0 }.map(format)
-                ?? (isSleep ? master.days.suffix(2).compactMap { $0 }.last.map(format) : nil)
-        }
-        if let type, let latest { return format(VaultFormat.scaled(latest.value, unit: type.metric.unit)) }
-        return master.lastIndex.flatMap { master.days[$0] }.map(format)
-    }
-
-    /// The engine's cue, for the metrics Soma interprets. The year is cut to
-    /// the ninety days the engine reads and turned into the unit Body reads
-    /// it in (km/h rather than m/s).
-    private func insight(_ master: MetricMaster) -> Insight? {
-        let days = Array(master.days.suffix(BodyBiomarkers.lookback))
-        let insight: Insight
-        if let type, let interpreted = InsightMetric.metric(for: type.metric.identifier) {
-            let factor: Double = BodyBiomarkerSpec(interpreted).map { $0.display(1) / VaultFormat.scaled(1, unit: type.metric.unit) } ?? 1
-            insight = InsightEngine.interpret(interpreted, days: days.map { $0.map { $0 * factor } })
-        } else if let score, !score.isClock {
-            let policy: InsightPolicy = switch profile.risingIsGood {
-            case true: .score
-            case false: InsightPolicy(preference: .lower, minimumSpread: InsightPolicy.score.minimumSpread, trendStep: InsightPolicy.score.trendStep)
-            default: .load
-            }
-            insight = InsightEngine.interpret(days, policy: score.isDuration ? InsightPolicy(preference: policy.preference, minimumSpread: 0.25, trendStep: 0.25) : policy)
-        } else {
-            return nil
-        }
-        return insight.cue == nil ? nil : insight
+        return format(value)
     }
 
     private var unitLabel: String? {
         if let score { return score.unit }
         if isSleep { return nil }
         if isCount { return "records" }
-        return type?.metric.unit.shortLabel
+        guard let type else { return nil }
+        return MetricPageWords.unit(identifier: identifier, fallback: type.metric.unit.shortLabel)
     }
 
     private func scaled(_ value: Double) -> Double {
@@ -257,13 +377,22 @@ struct VaultDataTypePage: View {
     }
 
     private func format(_ value: Double) -> String {
-        let wording = PulseWording(calendar: calendar, locale: .current)
-        if isSleep || score?.isDuration == true { return wording.clock(value * 3600) }
+        if isSleep || score?.isDuration == true {
+            return Duration.seconds((value * 3600).rounded()).formatted(.units(allowed: [.hours, .minutes], width: .narrow))
+        }
         if score?.isClock == true {
             let hour = value.truncatingRemainder(dividingBy: 24)
-            return wording.clock((hour < 0 ? hour + 24 : hour) * 3600)
+            return PulseWording(calendar: calendar, locale: .current).clock((hour < 0 ? hour + 24 : hour) * 3600)
         }
+        if readsWhole { return VaultFormat.number(value.rounded()) }
         return VaultFormat.number(value)
+    }
+
+    /// Beats, pressure, milliseconds and counts read as whole numbers: a
+    /// day's mean of 71.8 bpm says no more than 72.
+    private var readsWhole: Bool {
+        guard let type, identifier != "HKQuantityTypeIdentifierRespiratoryRate" else { return false }
+        return [.countPerMinute, .millimeterOfMercury, .millisecond, .count].contains(type.metric.unit)
     }
 
     // MARK: - Reading
@@ -272,8 +401,8 @@ struct VaultDataTypePage: View {
         if let score {
             await health.loadScores()
             guard !Task.isCancelled, let scores = health.scores else { return }
-            master = MetricMaster(today: calendar.startOfDay(for: .now), days: score.days(scores))
-            latest = nil
+            read = VaultLoaded(key: .score(score), value: VaultMasterRead(
+                master: MetricMaster(today: calendar.startOfDay(for: .now), days: score.days(scores)), hours: []))
             siblings = ScoreMetric.allCases
                 .filter { $0.days(scores).contains { $0 != nil } }
                 .map(VaultSubject.score)
@@ -287,11 +416,13 @@ struct VaultDataTypePage: View {
         guard let source = await health.prepare([metric.identifier, MetricProfile.diastolic, MetricProfile.systolic]) else { return }
         let reader = VaultMasterReader(source: source)
         async let year = reader.master(metric, now: .now)
-        async let record = VaultReader(source: source).latestRecord(metric)
-        let (read, newest) = await (year, record)
+        let readsHours = metric.identifier != MetricProfile.sleep && metric.kind != .category
+        async let day: [VaultPoint] = readsHours ? VaultReader(source: source).series(metric, period: .day, now: .now) : []
+        let (read, today) = await (year, day)
         guard !Task.isCancelled else { return }
-        master = read
-        latest = newest
+        withAnimation(reduceMotion ? nil : theme.motion.chartFade) {
+            self.read = VaultLoaded(key: .health(type), value: VaultMasterRead(master: read, hours: today))
+        }
         siblings = await withData(BodyCategory.containing(type)?.types ?? [], source: source).map(VaultSubject.health)
     }
 
@@ -311,23 +442,38 @@ struct VaultDataTypePage: View {
         return kept.count > 1 ? kept : []
     }
 
-    private func loadWindow() async {
+    /// The sources behind the span on show.
+    private func loadSources() async {
+        let key = WindowKey(subject: shown, period: span)
         guard let type else {
-            origins = []
+            sourcesRead = VaultLoaded(key: key, value: [])
             return
         }
         let metric = type.metric
         guard let source = await health.prepare([metric.identifier]) else { return }
-        let window = span.interval(endingAt: windowEnd, calendar: calendar)
-        if span == .day {
-            let points = await VaultReader(source: source).series(metric, period: .day, now: windowEnd)
-            guard !Task.isCancelled else { return }
-            hours = points
-        }
+        let window = span.interval(endingAt: .now, calendar: calendar)
         let found = await VaultMasterReader(source: source).origins(metric, in: window)
         guard !Task.isCancelled else { return }
-        origins = found
+        sourcesRead = VaultLoaded(key: key, value: found)
     }
+}
+
+/// A value read for one key, such as the metric a page shows: handed back
+/// only while the page still asks for that key, so a switch never shows the
+/// last key's value under the new one.
+struct VaultLoaded<Key: Hashable, Value> {
+    var key: Key
+    var value: Value
+
+    func value(for current: Key) -> Value? {
+        key == current ? value : nil
+    }
+}
+
+/// A metric's year, and today's hours.
+struct VaultMasterRead {
+    var master: MetricMaster
+    var hours: [VaultPoint]
 }
 
 /// What a data type page shows: a HealthKit type, or one of Soma's scores.

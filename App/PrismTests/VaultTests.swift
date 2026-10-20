@@ -271,3 +271,23 @@ struct VaultRecordWhenTests {
         #expect(!older.contains("2026"))
     }
 }
+
+/// A metric page switched to a sibling from its title.
+@Suite("Vault page switch")
+struct VaultPageSwitchTests {
+    @Test("A sibling never shows the last metric's data under its own name")
+    func readIsKeyedByItsMetric() throws {
+        let heart = try #require(HealthMetricCatalog.metric(for: "HKQuantityTypeIdentifierHeartRate"))
+        let resting = try #require(HealthMetricCatalog.metric(for: "HKQuantityTypeIdentifierRestingHeartRate"))
+        let opened = VaultSubject.health(BodyDataType(heart))
+        let sibling = VaultSubject.health(BodyDataType(resting))
+
+        let read = VaultLoaded(key: opened, value: [62.0, 64, 61])
+        #expect(read.value(for: opened) == [62, 64, 61])
+        // Switched: nothing until the sibling's own read lands.
+        #expect(read.value(for: sibling) == nil)
+        let next = VaultLoaded(key: sibling, value: [54.0])
+        #expect(next.value(for: sibling) == [54])
+        #expect(next.value(for: .score(.sleepScore)) == nil)
+    }
+}

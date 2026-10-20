@@ -169,10 +169,12 @@ struct PulseWording {
         return line
     }
 
-    func bodySummary(age: Int?) -> String {
-        let base = "No fitness age yet. It comes from a Soma visit."
-        guard let age else { return base }
-        return base + " You are \(age)."
+    /// The body card's line: where fitness age sits against your age, read
+    /// off the watch's VO2 max, or what it needs.
+    func bodySummary(_ fitness: BodyFitnessAge.Stat) -> String {
+        guard fitness.value != nil else { return "Fitness age needs a VO2 max from your watch." }
+        guard let cue = fitness.cue else { return "Read off your watch’s VO2 max." }
+        return "\(cue), read off your watch’s VO2 max."
     }
 
     /// A 0 to 100 score as the row prints it.

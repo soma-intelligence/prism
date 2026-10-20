@@ -84,7 +84,7 @@ struct TrackIntakeView: View {
         let today = log.drinks(on: now).reduce(0) { $0 + $1.caffeineMg }
         let curve = TrackCaffeine.curve(doses: doses, from: now, to: bedtime, count: 24)
         let peak = max(curve.max() ?? 0, 1)
-        let hue = theme.aspects[.activity].identity.color
+        let hue = SomaTrackTone.sand.color
 
         return VStack(alignment: .leading, spacing: metrics.cardSpacing) {
             HStack(alignment: .firstTextBaseline) {
@@ -108,7 +108,7 @@ struct TrackIntakeView: View {
                     ))
                     .frame(height: metrics.chartTrackHeight * 1.5)
                 Circle()
-                    .fill(theme.aspects[.sleep].identity.color)
+                    .fill(SomaTrackTone.dusk.color)
                     .frame(width: metrics.aspectDotSize * 2, height: metrics.aspectDotSize * 2)
             }
             .accessibilityHidden(true)

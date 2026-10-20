@@ -41,6 +41,17 @@ public struct SomaMotion: Sendable, Equatable {
     public var arrivalBlur: CGFloat
     /// The scale a page arrives from.
     public var arrivalScale: CGFloat
+    /// The scale the orb settles to under a finger. Shallow: a sphere that
+    /// size reads a few points as a press, and more as a flinch.
+    public var orbPressScale: CGFloat
+    /// How much the orb brightens under a finger, as if the touch lit it.
+    public var orbPressBrightness: Double
+    /// The orb sinking under a finger: quick and without bounce, so it
+    /// answers the touch before the finger lifts.
+    public var orbPress: Animation
+    /// The orb rising back when the finger lifts: a touch slower, with a
+    /// little bounce, so it settles rather than snaps.
+    public var orbRelease: Animation
 
     public init(
         // Snappy rather than smooth: the bubble has to leave quickly and settle
@@ -60,7 +71,11 @@ public struct SomaMotion: Sendable, Equatable {
         partSlide: CGFloat = 36,
         tabEntrance: Animation = .smooth(duration: 0.5),
         arrivalBlur: CGFloat = 8,
-        arrivalScale: CGFloat = 0.985
+        arrivalScale: CGFloat = 0.985,
+        orbPressScale: CGFloat = 0.965,
+        orbPressBrightness: Double = 0.05,
+        orbPress: Animation = .spring(duration: 0.18, bounce: 0),
+        orbRelease: Animation = .spring(duration: 0.42, bounce: 0.28)
     ) {
         self.selection = selection
         self.pressDuration = pressDuration
@@ -76,6 +91,10 @@ public struct SomaMotion: Sendable, Equatable {
         self.tabEntrance = tabEntrance
         self.arrivalBlur = arrivalBlur
         self.arrivalScale = arrivalScale
+        self.orbPressScale = orbPressScale
+        self.orbPressBrightness = orbPressBrightness
+        self.orbPress = orbPress
+        self.orbRelease = orbRelease
     }
 
     public static let standard = SomaMotion()

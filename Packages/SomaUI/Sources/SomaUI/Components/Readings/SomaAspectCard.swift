@@ -5,7 +5,7 @@
 
 import SwiftUI
 
-/// One card per aspect: its identity dot and name, the value that sums it up,
+/// One card per aspect: its glyph and name, the value that sums it up,
 /// one line saying what the value means, and a small chart at the end.
 public struct SomaAspectCard<Chart: View>: View {
     private let aspect: SomaAspect
@@ -39,15 +39,12 @@ public struct SomaAspectCard<Chart: View>: View {
         let metrics = theme.metrics
         let type = theme.typography
         let colors = theme.colors
-        let hue = theme.aspects[aspect].identity.color
 
         SomaCard {
             HStack(alignment: .center, spacing: metrics.cardSpacing) {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(spacing: metrics.identityDotSpacing) {
-                        Circle()
-                            .fill(hue)
-                            .frame(width: metrics.identityDotDiameter, height: metrics.identityDotDiameter)
+                        SomaAspectGlyph(aspect, style: .caption)
                         Text(aspect.title)
                             .somaFont(type.eyebrow)
                             .textCase(.uppercase)
@@ -282,7 +279,7 @@ public struct SomaRangeTrack: View {
                 SomaBandLine(aspect: .heart, values: [58, 57, nil, 59, 56, 57, 55, 54], band: 55...60)
             }
             SomaAspectCard(aspect: .body, value: nil, unit: "fitness age",
-                           summary: "No fitness age yet. It comes from a Soma visit. You are 46.") {
+                           summary: "No fitness age yet. It needs a VO2 max from your watch. You are 46.") {
                 SomaRangeTrack(aspect: .body, range: 20...80, estimate: nil, reference: 46, referenceLabel: "46")
             }
         }

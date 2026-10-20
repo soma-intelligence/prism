@@ -83,9 +83,9 @@ struct LinkDetail: Sendable, Equatable {
     /// The two rows' names: "With" and "Without", "Long" and "Short".
     var highLabel: String
     var lowLabel: String
-    /// The gap as the headline states it: "−11 pts".
+    /// The gap as the headline states it: "−11 points".
     var differenceText: String
-    /// The smallest gap that counts: "±5 pts". Nil when it cannot be stated.
+    /// The smallest gap that counts: "±5 points". Nil when it cannot be stated.
     var noiseText: String?
     /// "9 vs 41".
     var daysText: String
@@ -93,7 +93,7 @@ struct LinkDetail: Sendable, Equatable {
     var strengthLevel: Int
     /// "Same night", "Next morning".
     var lagText: String
-    /// "Nights after alcohol: 11 pts lower". Nil until the link is shown.
+    /// "Nights after alcohol: 11 points lower". Nil until the link is shown.
     var takeaway: String?
     /// Nil once the link is shown.
     var progress: Progress?
@@ -102,7 +102,7 @@ struct LinkDetail: Sendable, Equatable {
         self.link = link
         let result = link.result
         let scale = link.outcome.scale
-        let unit = link.outcome.unit
+        let unit = link.outcome.unitWords
 
         high = result.high.map { $0 * scale }
         low = result.low.map { $0 * scale }
@@ -141,7 +141,7 @@ struct LinkDetail: Sendable, Equatable {
         } else {
             effect > 0 ? "higher" : "lower"
         }
-        let amount = "\(link.magnitudeText(effect)) \(link.outcome.unit) \(word)"
+        let amount = "\(link.magnitudeText(effect)) \(link.outcome.unitWords) \(word)"
         if let sides = link.driver.sides {
             return "After \(sides.high) \(link.driver.noun): \(amount)"
         }
@@ -177,12 +177,12 @@ struct LinkDetail: Sendable, Equatable {
             return Progress(fraction: 1, label: "\(name) too steady to compare")
         case .withinNoise:
             guard let delta = result.delta, let noise = result.noise, noise > 0 else {
-                return Progress(fraction: 0, label: "Inside the noise")
+                return Progress(fraction: 0, label: "Within the usual swing")
             }
             let scale = link.outcome.scale
             return Progress(
                 fraction: abs(delta) / noise,
-                label: "Inside the noise: \(link.magnitudeText(delta * scale)) of \(link.magnitudeText(noise * scale)) \(link.outcome.unit)"
+                label: "Within the usual swing: \(link.magnitudeText(delta * scale)) of \(link.magnitudeText(noise * scale)) \(link.outcome.unitWords)"
             )
         }
     }

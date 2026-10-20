@@ -15,8 +15,17 @@ public extension SomaMetrics {
     var environmentGaugeDiameter: CGFloat { 128 }
     /// The daylight gauge's stroke.
     var environmentGaugeStroke: CGFloat { 13 }
-    /// The sun's path from horizon to the top of its arc, labels apart.
-    var environmentSunPathHeight: CGFloat { 74 }
+    /// The sun's day: the curve's height, where the horizon sits on it (as
+    /// a share from the top), the gap between its lines, the band its times
+    /// sit in and how far they keep from the sides, the dots on the horizon
+    /// at sunrise and sunset, and the fill under the arc.
+    var sunPathHeight: CGFloat { 96 }
+    var sunPathHorizon: CGFloat { 0.68 }
+    var sunPathSpacing: CGFloat { 8 }
+    var sunPathLabelHeight: CGFloat { 16 }
+    var sunPathLabelInset: CGFloat { 22 }
+    var sunPathTick: CGFloat { 5 }
+    var sunPathFillOpacity: Double { 0.28 }
     /// The sun on its path.
     var environmentSunDiameter: CGFloat { 14 }
     /// A scale bar's track.
@@ -40,4 +49,7 @@ public extension SomaMetrics {
     var environmentLegendDot: CGFloat { 12 }
     /// How much ground the map of where you are spans, in metres.
     var environmentMapSpan: Double { 9000 }
+    /// The span the map shows round the device's own position: close enough
+    /// to read the street you are on.
+    var environmentMapExactSpan: Double { 900 }
 }

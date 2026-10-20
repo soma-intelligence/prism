@@ -7,15 +7,16 @@ import SwiftUI
 import SomaUI
 import HealthExportCore
 
-/// The Longevity tab's Body lens: the three
-/// numbers that sum the body up, the fitness readings as tiles, every
-/// biomarker as a row with its last thirty days, then the pod's body map, the
-/// next visit and the pages further in.
+/// The Longevity tab's Body lens: the three numbers that sum the body up,
+/// then every reading the wearables give as a tile or a row with its last
+/// thirty days: heart and fitness, movement, walking, muscle freshness, the
+/// biomarkers, and the pages further in.
 ///
 /// Few words on purpose (owner, 2026-10-03): each reading says its value,
 /// where it sits, a cue of a few words on what that means, and the line
 /// beside it drawn over the usual band. Tiles and rows are ordered by how
-/// much each moved (``InsightEngine``), so what moved comes first.
+/// much each moved (``InsightEngine``), so what moved comes first. Prism reads
+/// wearables (owner, 2026-10-19): nothing here waits on a visit.
 ///
 /// It draws no stack and no top bar: the Longevity page hosts both, and maps
 /// the ``LongevityRoute`` values the rows push.
@@ -24,8 +25,9 @@ struct LongevityBodyView: View {
     @Environment(\.somaTheme) private var theme
 
     @State private var page = BodyOverview.make(from: BodyOverviewInputs(now: .now))
+    @State private var sex: BodyFitnessAge.Sex = .unknown
+    /// Empty until the first read lands.
     @State private var markers: [BodyBiomarkerSpec: BodyBiomarker] = [:]
-    @State private var isBooking = false
 
     var body: some View {
         let metrics = theme.metrics
@@ -35,7 +37,12 @@ struct LongevityBodyView: View {
                 // Three numbers, no line under them (owner, 2026-10-03), each a
                 // door to its page.
                 SomaStatRow([
-                    SomaStat("Fitness age", value: nil),
+                    SomaStat(
+                        "Fitness age",
+                        value: page.fitnessAge.value,
+                        cue: page.fitnessAge.cue.map { LocalizedStringResource(stringLiteral: $0) },
+                        cueTone: page.fitnessAge.isGood ? .good : .neutral
+                    ),
                     SomaStat("Lean mass", value: page.leanMass, unit: "kg", trend: page.leanTrend),
                     SomaStat("VO2 max", value: page.vo2Max, trend: page.vo2Trend),
                 ]) { stat in
@@ -43,27 +50,30 @@ struct LongevityBodyView: View {
                 }
                 .padding(.top, metrics.heroTopPadding)
 
-                BodySection("Fitness") {
-                    LazyVGrid(
-                        columns: [GridItem(.flexible(), spacing: metrics.cardSpacing), GridItem(.flexible(), spacing: metrics.cardSpacing)],
-                        spacing: metrics.cardSpacing
-                    ) {
-                        ForEach(ranked(BodyBiomarkerSpec.tiles), id: \.self) { spec in
-                            let marker = marker(spec)
-                            BodyMarkerLink(spec: spec) {
-                                SomaTrendTile(
-                                    LocalizedStringResource(stringLiteral: marker.title),
-                                    value: marker.value,
-                                    unit: marker.unit.isEmpty ? nil : marker.unit,
-                                    status: marker.status.reading,
-                                    cue: marker.cue.map { LocalizedStringResource(stringLiteral: $0) },
-                                    values: marker.days,
-                                    band: marker.band,
-                                    hue: spec.hue
-                                )
-                            }
+                BodySection("Heart and fitness") {
+                    BodyTileGrid {
+                        NavigationLink(value: LabRoute.biologicalAge) {
+                            BodyFitnessAgeTile(stat: page.fitnessAge, days: fitnessAgeDays)
+                                .contentShape(.rect)
                         }
+                        .buttonStyle(.somaGlassPress)
+                        tiles(ranked(BodyBiomarkerSpec.tiles))
                     }
+                }
+
+                BodySection("Movement") {
+                    BodyTileGrid { tiles(ranked(BodyBiomarkerSpec.movement)) }
+                }
+
+                // Shown once the read has landed, with only the readings
+                // Health holds: deciding before would draw every tile and
+                // then take most of them away.
+                let walking = ranked(BodyBiomarkerSpec.walking).filter(hasReadings)
+                if !walking.isEmpty {
+                    BodySection("Walking") {
+                        BodyTileGrid { tiles(walking) }
+                    }
+                    .transition(.opacity)
                 }
 
                 BodyMapCard()
@@ -87,21 +97,6 @@ struct LongevityBodyView: View {
                     }
                 }
 
-                BodySection("From a Soma visit") {
-                    VStack(spacing: metrics.cardSpacing) {
-                        BodyFitnessAgeCard(age: page.age)
-                        SomaActionCard(
-                            eyebrow: "Next visit",
-                            title: "No visit booked",
-                            detail: "Twenty minutes at a Soma studio.",
-                            actionTitle: "Book",
-                            action: { isBooking = true }
-                        ) {
-                            SomaOrb(aspect: .body, scale: .mini)
-                        }
-                    }
-                }
-
                 BodyMoreRows(vo2Max: page.vo2Max)
             }
             .padding(.horizontal, metrics.pagePadding)
@@ -110,18 +105,45 @@ struct LongevityBodyView: View {
             .frame(maxWidth: .infinity)
         }
         .aspectWash(.body)
-        .task { await load() }
-        .refreshable { await load() }
-        .sheet(isPresented: $isBooking) {
-            NotWiredPage(
-                eyebrow: "Next visit",
-                title: "Book a visit",
-                message: "Booking a Soma visit isn’t connected yet. When it is, this is where you pick a time."
-            )
+        .animation(reduceMotion ? nil : theme.motion.chartFade, value: markers.isEmpty)
+        .onAppear { show(BodyLensCache.shared.fresh(for: health)) }
+        .task { await load(force: false) }
+        .refreshable { await load(force: true) }
+    }
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    @Environment(AppRouter.self) private var router
+
+    /// One tile per reading, each a door to its page in the Vault.
+    @ViewBuilder
+    private func tiles(_ specs: [BodyBiomarkerSpec]) -> some View {
+        ForEach(specs, id: \.self) { spec in
+            let marker = marker(spec)
+            BodyMarkerLink(spec: spec) {
+                SomaTrendTile(
+                    LocalizedStringResource(stringLiteral: marker.title),
+                    value: marker.value,
+                    unit: marker.unit.isEmpty ? nil : marker.unit,
+                    status: marker.status.reading,
+                    cue: marker.cue.map { LocalizedStringResource(stringLiteral: $0) },
+                    values: marker.days,
+                    band: marker.band,
+                    hue: spec.hue
+                )
+            }
         }
     }
 
-    @Environment(AppRouter.self) private var router
+    /// Fitness age day by day, read off each day's VO2 max: the same curve
+    /// the stat reads, so the tile's line and the number agree.
+    private var fitnessAgeDays: [Double?] {
+        marker(.vo2Max).days.map { day in day.map { Double(BodyFitnessAge.estimate(vo2Max: $0, sex: sex)) } }
+    }
+
+    private func hasReadings(_ spec: BodyBiomarkerSpec) -> Bool {
+        markers[spec].map { $0.value != nil || $0.days.contains { $0 != nil } } ?? false
+    }
 
     /// Fitness age opens the biological age page; the two Health readings open
     /// their page in the Vault.
@@ -153,25 +175,49 @@ struct LongevityBodyView: View {
         InsightEngine.sortedBySeverity(specs) { markers[$0]?.insight.severity ?? 0 }
     }
 
-    private func cue(_ spec: BodyBiomarkerSpec) -> LocalizedStringResource? {
-        markers[spec]?.cue.map { LocalizedStringResource(stringLiteral: $0) }
+    /// Reads Health, or takes the read kept from the last minute.
+    private func load(force: Bool) async {
+        show(await BodyLensCache.shared.read(health: health, force: force))
     }
 
-    private func tone(_ spec: BodyBiomarkerSpec) -> SomaCueTone {
-        markers[spec]?.insight.tone.cueTone ?? .neutral
+    private func show(_ read: BodyLensRead?) {
+        guard let read else { return }
+        page = BodyOverview.make(from: read.inputs)
+        sex = read.inputs.sex
+        markers = read.markers
     }
+}
 
-    private func load() async {
-        guard let source = await health.prepare(BodyOverviewInputs.metrics + BodyBiomarkers.metrics) else { return }
-        async let overview = BodyOverviewInputs.read(from: source, now: .now, calendar: .current)
-        async let readings = BodyBiomarkers.read(from: source, now: .now, calendar: .current)
-        page = BodyOverview.make(from: await overview)
-        let all = await readings
-        var built: [BodyBiomarkerSpec: BodyBiomarker] = [:]
-        for spec in BodyBiomarkerSpec.allCases {
-            built[spec] = BodyBiomarkers.make(spec, readings: all[spec] ?? [], now: .now, calendar: .current)
+/// Two tiles to a row.
+private struct BodyTileGrid<Content: View>: View {
+    @ViewBuilder let content: Content
+
+    @Environment(\.somaTheme) private var theme
+
+    var body: some View {
+        let spacing = theme.metrics.cardSpacing
+        LazyVGrid(columns: [GridItem(.flexible(), spacing: spacing), GridItem(.flexible(), spacing: spacing)], spacing: spacing) {
+            content
         }
-        markers = built
+    }
+}
+
+/// Fitness age as a tile: the age, how it sits against yours, and the age
+/// day by day as the watch's VO2 max moved.
+private struct BodyFitnessAgeTile: View {
+    let stat: BodyFitnessAge.Stat
+    let days: [Double?]
+
+    var body: some View {
+        SomaTrendTile(
+            "Fitness age",
+            value: stat.value,
+            unit: stat.value == nil ? nil : "years",
+            status: .none,
+            cue: stat.cue.map { LocalizedStringResource(stringLiteral: $0) },
+            values: days,
+            hue: .activity
+        )
     }
 }
 
@@ -216,86 +262,26 @@ private struct BodySection<Content: View>: View {
     }
 }
 
-/// Fitness age over visits. Built from the pod, so it is empty until the
-/// first visit, with your age already drawn as the line to read it against.
-private struct BodyFitnessAgeCard: View {
-    let age: Int?
-
-    var body: some View {
-        TileLink(value: PulseRoute.category("Body Measurements")) {
-            SomaChartCard(
-                eyebrow: "Fitness age",
-                value: nil,
-                unit: "give or take",
-                note: "Comes from a Soma visit."
-            ) {
-                BodyFitnessAgeFrame(age: age)
-            }
-        }
-    }
-}
-
-/// Every muscle front and back, filled by how rested it is, with the three
-/// states as a legend under the figure.
-/// Read from the last month of workouts (``MuscleFreshness``).
+/// Muscle freshness from the last month of workouts (``MuscleFreshness``):
+/// the body front and back in calm tones, a legend that counts the states,
+/// the six groups as pills; a tap on a muscle or a pill says when that group
+/// last worked and when it is fresh again.
 private struct BodyMapCard: View {
     @Environment(HealthDashboard.self) private var health
-    @Environment(\.somaTheme) private var theme
-    @State private var states: [SomaMuscle: SomaMuscleState] = MuscleFreshness.map([:])
+    @State private var readings = MuscleFreshness.readings([], now: .now)
 
     var body: some View {
-        let metrics = theme.metrics
-
-        VStack(alignment: .leading, spacing: metrics.cardSpacing) {
-            Text("Muscle freshness")
-                .somaFont(theme.typography.cardTitle)
-                .fontWeight(.semibold)
-                .foregroundStyle(theme.colors.inkPrimary.color)
-            SomaMuscleMap(states)
-                .frame(maxWidth: .infinity)
-            HStack(spacing: metrics.cardSpacing) {
-                ForEach([SomaMuscleState.recovered, .fatigued, .depleted], id: \.self) { state in
-                    BodyLegendChip(state: state)
+        SomaMuscleFreshness(readings)
+            .task {
+#if DEBUG
+                if EnvironmentReport.usesPreview {
+                    readings = MuscleFreshness.preview
+                    return
                 }
+#endif
+                guard let history = await health.fitnessHistory(days: Int(MuscleFreshness.days)) else { return }
+                readings = MuscleFreshness.readings(history.workouts, now: .now)
             }
-            .frame(maxWidth: .infinity)
-        }
-        .padding(metrics.cardPadding)
-        .background(theme.colors.surface.color, in: .rect(cornerRadius: metrics.cardCornerRadius, style: .continuous))
-        .task {
-            guard let history = await health.fitnessHistory(days: Int(MuscleFreshness.days)) else { return }
-            states = MuscleFreshness.map(MuscleFreshness.states(history.workouts, now: .now))
-        }
-    }
-}
-
-/// A dot and a word, a legend chip under the figure.
-private struct BodyLegendChip: View {
-    let state: SomaMuscleState
-
-    @Environment(\.somaTheme) private var theme
-
-    var body: some View {
-        HStack(spacing: 6) {
-            Circle()
-                .fill(color)
-                .frame(width: 7, height: 7)
-            Text(state.title)
-                .somaFont(theme.typography.caption)
-                .foregroundStyle(theme.colors.inkPrimary.color)
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(theme.colors.surfaceRecessed.color, in: .capsule)
-    }
-
-    private var color: Color {
-        switch state {
-        case .recovered: theme.colors.statusNormal.color
-        case .fatigued: theme.colors.statusOut.color
-        case .depleted: theme.colors.statusAlert.color
-        case .none: theme.colors.inkSecondary.color
-        }
     }
 }
 
@@ -319,8 +305,7 @@ private struct BodyMoreRows: View {
     private var rows: [Row] {
         [
             Row(id: "cardio", title: "Cardio", detail: "VO2 max \(vo2Max ?? "-")", route: .cardio),
-            Row(id: "strength", title: "Strength", detail: "Grip -", route: .strength),
-            Row(id: "visit", title: "Visit results", detail: "-", route: nil, lab: .visit),
+            Row(id: "strength", title: "Strength", detail: nil, route: .strength),
             Row(id: "bioage", title: "Biological age", detail: nil, route: nil, lab: .biologicalAge),
             Row(id: "blood", title: "Blood panel", detail: BloodPanelStore.shared.latest?.date.labDay ?? "-", route: nil, lab: .bloodPanel),
             Row(id: "risk", title: "Cardiometabolic risk", detail: nil, route: nil, lab: .risk),

@@ -6,11 +6,9 @@
 import SwiftUI
 import SomaUI
 
-/// Strength, pushed from the Longevity tab's Body page: lean mass, grip and sessions a week, then
-/// lean mass by region, eight weeks of strength sessions and the next session.
-///
-/// Lean mass and the sessions come from Health. Grip and the regions come from
-/// pod visits, so until the first one they are dashes with a line saying so.
+/// Strength, pushed from the Longevity tab's Body page: lean mass and
+/// sessions a week, then eight weeks of strength sessions and the next
+/// session, all from Health.
 struct BodyStrengthPage: View {
     @Environment(HealthDashboard.self) private var health
 
@@ -25,11 +23,9 @@ struct BodyStrengthPage: View {
             reason: page.reason,
             stats: [
                 SomaStat("Lean mass", value: page.leanMass, unit: "kg", trend: page.leanTrend),
-                SomaStat("Grip", value: nil),
                 SomaStat("Sessions", value: page.sessionsPerWeek, unit: "a week"),
             ]
         ) {
-            BodyRegionsCard()
             BodySessionsCard(page: page)
             SomaActionCard(
                 eyebrow: "Next session",
@@ -59,32 +55,6 @@ struct BodyStrengthPage: View {
         guard let source = await health.prepare(BodyStrengthInputs.metrics) else { return }
         let inputs = await BodyStrengthInputs.read(from: source, now: .now, calendar: .current)
         page = BodyStrength.make(from: inputs)
-    }
-}
-
-/// Lean mass change by region, from Soma visits: a dash in every row until
-/// the first one.
-private struct BodyRegionsCard: View {
-    @Environment(\.somaTheme) private var theme
-
-    private static let regions = ["Left leg", "Right leg", "Left arm", "Right arm", "Trunk"]
-
-    var body: some View {
-        let metrics = theme.metrics
-
-        SomaCard {
-            VStack(alignment: .leading, spacing: metrics.cardHeaderSpacing * 2) {
-                SomaCardHeader("Lean mass by region", caption: "From Soma visits")
-                VStack(spacing: metrics.bodyRowSpacing) {
-                    ForEach(Self.regions, id: \.self) { region in
-                        BodyBarRow(title: region, fraction: nil, value: nil)
-                    }
-                }
-                Text("Comes from a Soma visit.")
-                    .somaFont(theme.typography.caption)
-                    .foregroundStyle(theme.colors.inkSecondary.color)
-            }
-        }
     }
 }
 

@@ -73,10 +73,10 @@ struct LinkDetailTests {
         let link = try #require(link(alcoholSeries(), .tag("alcohol"), .sleepScore))
         let detail = LinkDetail(link: link, today: day(60), calendar: calendar)
         #expect(detail.progress == nil)
-        #expect(detail.takeaway == "Nights after alcohol: 13 pts lower")
+        #expect(detail.takeaway == "Nights after alcohol: 13 points lower")
         #expect(detail.highLabel == "With")
         #expect(detail.lowLabel == "Without")
-        #expect(detail.differenceText == "\u{2212}13 pts")
+        #expect(detail.differenceText == "\u{2212}13 points")
         #expect(detail.daysText == "10 vs 50")
         #expect(detail.noiseText?.hasPrefix("\u{00B1}") == true)
         #expect(detail.strengthLevel == LinkDetail.strengthSteps.count)
@@ -112,7 +112,7 @@ struct LinkDetailTests {
         #expect(detail.highLabel == "Bright")
         #expect(detail.lowLabel == "Dim")
         #expect(detail.takeaway?.hasPrefix("After bright days: ") == true)
-        #expect(detail.takeaway?.hasSuffix(" min earlier") == true)
+        #expect(detail.takeaway?.hasSuffix(" minutes earlier") == true)
         #expect(detail.high.allSatisfy { $0 > 1_000 })
     }
 
@@ -179,7 +179,20 @@ struct LinkDetailTests {
         let detail = LinkDetail(link: CauseLink(driver: .strain, outcome: .recovery, result: result),
                                 today: day(0), calendar: calendar)
         let progress = detail.progress
-        #expect(progress?.label.hasPrefix("Inside the noise: ") == true)
+        #expect(progress?.label.hasPrefix("Within the usual swing: ") == true)
         #expect((progress?.fraction ?? 1) < 1)
+    }
+
+    @Test func sheetWordsCarryNoArrowsOrPointShorthand() {
+        for link in CauseLinks.preview.shown + CauseLinks.preview.pending {
+            let detail = LinkDetail(link: link, today: CauseLinks.previewToday, calendar: calendar)
+            let words = [detail.differenceText, detail.noiseText, detail.takeaway, detail.progress?.label,
+                         link.headline, link.plainTitle, link.outcome.unitWords].compactMap { $0 }
+            for word in words {
+                #expect(!word.contains("\u{2192}"), "\(word)")
+                #expect(!word.contains("pts"), "\(word)")
+                #expect(!word.lowercased().contains("noise"), "\(word)")
+            }
+        }
     }
 }

@@ -364,14 +364,12 @@ struct MindHeatmapCard: View {
     }
 }
 
-// MARK: - Deeper pages
-
-/// One way into a deeper Mind page: a glyph in its colour and a short name.
+/// A deeper Mind page as a tile: its line glyph on the Mind badge, drawn
+/// like the aspect glyphs, and its name under it.
 struct MindGlyphTile: View {
     let route: MindRoute
-    let symbol: String
+    let glyph: SomaMindGlyph.Kind
     let title: LocalizedStringResource
-    let hue: SomaHealthHue
 
     @Environment(\.somaTheme) private var theme
 
@@ -380,15 +378,7 @@ struct MindGlyphTile: View {
 
         TileLink(value: route) {
             VStack(spacing: metrics.cardHeaderSpacing + 4) {
-                Image(systemName: symbol)
-                    .somaFont(theme.typography.callout)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(SomaHealthHue.ink.color)
-                    .frame(width: metrics.minimumTapTarget, height: metrics.minimumTapTarget)
-                    .background(
-                        LinearGradient(colors: [hue.end.color, hue.start.color], startPoint: .top, endPoint: .bottom),
-                        in: .rect(cornerRadius: metrics.cardCornerRadius * 0.8, style: .continuous)
-                    )
+                SomaMindGlyph(glyph)
                 Text(title)
                     .somaFont(theme.typography.caption)
                     .foregroundStyle(theme.colors.inkPrimary.color)
@@ -398,6 +388,10 @@ struct MindGlyphTile: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, metrics.cardPadding)
             .background(theme.colors.surface.color, in: .rect(cornerRadius: metrics.cardCornerRadius, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: metrics.cardCornerRadius, style: .continuous)
+                    .strokeBorder(theme.colors.inkPrimary.color.opacity(metrics.hairlineOpacity), lineWidth: 0.5)
+            )
         }
         .accessibilityLabel(Text(title))
     }
@@ -411,14 +405,14 @@ struct MindGlyphGrid: View {
         let spacing = theme.metrics.cardSpacing * 0.75
 
         LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: spacing), count: 4), spacing: spacing) {
-            MindGlyphTile(route: .hrv, symbol: "waveform.path.ecg", title: "HRV", hue: .heart)
-            MindGlyphTile(route: .stressRadar, symbol: "scope", title: "Radar", hue: .vitals)
-            MindGlyphTile(route: .moodForecast, symbol: "cloud.sun.fill", title: "Forecast", hue: .mobility)
-            MindGlyphTile(route: .innerMap, symbol: "circle.hexagongrid.fill", title: "Inner map", hue: .symptoms)
-            MindGlyphTile(route: .detail, symbol: "brain.head.profile", title: "Score", hue: .mind)
-            MindGlyphTile(route: .insights, symbol: "square.grid.3x3.fill", title: "Insights", hue: .cycle)
-            MindGlyphTile(route: .meetings, symbol: "calendar", title: "Meetings", hue: .hearing)
-            MindGlyphTile(route: .habits(.recovery), symbol: "leaf.fill", title: "Habits", hue: .nutrition)
+            MindGlyphTile(route: .hrv, glyph: .hrv, title: "HRV")
+            MindGlyphTile(route: .stressRadar, glyph: .radar, title: "Radar")
+            MindGlyphTile(route: .moodForecast, glyph: .forecast, title: "Forecast")
+            MindGlyphTile(route: .innerMap, glyph: .innerMap, title: "Inner map")
+            MindGlyphTile(route: .detail, glyph: .score, title: "Score")
+            MindGlyphTile(route: .insights, glyph: .insights, title: "Insights")
+            MindGlyphTile(route: .meetings, glyph: .meetings, title: "Meetings")
+            MindGlyphTile(route: .habits(.recovery), glyph: .habits, title: "Habits")
         }
     }
 }

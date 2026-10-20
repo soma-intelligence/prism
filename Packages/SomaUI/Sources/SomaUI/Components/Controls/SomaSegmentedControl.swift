@@ -96,7 +96,12 @@ private struct SomaSegmentButton<ID: Hashable>: View {
                 .somaFont(theme.typography.segment)
                 .fontWeight(isSelected ? theme.typography.segment.weight : .regular)
                 .lineLimit(1)
-                .foregroundStyle(isSelected ? pillInk : theme.colors.inkSecondary.color)
+                // Primary ink on the unselected segments, as the system's
+                // own segmented controls set them: the pill alone marks the
+                // selection. Secondary ink sinks into the glass wherever a
+                // page's wash sits behind the bar (under 2:1 on Body and
+                // Mind in dark mode).
+                .foregroundStyle(isSelected ? pillInk : theme.colors.inkPrimary.color)
                 .padding(.horizontal, theme.metrics.segmentLabelPadding)
                 .frame(minHeight: theme.metrics.segmentHeight)
                 .background {

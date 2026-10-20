@@ -92,8 +92,14 @@ private struct PulseLead: View {
     let moved: [PulseInsightItem]
 
     @Environment(\.somaTheme) private var theme
+    @Environment(\.zoomNamespace) private var zoom
     /// The score page the orb or a score opened.
     @State private var openedScore: ScoreRoute?
+    /// The ring that opened it, which the page zooms out of. Nil when the orb
+    /// opened it: the orb is no tile, its page pushes.
+    @State private var openedRing: SomaAspect?
+    /// The category page the orb opened, for an aspect with no score page.
+    @State private var openedCategory: PulseRoute?
     /// The quick add, lifted by a long press on the orb.
     @State private var quickAdd: HomeSheetRoute?
 
@@ -108,18 +114,19 @@ private struct PulseLead: View {
             SomaOrb(aspect: now.aspect, label: now.label)
                 .frame(maxWidth: .infinity)
                 .padding(.top, metrics.heroTopPadding)
-                .somaOrbTap(aspect: now.aspect) { openedScore = ScoreRoute.aspect(now.aspect) }
+                .somaOrbTap { open(now.aspect) }
                 .accessibilityElement()
                 .accessibilityLabel(Text(now.label))
                 .accessibilityAddTraits(.isButton)
-                .accessibilityAction(named: "Open") { openedScore = ScoreRoute.aspect(now.aspect) }
+                .accessibilityAction(named: "Open") { open(now.aspect) }
                 // A long press lifts the quick add over Today.
                 .onLongPressGesture { quickAdd = .quickAdd }
                 .accessibilityAction(named: "Add to today") { quickAdd = .quickAdd }
                 .homeSheets($quickAdd)
 
             // One tap on a score opens its page.
-            SomaScoreRings(scoreRow) { tapped in
+            SomaScoreRings(scoreRow, zoom: zoom) { tapped in
+                openedRing = tapped
                 openedScore = ScoreRoute.aspect(tapped)
             }
                 .padding(.top, metrics.heroSpacing * 2)
@@ -134,7 +141,25 @@ private struct PulseLead: View {
             }
 
         }
-        .navigationDestination(item: $openedScore) { $0.page }
+        .navigationDestination(item: $openedScore) { route in
+            if let ring = openedRing {
+                route.page.zoomDestination(ring)
+            } else {
+                route.page
+            }
+        }
+        .navigationDestination(item: $openedCategory) { $0.page }
+    }
+
+    /// The orb always opens something: its aspect's score page, or for heart,
+    /// gut and body, which have none, the aspect's page of readings.
+    private func open(_ aspect: SomaAspect) {
+        switch PulseOrbTarget.make(aspect) {
+        case .score(let route):
+            openedRing = nil
+            openedScore = route
+        case .category(let route): openedCategory = route
+        }
     }
 
     private var scoreRow: [SomaRingScore] {
@@ -296,8 +321,9 @@ private struct PulseMovesCard: View {
     }
 }
 
-/// The energy bank, set like the other cards: the number with "of 100", one
-/// slim track filled to the level in the energy colours, and today's line.
+/// The energy bank on Today: the charge cell with the level beside it and
+/// the page's one line, then the day as a row of hours that filled or drew
+/// down. It opens the energy page.
 private struct PulseEnergyCard: View {
     let today: PulseToday?
     let scores: SomaScores?
@@ -305,65 +331,52 @@ private struct PulseEnergyCard: View {
     @Environment(\.somaTheme) private var theme
 
     var body: some View {
-        let type = theme.typography
-        let colors = theme.colors
-        let metrics = theme.metrics
-        let level = today?.energyLevel
-        let curve = (scores?.energyCurve ?? []).sorted { $0.date < $1.date }.map { Optional($0.level) }
-        let ramp = Gradient(stops: [
-            .init(color: colors.statusAlert.color, location: 0),
-            .init(color: colors.statusOut.color, location: 0.4),
-            .init(color: colors.statusNormal.color, location: 0.8),
-        ])
-        // The line wears the colour of where the level sits on that ramp.
-        let tint: Color = switch level ?? 1 {
-        case ..<0.34: colors.statusAlert.color
-        case ..<0.67: colors.statusOut.color
-        default: colors.statusNormal.color
-        }
+        let page = ScorePages.energy(scores)
+        let day = EnergyDay(scores: scores, inputs: nil, page: page)
+        let level = page.lead.value ?? today?.energyLevel.map { Int(($0 * 100).rounded()) }
 
         SomaCard {
-            VStack(alignment: .leading, spacing: metrics.cardSpacing) {
+            VStack(alignment: .leading, spacing: theme.metrics.cardSpacing) {
                 Text("Energy")
-                    .somaFont(type.cardTitle)
-                    .foregroundStyle(colors.inkPrimary.color)
+                    .somaFont(theme.typography.cardTitle)
+                    .foregroundStyle(theme.colors.inkPrimary.color)
                     .accessibilityAddTraits(.isHeader)
-
-                HStack(alignment: .bottom, spacing: metrics.cardSpacing) {
-                    HStack(alignment: .firstTextBaseline, spacing: 6) {
-                        Text(level.map { "\(Int(($0 * 100).rounded()))" } ?? "-")
-                            .somaFont(type.metric)
-                            .foregroundStyle(colors.inkPrimary.color)
-                        Text("of 100")
-                            .somaFont(type.callout)
-                            .foregroundStyle(colors.inkSecondary.color)
-                    }
-                    .accessibilityElement(children: .combine)
-                    Spacer(minLength: 0)
-                    if curve.count > 1 {
-                        SomaSparkline(curve, tint: tint, filled: false)
-                            .frame(width: metrics.chartSparkHeight * 3, height: metrics.chartSparkHeight)
-                    }
+                SomaEnergyGauge(level: level, line: page.lead.value == nil ? nil : page.lead.headline, size: .compact)
+                if day.points.count > 1 {
+                    SomaEnergyTimeline(points: day.points, now: day.now, ticks: [],
+                                       charged: page.charged, drained: page.drained, size: .compact)
                 }
-
-                // The track: a slim capsule filled to the level, red to amber
-                // to green along its length.
-                GeometryReader { proxy in
-                    ZStack(alignment: .leading) {
-                        Capsule().fill(colors.surfaceRecessed.color)
-                        if let level {
-                            Capsule()
-                                .fill(LinearGradient(gradient: ramp, startPoint: .leading, endPoint: .trailing))
-                                .mask(alignment: .leading) {
-                                    Capsule().frame(width: max(metrics.sleepGradeBarHeight * 1.5, proxy.size.width * min(1, max(0, level))))
-                                }
-                        }
-                    }
-                }
-                .frame(height: metrics.sleepGradeBarHeight * 1.5)
-                .accessibilityHidden(true)
             }
         }
+    }
+}
+
+/// Last night on Today: the time asleep, one line, and the night in stages
+/// as the hero. The score stays on the sleep page the card opens.
+struct PulseSleepCard: View {
+    let scores: SomaScores?
+
+    var body: some View {
+        let night = PulseSleepCard.night(scores)
+        SomaNightCard(
+            runs: night?.runs ?? [],
+            asleep: night?.asleep,
+            bed: night.map { ScoreMath.clock($0.bed) },
+            wake: night.map { ScoreMath.clock($0.wake) },
+            line: PulseSleepCard.line(scores),
+            empty: "Stages draw here from a night your watch records."
+        )
+    }
+
+    static func night(_ scores: SomaScores?) -> SleepNightSummary? {
+        guard let detail = scores?.detail else { return nil }
+        return SleepNightSummary.make(scoring: detail.lastNightStages, inBedStart: nil, parts: detail.sleepParts)
+    }
+
+    /// The sleep page's own headline, once there is a night to say it of.
+    static func line(_ scores: SomaScores?) -> String? {
+        let lead = ScorePages.sleep(scores, nil).lead
+        return lead.value == nil ? nil : lead.headline
     }
 }
 
@@ -384,8 +397,8 @@ private struct PulseDayCard: View {
     }
 }
 
-/// One of Today's cards, as Edit Today orders them. The sleep and heart cards
-/// open their sheets; the day card opens the timeline.
+/// One of Today's cards, as Edit Today orders them. The sleep card opens the
+/// sleep page, the heart card its sheet, the day card the timeline.
 private struct PulseTodayCardView: View {
     let card: HomeTodayCard
     let today: PulseToday?
@@ -402,14 +415,7 @@ private struct PulseTodayCardView: View {
         case .today:
             TileLink(value: HomeRoute.timeline) { PulseDayCard(today: today) }
         case .sleep:
-            Button { open(.lastNight) } label: {
-                SomaAspectCard(aspect: .sleep, value: today?.sleepCard.value, unit: "asleep",
-                               summary: today?.sleepCard.value == nil ? nil : insights[.sleepDuration]?.insight.label) {
-                    SomaNightBars(aspect: .sleep, values: today?.nights ?? Array(repeating: nil, count: 7))
-                }
-                .contentShape(.rect)
-            }
-            .buttonStyle(TilePressStyle())
+            TileLink(value: ScoreRoute.sleep) { PulseSleepCard(scores: scores) }
         case .heart:
             Button { open(.marker(.restingHeartRate)) } label: {
                 SomaAspectCard(aspect: .heart, value: today?.heartCard.value, unit: "bpm resting",
@@ -476,6 +482,16 @@ struct PulseDoneMoves {
     static func stamp(_ date: Date, calendar: Calendar) -> String {
         let parts = calendar.dateComponents([.year, .month, .day], from: date)
         return "\(parts.year ?? 0)-\(parts.month ?? 0)-\(parts.day ?? 0)"
+    }
+}
+
+/// Where a tap on the orb lands.
+enum PulseOrbTarget: Equatable {
+    case score(ScoreRoute)
+    case category(PulseRoute)
+
+    static func make(_ aspect: SomaAspect) -> PulseOrbTarget {
+        ScoreRoute.aspect(aspect).map(PulseOrbTarget.score) ?? .category(.aspect(aspect))
     }
 }
 

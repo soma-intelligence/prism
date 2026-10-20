@@ -12,9 +12,9 @@ import SwiftUI
 /// the move is a cost. Nil draws the track and the tick alone: nothing clear
 /// yet.
 ///
-/// The status form (``init(fraction:isCost:)``) drops the aspect: the fill is
-/// the theme's normal green for a move for the better and its alert red for a
-/// cost, for a list where the direction matters more than the reading.
+/// The calm form (``init(fraction:isCost:)``) drops the aspect: the fill is
+/// sage for a move for the better and clay for a cost (``SomaTrackTone``), for
+/// a list where the direction matters more than the reading.
 public struct SomaEffectBar: View {
     private let fraction: Double?
     private let aspect: SomaAspect?
@@ -33,7 +33,7 @@ public struct SomaEffectBar: View {
         self.isCost = isCost
     }
 
-    /// A bar in the status colours: green for the better, red for a cost.
+    /// A bar in the calm tones: sage for the better, clay for a cost.
     public init(fraction: Double?, isCost: Bool) {
         self.fraction = fraction.map { min(max($0, -1), 1) }
         self.aspect = nil
@@ -44,7 +44,7 @@ public struct SomaEffectBar: View {
         let metrics = theme.metrics
         let colors = theme.colors
         let fill: Color = {
-            guard let aspect else { return isCost ? colors.statusAlert.color : colors.statusNormal.color }
+            guard let aspect else { return isCost ? SomaTrackTone.clay.color : SomaTrackTone.sage.color }
             return isCost ? colors.danger.color : theme.aspects[aspect].identity.color
         }()
 

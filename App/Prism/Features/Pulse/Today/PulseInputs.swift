@@ -42,6 +42,11 @@ struct PulseInputs: Sendable, Equatable {
     var mindful: [HealthReading] = []
     /// Age in whole years, from the date of birth in Health.
     var age: Int?
+    /// The latest VO2 max from the watch in the last sixteen weeks, which
+    /// fitness age is read off.
+    var vo2Max: Double?
+    /// The sex fitness age is read with.
+    var sex: BodyFitnessAge.Sex = .unknown
 
     /// Whether Health returned anything at all for the page to read.
     var isEmpty: Bool {

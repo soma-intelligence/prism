@@ -16,7 +16,11 @@ struct EnvironmentDetailSheet: View {
 
     var body: some View {
         ScoreSheet(eyebrow: "Environment", title: LocalizedStringResource(stringLiteral: measure.title)) {
-            EnvironmentDetailBody(measure: measure, report: report)
+            if measure == .temperature {
+                EnvironmentTemperatureBody(report: report)
+            } else {
+                EnvironmentDetailBody(measure: measure, report: report)
+            }
         }
     }
 }

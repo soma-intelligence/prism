@@ -46,14 +46,26 @@ struct BodyBiomarker: Identifiable, Equatable, Sendable {
 
 /// The readings the Body lens shows and how each is formatted.
 enum BodyBiomarkerSpec: String, CaseIterable, Sendable {
-    // Fitness tiles.
-    case vo2Max, restingHeartRate, heartRateVariabilitySDNN, heartRateRecoveryOneMinute, walkingSpeed, stepCount
+    // Heart and fitness tiles.
+    case vo2Max, restingHeartRate, heartRateVariabilitySDNN, heartRateRecoveryOneMinute, walkingHeartRateAverage
+    // Movement tiles.
+    case stepCount, appleExerciseTime, activeEnergyBurned, walkingSpeed
+    // Walking tiles: what the phone and the watch read off the way you walk.
+    case appleWalkingSteadiness, walkingStepLength, walkingAsymmetryPercentage, walkingDoubleSupportPercentage,
+         sixMinuteWalkTestDistance, stairAscentSpeed
     // Biomarker rows.
     case bodyMass, bodyFatPercentage, leanBodyMass, bodyMassIndex, bloodPressureSystolic, bloodGlucose,
          respiratoryRate, oxygenSaturation, appleSleepingWristTemperature
 
-    static let tiles: [BodyBiomarkerSpec] = [.vo2Max, .restingHeartRate, .heartRateVariabilitySDNN, .heartRateRecoveryOneMinute, .walkingSpeed, .stepCount]
+    /// The heart and fitness tiles, after fitness age.
+    static let tiles: [BodyBiomarkerSpec] = [.vo2Max, .restingHeartRate, .heartRateVariabilitySDNN, .heartRateRecoveryOneMinute, .walkingHeartRateAverage]
+    static let movement: [BodyBiomarkerSpec] = [.stepCount, .appleExerciseTime, .activeEnergyBurned, .walkingSpeed]
+    static let walking: [BodyBiomarkerSpec] = [.appleWalkingSteadiness, .walkingStepLength, .walkingAsymmetryPercentage,
+                                               .walkingDoubleSupportPercentage, .sixMinuteWalkTestDistance, .stairAscentSpeed]
     static let rows: [BodyBiomarkerSpec] = [.bodyMass, .bodyFatPercentage, .leanBodyMass, .bodyMassIndex, .bloodPressureSystolic, .bloodGlucose, .respiratoryRate, .oxygenSaturation, .appleSleepingWristTemperature]
+
+    /// The readings the interpretation engine knows, which Today reads too.
+    static var interpreted: [BodyBiomarkerSpec] { allCases.filter { $0.insight != nil } }
 
     var identifier: String {
         let raw = rawValue
@@ -71,6 +83,15 @@ enum BodyBiomarkerSpec: String, CaseIterable, Sendable {
         case .heartRateRecoveryOneMinute: "Heart rate recovery"
         case .walkingSpeed: "Walking speed"
         case .stepCount: "Steps"
+        case .walkingHeartRateAverage: "Walking heart rate"
+        case .appleExerciseTime: "Exercise"
+        case .activeEnergyBurned: "Active energy"
+        case .appleWalkingSteadiness: "Steadiness"
+        case .walkingStepLength: "Step length"
+        case .walkingAsymmetryPercentage: "Asymmetry"
+        case .walkingDoubleSupportPercentage: "Double support"
+        case .sixMinuteWalkTestDistance: "Six minute walk"
+        case .stairAscentSpeed: "Stair speed"
         case .bodyMass: "Weight"
         case .bodyFatPercentage: "Body fat"
         case .leanBodyMass: "Lean body mass"
@@ -86,7 +107,13 @@ enum BodyBiomarkerSpec: String, CaseIterable, Sendable {
     var unit: String {
         switch self {
         case .vo2Max: "ml/kg/min"
-        case .restingHeartRate, .heartRateRecoveryOneMinute: "bpm"
+        case .restingHeartRate, .heartRateRecoveryOneMinute, .walkingHeartRateAverage: "bpm"
+        case .appleExerciseTime: "min"
+        case .activeEnergyBurned: "kcal"
+        case .appleWalkingSteadiness, .walkingAsymmetryPercentage, .walkingDoubleSupportPercentage: "%"
+        case .walkingStepLength: "cm"
+        case .sixMinuteWalkTestDistance: "m"
+        case .stairAscentSpeed: "m/s"
         case .heartRateVariabilitySDNN: "ms"
         case .walkingSpeed: "km/h"
         case .stepCount: "steps"
@@ -105,7 +132,7 @@ enum BodyBiomarkerSpec: String, CaseIterable, Sendable {
         case .bodyMass, .leanBodyMass, .bodyFatPercentage, .bodyMassIndex, .respiratoryRate, .walkingSpeed,
              .vo2Max, .oxygenSaturation:
             1
-        case .appleSleepingWristTemperature: 2
+        case .appleSleepingWristTemperature, .stairAscentSpeed: 2
         default: 0
         }
     }
@@ -114,27 +141,44 @@ enum BodyBiomarkerSpec: String, CaseIterable, Sendable {
     /// percent, metres a second into km/h.
     func display(_ value: Double) -> Double {
         switch self {
-        case .bodyFatPercentage, .oxygenSaturation: value * 100
+        case .bodyFatPercentage, .oxygenSaturation, .appleWalkingSteadiness, .walkingAsymmetryPercentage,
+             .walkingDoubleSupportPercentage: value * 100
         case .walkingSpeed: value * 3.6
+        case .walkingStepLength: value * 100
         default: value
         }
     }
 
     var judgement: BodyBiomarker.Judgement {
         switch self {
-        case .bodyMass, .bodyFatPercentage, .leanBodyMass, .bodyMassIndex, .vo2Max, .stepCount, .walkingSpeed: .direction
+        case .bodyMass, .bodyFatPercentage, .leanBodyMass, .bodyMassIndex, .vo2Max, .stepCount, .walkingSpeed,
+             .appleExerciseTime, .activeEnergyBurned, .walkingStepLength, .sixMinuteWalkTestDistance, .stairAscentSpeed:
+            .direction
         default: .usual
         }
     }
 
-    /// Steps add up over a day; everything else is a mean of the day.
-    var sumsPerDay: Bool { self == .stepCount }
+    /// Steps, exercise minutes and active energy add up over a day;
+    /// everything else is a mean of the day.
+    var sumsPerDay: Bool { [.stepCount, .appleExerciseTime, .activeEnergyBurned].contains(self) }
 
     /// Its category's hue, for its line: never ink alone.
-    var hue: SomaHealthHue { insight.hue }
+    var hue: SomaHealthHue {
+        if let insight { return insight.hue }
+        guard let metric = HealthMetricCatalog.metric(for: identifier) else { return .other }
+        return BodyCategory.containing(BodyDataType(metric))?.hue ?? .other
+    }
 
-    /// The metric the interpretation engine reads it as.
-    var insight: InsightMetric {
+    /// How the engine judges it: the one table's policy, the same the
+    /// metric's page reads.
+    var policy: InsightPolicy {
+        insight?.policy ?? MetricProfile.of(identifier).policy
+            ?? InsightPolicy(preference: .steady, minimumSpread: 0, trendStep: 0)
+    }
+
+    /// The metric the interpretation engine reads it as; nil for the
+    /// walking and movement readings it does not rank.
+    var insight: InsightMetric? {
         switch self {
         case .vo2Max: .vo2Max
         case .restingHeartRate: .restingHeartRate
@@ -151,6 +195,9 @@ enum BodyBiomarkerSpec: String, CaseIterable, Sendable {
         case .respiratoryRate: .respiratoryRate
         case .oxygenSaturation: .bloodOxygen
         case .appleSleepingWristTemperature: .wristTemperature
+        case .walkingHeartRateAverage, .appleExerciseTime, .activeEnergyBurned, .appleWalkingSteadiness, .walkingStepLength,
+             .walkingAsymmetryPercentage, .walkingDoubleSupportPercentage, .sixMinuteWalkTestDistance, .stairAscentSpeed:
+            nil
         }
     }
 
@@ -173,12 +220,17 @@ enum BodyBiomarkers {
 
     static var metrics: [String] { BodyBiomarkerSpec.allCases.map(\.identifier) }
 
-    /// Reads ninety days of every reading at once.
-    static func read(from source: any HealthSampleSource, now: Date, calendar: Calendar) async -> [BodyBiomarkerSpec: [HealthReading]] {
+    /// Reads ninety days of every reading in `specs` at once.
+    static func read(
+        _ specs: [BodyBiomarkerSpec] = BodyBiomarkerSpec.allCases,
+        from source: any HealthSampleSource,
+        now: Date,
+        calendar: Calendar
+    ) async -> [BodyBiomarkerSpec: [HealthReading]] {
         let start = calendar.date(byAdding: .day, value: -lookback, to: calendar.startOfDay(for: now)) ?? now
         return await withTaskGroup(of: (BodyBiomarkerSpec, [HealthReading]).self) { group in
-            for spec in BodyBiomarkerSpec.allCases {
-                group.addTask { (spec, await read(spec, from: source, start: start, now: now)) }
+            for spec in specs {
+                group.addTask { (spec, await read(spec, from: source, start: start, now: now, calendar: calendar)) }
             }
             var result: [BodyBiomarkerSpec: [HealthReading]] = [:]
             for await (spec, readings) in group { result[spec] = readings }
@@ -189,12 +241,43 @@ enum BodyBiomarkers {
     /// Reads ninety days of one reading.
     static func read(_ spec: BodyBiomarkerSpec, from source: any HealthSampleSource, now: Date, calendar: Calendar) async -> [HealthReading] {
         let start = calendar.date(byAdding: .day, value: -lookback, to: calendar.startOfDay(for: now)) ?? now
-        return await read(spec, from: source, start: start, now: now)
+        return await read(spec, from: source, start: start, now: now, calendar: calendar)
     }
 
-    private static func read(_ spec: BodyBiomarkerSpec, from source: any HealthSampleSource, start: Date, now: Date) async -> [HealthReading] {
+    private static func read(_ spec: BodyBiomarkerSpec, from source: any HealthSampleSource, start: Date, now: Date, calendar: Calendar) async -> [HealthReading] {
         guard let metric = HealthMetricCatalog.metric(for: spec.identifier) else { return [] }
+        if spec.sumsPerDay {
+            return await dailyTotals(metric, from: start, to: now, calendar: calendar, in: source)
+        }
         return (try? await source.samples(metric, from: start, to: now, limit: 0)) ?? []
+    }
+
+    /// One reading per day holding Health's own total for it, oldest first,
+    /// with nothing for a day that has none.
+    ///
+    /// For a reading that adds up, such as steps: ninety days of raw samples
+    /// from a phone and a watch run to tens of thousands, each one fetched and
+    /// then bucketed on the main actor before a tile can draw, and summed as
+    /// they come they count a step twice when both devices took it. Health's
+    /// statistics merge the sources the way the Health app does, and the
+    /// source reads every day in one query (one statistics collection on the
+    /// real store) rather than one query a day.
+    static func dailyTotals(
+        _ metric: HealthMetric,
+        from start: Date,
+        to now: Date,
+        calendar: Calendar,
+        in source: any HealthSampleSource
+    ) async -> [HealthReading] {
+        let days = (try? await source.dailyTotals(metric, from: start, to: now, calendar: calendar)) ?? []
+        return days.map { day in
+            // Dated inside its own day, so the daily buckets file it there and
+            // not under the midnight it ends on.
+            let next = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: day.start)) ?? now
+            let end = min(next.addingTimeInterval(-1), now)
+            return HealthReading(metric: day.metric, value: day.value, unit: day.unit, start: day.start, end: end)
+        }
+        .sorted { $0.end < $1.end }
     }
 
     static func make(_ spec: BodyBiomarkerSpec, readings: [HealthReading], now: Date, calendar: Calendar) -> BodyBiomarker {
@@ -202,7 +285,8 @@ enum BodyBiomarkers {
         let recent = Array(all.suffix(days))
         let latest = readings.max(by: { $0.end < $1.end }).map { spec.display($0.value) }
         let shownLatest = spec.sumsPerDay ? recent.last.flatMap { $0 } ?? recent.compactMap { $0 }.last : latest
-        let insight = InsightEngine.interpret(spec.insight, days: all)
+        let insight = spec.insight.map { InsightEngine.interpret($0, days: all) }
+            ?? InsightEngine.interpret(all, policy: spec.policy)
         let standing = MetricDetailMath.standing(all, profile: MetricProfile.of(spec.identifier))
         return BodyBiomarker(
             id: spec.rawValue,
@@ -244,7 +328,8 @@ enum BodyBiomarkers {
     }
 
     static func status(_ spec: BodyBiomarkerSpec, all: [Double?], latest: Double?) -> BodyBiomarker.Status {
-        status(spec, all: all, insight: InsightEngine.interpret(spec.insight, days: all), latest: latest)
+        let insight = spec.insight.map { InsightEngine.interpret($0, days: all) } ?? InsightEngine.interpret(all, policy: spec.policy)
+        return status(spec, all: all, insight: insight, latest: latest)
     }
 
     /// The word under the name: where the latest reading sits against its

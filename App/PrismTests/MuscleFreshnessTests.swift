@@ -41,3 +41,36 @@ struct MuscleFreshnessTests {
         #expect(MuscleFreshness.map([:]).count == SomaMuscle.allCases.count)
     }
 }
+
+@Suite("Muscle freshness readings")
+struct MuscleFreshnessReadingsTests {
+    private let now = Date(timeIntervalSince1970: 1_790_000_000)
+
+    private func run(hoursAgo: Double, minutes: Double = 45) -> FitnessWorkout {
+        let end = now.addingTimeInterval(-hoursAgo * 3600)
+        return FitnessWorkout(start: end.addingTimeInterval(-minutes * 60), end: end, activity: 37)
+    }
+
+    @Test("Each of the six groups is read, worked or not")
+    func everyGroup() {
+        let readings = MuscleFreshness.readings([], now: now)
+        #expect(readings.count == SomaMuscleGroup.allCases.count)
+        #expect(readings.allSatisfy { $0.state == .none && $0.lastWorked == nil })
+    }
+
+    @Test("A run this morning: the legs last worked then, and freshen later, not now")
+    func tiredLegs() {
+        let readings = MuscleFreshness.readings([run(hoursAgo: 25 * 24), run(hoursAgo: 3)], now: now)
+        let legs = readings.first { $0.group == .legs }
+        #expect(legs?.state == MuscleFreshness.states([run(hoursAgo: 25 * 24), run(hoursAgo: 3)], now: now)[.legs])
+        #expect(legs?.lastWorked == now.addingTimeInterval(-3 * 3600))
+        #expect((legs?.freshAt ?? now) > now)
+    }
+
+    @Test("A group already rested has no time to wait")
+    func restedGroup() {
+        let legs = MuscleFreshness.readings([run(hoursAgo: 21 * 24)], now: now).first { $0.group == .legs }
+        #expect(legs?.state == .recovered)
+        #expect(legs?.freshAt == nil)
+    }
+}

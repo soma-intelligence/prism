@@ -65,10 +65,11 @@ struct PulseLinkDetailContent: View {
         VStack(alignment: .leading, spacing: metrics.linkDetailSpacing) {
             VStack(alignment: .leading, spacing: metrics.linkCardSpacing * 1.5) {
                 SomaLinkHeadline(
-                    driver: link.driver.name,
-                    outcome: link.outcome.name,
+                    // What it says, in the words the list uses; a link still
+                    // waiting is only named.
+                    title: detail.progress == nil ? link.headline : link.plainTitle,
                     value: detail.progress == nil ? link.valueText : nil,
-                    unit: link.outcome.unit,
+                    unit: link.outcome.unitWords,
                     caption: detail.progress == nil ? link.caption : nil,
                     tone: tone
                 )
@@ -150,11 +151,11 @@ struct PulseLinkDetailContent: View {
         var facts = [SomaLinkFact("Days", value: detail.daysText)]
         if detail.progress == nil {
             facts.append(SomaLinkFact("Difference", value: detail.differenceText))
-            facts.append(SomaLinkFact("Noise", value: detail.noiseText))
+            facts.append(SomaLinkFact("Usual swing", value: detail.noiseText))
             facts.append(SomaLinkFact("Strength", strength: detail.strengthLevel))
         } else if link.result.verdict == .withinNoise {
             facts.append(SomaLinkFact("Difference", value: detail.differenceText))
-            facts.append(SomaLinkFact("Noise", value: detail.noiseText))
+            facts.append(SomaLinkFact("Usual swing", value: detail.noiseText))
         }
         facts.append(SomaLinkFact("Timing", value: detail.lagText))
         return facts

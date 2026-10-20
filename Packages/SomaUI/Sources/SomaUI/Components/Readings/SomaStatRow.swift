@@ -19,7 +19,8 @@ public struct SomaStat: Identifiable, Sendable {
     public var unit: LocalizedStringResource?
     /// Nil when it held steady, or when there is nothing to compare it with.
     public var trend: SomaTrend?
-    /// A few words on what the value means, set under it. Never a sentence.
+    /// A few words on what the value means, set under it. Under a dash, what
+    /// the reading is waiting for. Never a sentence.
     public var cue: LocalizedStringResource?
     public var cueTone: SomaCueTone
 
@@ -119,7 +120,9 @@ struct SomaStatView: View {
                 }
             }
 
-            if let cue, value != nil {
+            // Under a dash too: a missing value that says what it needs is
+            // not mistaken for a broken one.
+            if let cue {
                 Text(cue)
                     .somaFont(type.caption)
                     .foregroundStyle(cueTone.color(colors))
@@ -133,7 +136,10 @@ struct SomaStatView: View {
     }
 
     private var accessibilityValue: Text {
-        guard let value else { return Text("Not measured") }
+        guard let value else {
+            guard let cue else { return Text("Not measured") }
+            return Text("Not measured, \(Text(cue))")
+        }
         let unit = unit.map { Text($0) } ?? Text(verbatim: "")
         let read: Text = switch trend {
         case .up: Text("\(value) \(unit), rising")
@@ -151,7 +157,7 @@ struct SomaStatView: View {
         SomaStatRow([
             SomaStat("Fitness age", value: "41", trend: .down),
             SomaStat("Lean mass", value: "53.6", trend: .up),
-            SomaStat("VO2 max", value: nil),
+            SomaStat("VO2 max", value: nil, cue: "Needs a workout"),
         ])
         .padding()
     }

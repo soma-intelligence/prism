@@ -15,6 +15,8 @@ struct EnvironmentHere: Equatable {
     var access: EnvironmentLocation.Access
     var place: EnvironmentSun.Place?
     var isHere: Bool
+    /// The device's own position, for the map alone.
+    var exact: EnvironmentSun.Place? = nil
 }
 
 // MARK: - Where you are
@@ -44,7 +46,7 @@ struct EnvironmentWhereCard: View {
                 Group {
                     if let place = here.place {
                         Button { open(.temperature) } label: {
-                            EnvironmentPlaceMap(place: place, isHere: here.isHere, tint: tint)
+                            EnvironmentPlaceMap(place: here.exact ?? place, isHere: here.isHere, isExact: here.exact != nil, tint: tint)
                         }
                         .buttonStyle(.somaGlassPress)
                     } else {
@@ -172,11 +174,14 @@ private struct EnvironmentNoPlace: View {
     }
 }
 
-/// The place on a still map, a dot on it, the name in a pill. On visionOS,
-/// which this page draws without a map, a coloured pill with the name.
+/// The place on a still map, a dot on it, the name in a pill. Where the
+/// device gave its own position the map is drawn close in, on that very
+/// spot; a city is drawn wider. On visionOS, which this page draws without a
+/// map, a coloured pill with the name.
 private struct EnvironmentPlaceMap: View {
     let place: EnvironmentSun.Place
     let isHere: Bool
+    var isExact = false
     let tint: Color
 
     @Environment(\.somaTheme) private var theme
@@ -189,7 +194,8 @@ private struct EnvironmentPlaceMap: View {
             .frame(maxWidth: .infinity, alignment: .leading)
 #else
         let centre = CLLocationCoordinate2D(latitude: place.latitude, longitude: place.longitude)
-        Map(initialPosition: .region(MKCoordinateRegion(center: centre, latitudinalMeters: metrics.environmentMapSpan, longitudinalMeters: metrics.environmentMapSpan)),
+        let span = isExact ? metrics.environmentMapExactSpan : metrics.environmentMapSpan
+        Map(initialPosition: .region(MKCoordinateRegion(center: centre, latitudinalMeters: span, longitudinalMeters: span)),
             interactionModes: []) {
             Annotation("", coordinate: centre) {
                 ZStack {
@@ -253,7 +259,7 @@ struct EnvironmentSleepPlacesCard: View {
     @Environment(\.somaTheme) private var theme
 
     static func color(_ score: Double?) -> Color {
-        score.map { SomaEnergyRamp.standard.value(at: $0 / 100).color } ?? SomaHealthHue.sleep.color
+        score.map { SomaEnergyRamp.calm.value(at: $0 / 100).color } ?? SomaHealthHue.sleep.color
     }
 
     var body: some View {
@@ -328,7 +334,7 @@ private struct EnvironmentSleepPlaceRow: View {
                     .foregroundStyle(SomaHealthHue.sleep.color)
             }
             Spacer(minLength: 0)
-            Text(verbatim: "\(place.nights) nights")
+            Text(place.nights == 1 ? "1 night" : "\(place.nights) nights")
                 .somaFont(theme.typography.caption)
                 .foregroundStyle(colors.inkSecondary.color)
             Text(verbatim: place.score.map { "\(Int($0.rounded()))" } ?? "-")
@@ -341,7 +347,8 @@ private struct EnvironmentSleepPlaceRow: View {
 }
 
 #if !os(visionOS)
-/// The pins on a still map that fits them all.
+/// The pins on a still map that fits them all, each at the exact spot it
+/// was set and named beside it.
 private struct EnvironmentSleepMap: View {
     let places: [EnvironmentSleepPlace]
 
@@ -349,11 +356,11 @@ private struct EnvironmentSleepMap: View {
 
     var body: some View {
         let metrics = theme.metrics
-        Map(initialPosition: .automatic, interactionModes: []) {
+        Map(initialPosition: Self.position(places, span: metrics.environmentMapExactSpan), interactionModes: []) {
             ForEach(places) { place in
                 let tint = EnvironmentSleepPlacesCard.color(place.score)
                 let size = place.isLastNight ? metrics.environmentPinLastDiameter : metrics.environmentPinDiameter
-                Annotation("", coordinate: CLLocationCoordinate2D(latitude: place.latitude, longitude: place.longitude)) {
+                Annotation(place.name, coordinate: CLLocationCoordinate2D(latitude: place.latitude, longitude: place.longitude)) {
                     Text(verbatim: "\(place.nights)")
                         .somaFont(theme.typography.captionValue)
                         .foregroundStyle(SomaHealthHue.ink.color)
@@ -370,6 +377,14 @@ private struct EnvironmentSleepMap: View {
         .background(theme.colors.surfaceRecessed.color)
         .clipShape(.rect(cornerRadius: metrics.chartBarCornerRadius + 6, style: .continuous))
         .accessibilityHidden(true)
+    }
+
+    /// One place is drawn round its spot, close enough to read the street;
+    /// several are fitted together.
+    static func position(_ places: [EnvironmentSleepPlace], span: Double) -> MapCameraPosition {
+        guard places.count == 1, let only = places.first else { return .automatic }
+        return .region(MKCoordinateRegion(center: CLLocationCoordinate2D(latitude: only.latitude, longitude: only.longitude),
+                                          latitudinalMeters: span, longitudinalMeters: span))
     }
 }
 #endif

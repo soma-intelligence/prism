@@ -21,9 +21,12 @@ extension EnvironmentValues {
 
 extension View {
     /// Marks this tile as where the page with `id` zooms out of.
+    ///
+    /// - Parameter cornerRadius: the tile's own corner, when it is not a
+    ///   card's (an article's cover, say), so the zoom grows from its shape.
     @ViewBuilder
-    func zoomSource(_ id: some Hashable) -> some View {
-        modifier(ZoomSource(id: AnyHashable(id)))
+    func zoomSource(_ id: some Hashable, cornerRadius: CGFloat? = nil) -> some View {
+        modifier(ZoomSource(id: AnyHashable(id), cornerRadius: cornerRadius))
     }
 
     /// Makes this page zoom out of the tile marked with the same `id`.
@@ -35,6 +38,7 @@ extension View {
 
 private struct ZoomSource: ViewModifier {
     let id: AnyHashable
+    let cornerRadius: CGFloat?
     @Environment(\.zoomNamespace) private var namespace
     @Environment(\.somaTheme) private var theme
 
@@ -42,7 +46,7 @@ private struct ZoomSource: ViewModifier {
 #if os(iOS)
         if let namespace {
             content.matchedTransitionSource(id: id, in: namespace) { source in
-                source.clipShape(.rect(cornerRadius: theme.metrics.cardCornerRadius, style: .continuous))
+                source.clipShape(.rect(cornerRadius: cornerRadius ?? theme.metrics.cardCornerRadius, style: .continuous))
             }
         } else {
             content

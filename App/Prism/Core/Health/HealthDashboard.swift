@@ -52,6 +52,9 @@ final class HealthDashboard {
     /// When `loadLatest` or `load` last ran to the end, so the widgets can
     /// tell a reading that came back nil from one never read.
     @ObservationIgnored private var readingsReadAt: Date?
+    /// When `load` last read every displayed metric, so `start` can keep a
+    /// read under a minute old.
+    @ObservationIgnored private var displayedReadAt: Date?
 
     /// Whether the scores were read in this process.
     var hasReadScores: Bool { scoresReadAt != nil }
@@ -206,6 +209,11 @@ final class HealthDashboard {
     /// switch. Only the first time does it ask: after that the request is a
     /// no-op and what is left is the read, which is why the page is not put
     /// back through `.loading` once it is ready.
+    ///
+    /// A read less than a minute old is kept, as `loadToday` keeps its own:
+    /// read again on every tab switch, the ten metrics, one after the other,
+    /// hold the page that has just appeared behind them for the store and the
+    /// main thread.
     func start() async {
         guard source.isAvailable else {
             status = .unavailable
@@ -220,6 +228,10 @@ final class HealthDashboard {
             return
         }
 
+        if let readAt = displayedReadAt, Date().timeIntervalSince(readAt) < 60 {
+            status = .ready
+            return
+        }
         await load()
         status = .ready
     }
@@ -272,6 +284,7 @@ final class HealthDashboard {
             healthDistanceToday = try? await source.summary(distance, from: dayStart, to: now)
         }
         readingsReadAt = now
+        displayedReadAt = now
         await motion.refresh()
     }
 

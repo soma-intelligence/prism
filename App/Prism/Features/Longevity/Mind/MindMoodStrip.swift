@@ -85,7 +85,7 @@ struct MindMoodStrip: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(Text(day.day, format: .dateTime.weekday(.wide).day().month()))
-        .accessibilityValue(day.valence.map { MindMoodEntry.title(stop: MindMoodEntry.stop(valence: $0)) } ?? String(localized: "Nothing logged"))
+        .accessibilityValue(day.valence.map { String(localized: MindQuickMood.mood(valence: $0).title) } ?? String(localized: "Nothing logged"))
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
@@ -102,7 +102,7 @@ struct MindMoodStrip: View {
                         .somaFont(type.captionValue)
                         .foregroundStyle(colors.inkSecondary.color)
                     if let valence = day.valence {
-                        Text(MindMoodEntry.title(stop: MindMoodEntry.stop(valence: valence)))
+                        Text(MindQuickMood.mood(valence: valence).title)
                             .somaFont(type.callout)
                             .foregroundStyle(MindMoodPalette.color(valence))
                     } else {

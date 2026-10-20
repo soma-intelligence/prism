@@ -89,6 +89,14 @@ struct FixtureHealthSource: HealthSampleSource {
             add(q + "VO2Max", day: day, hour: 18, value: value(41, wave: 0.6, noise: 0.3, day: day, seed: 6) + Double(365 - day) * 0.006, every: 4)
             add(q + "HeartRateRecoveryOneMinute", day: day, hour: 18, value: value(28, wave: 2, noise: 2, day: day, seed: 7), every: 3)
             add(q + "WalkingSpeed", day: day, hour: 12, value: value(1.38, wave: 0.03, noise: 0.03, day: day, seed: 8))
+            add(q + "WalkingHeartRateAverage", day: day, hour: 13, value: value(98, wave: 2, noise: 2, day: day, seed: 21))
+            add(q + "AppleWalkingSteadiness", day: day, hour: 20, value: value(0.94, wave: 0.01, noise: 0.008, day: day, seed: 22), every: 7, source: "iPhone")
+            add(q + "WalkingStepLength", day: day, hour: 12.5, value: value(0.74, wave: 0.01, noise: 0.01, day: day, seed: 23), source: "iPhone")
+            add(q + "WalkingAsymmetryPercentage", day: day, hour: 12.5, value: max(0, value(0.03, wave: 0.006, noise: 0.006, day: day, seed: 24)), source: "iPhone")
+            add(q + "WalkingDoubleSupportPercentage", day: day, hour: 12.5, value: value(0.27, wave: 0.006, noise: 0.006, day: day, seed: 25), source: "iPhone")
+            add(q + "SixMinuteWalkTestDistance", day: day, hour: 20, value: value(560, wave: 8, noise: 6, day: day, seed: 26) + Double(365 - day) * 0.03, every: 7, source: "iPhone")
+            add(q + "StairAscentSpeed", day: day, hour: 9, value: value(0.42, wave: 0.02, noise: 0.015, day: day, seed: 27), every: 2, source: "iPhone")
+            add(q + "AppleExerciseTime", day: day, hour: 18, value: max(0, value(34, wave: 10, noise: 12, day: day, seed: 28)), length: 1800)
             add(q + "BodyMass", day: day, hour: 7.2, value: 78.5 - Double(120 - min(day, 120)) * 0.02 + value(0, wave: 0.2, noise: 0.25, day: day, seed: 9), every: 3, source: "Withings")
             add(q + "BodyFatPercentage", day: day, hour: 7.2, value: 0.215 - Double(120 - min(day, 120)) * 0.00008 + value(0, wave: 0.002, noise: 0.002, day: day, seed: 10), every: 7, source: "Withings")
             add(q + "LeanBodyMass", day: day, hour: 7.2, value: 61 + Double(120 - min(day, 120)) * 0.006 + value(0, wave: 0.2, noise: 0.2, day: day, seed: 11), every: 7, source: "Withings")
@@ -107,6 +115,12 @@ struct FixtureHealthSource: HealthSampleSource {
             add("HKCategoryTypeIdentifierSleepAnalysis", day: day, hour: bed, value: 4, length: 1.2 * 3600)
             add("HKCategoryTypeIdentifierSleepAnalysis", day: day, hour: bed + 1.2, value: 3, length: (asleep - 2.8) * 3600)
             add("HKCategoryTypeIdentifierSleepAnalysis", day: day, hour: bed + asleep - 1.6, value: 5, length: 1.6 * 3600)
+        }
+        // A date of birth, read as the age today, as the real store reads it:
+        // the line fitness age and the heart rate zones are read against.
+        let birth = "HKCharacteristicTypeIdentifierDateOfBirth"
+        if let metric = HealthMetricCatalog.metric(for: birth), let born = calendar.date(byAdding: .year, value: -38, to: today) {
+            out[birth] = [HealthReading(metric: birth, value: 38, unit: metric.unit, start: born, end: now)]
         }
         return out
     }

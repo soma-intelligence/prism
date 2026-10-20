@@ -18,6 +18,8 @@ struct HomeSheet<Content: View>: View {
 
     @Environment(\.somaTheme) private var theme
     @Environment(\.dismiss) private var dismiss
+    /// The sheet's own stack zooms its pages out of the rows that open them.
+    @Namespace private var zoom
 
     init(eyebrow: String, title: String, @ViewBuilder content: () -> Content) {
         self.eyebrow = eyebrow
@@ -52,9 +54,10 @@ struct HomeSheet<Content: View>: View {
                     Button("Done") { dismiss() }
                 }
             }
-            .navigationDestination(for: PulseRoute.self) { $0.page }
+            .navigationDestination(for: PulseRoute.self) { $0.page.zoomDestination($0) }
             .journeyDestinations()
         }
+        .environment(\.zoomNamespace, zoom)
         .presentationBackground(theme.colors.canvas.color)
     }
 }

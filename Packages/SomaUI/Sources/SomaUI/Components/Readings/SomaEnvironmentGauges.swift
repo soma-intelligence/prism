@@ -189,126 +189,6 @@ public struct SomaArcGauge<Center: View>: View {
     }
 }
 
-// MARK: - Sun path
-
-/// The sun's day as an arc over the horizon, sunrise on the left and sunset
-/// on the right, the part already travelled drawn in the daylight colours
-/// and the sun where it stands now. Without times, the arc stands alone with
-/// a dash at each end.
-public struct SomaSunPath: View {
-    private let progress: Double?
-    private let rise: String?
-    private let set: String?
-
-    @Environment(\.somaTheme) private var theme
-
-    /// - Parameter progress: the share of daylight gone by: 0 at sunrise,
-    ///   1 at sunset, under 0 before it rose and over 1 after it set. Nil
-    ///   when the times are unknown.
-    public init(progress: Double?, rise: String?, set: String?) {
-        self.progress = progress
-        self.rise = rise
-        self.set = set
-    }
-
-    public var body: some View {
-        let metrics = theme.metrics
-        let colors = theme.colors
-        let sun = metrics.environmentSunDiameter
-        let gradient = SomaDataScale.daylight.gradient
-        let progress = progress
-        let isUp = progress.map { (0...1).contains($0) } ?? false
-
-        VStack(spacing: 6) {
-            Canvas { context, size in
-                let inset = sun / 2 + 2
-                let horizon = size.height - inset
-                let left = inset
-                let right = size.width - inset
-                let rx = (right - left) / 2
-                let ry = horizon - inset
-                let cx = left + rx
-                func point(_ t: Double) -> CGPoint {
-                    CGPoint(x: cx - rx * cos(.pi * t), y: horizon - ry * sin(.pi * t))
-                }
-                func arc(to end: Double) -> Path {
-                    var path = Path()
-                    let steps = 64
-                    path.move(to: point(0))
-                    for step in 1...steps { path.addLine(to: point(end * Double(step) / Double(steps))) }
-                    return path
-                }
-
-                // The horizon.
-                var line = Path()
-                line.move(to: CGPoint(x: 0, y: horizon))
-                line.addLine(to: CGPoint(x: size.width, y: horizon))
-                context.stroke(line, with: .color(colors.inkSecondary.color.opacity(0.35)), lineWidth: 1)
-
-                // The whole path, dotted.
-                context.stroke(arc(to: 1), with: .color(colors.inkSecondary.color.opacity(0.45)),
-                               style: StrokeStyle(lineWidth: 1.5, lineCap: .round, dash: [1.5, 4]))
-
-                guard let progress else { return }
-                let travelled = min(1, max(0, progress))
-                let shading = GraphicsContext.Shading.linearGradient(
-                    gradient, startPoint: CGPoint(x: left, y: horizon), endPoint: CGPoint(x: right, y: horizon))
-                if travelled > 0 {
-                    var area = arc(to: travelled)
-                    area.addLine(to: CGPoint(x: point(travelled).x, y: horizon))
-                    area.closeSubpath()
-                    var glow = context
-                    glow.opacity = 0.18
-                    glow.fill(area, with: shading)
-                    context.stroke(arc(to: travelled), with: shading,
-                                   style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
-                }
-
-                let at = point(travelled)
-                let disc = CGRect(x: at.x - sun / 2, y: at.y - sun / 2, width: sun, height: sun)
-                if isUp {
-                    let halo = disc.insetBy(dx: -sun * 0.6, dy: -sun * 0.6)
-                    context.fill(Path(ellipseIn: halo), with: .radialGradient(
-                        Gradient(colors: [SomaDataScale.daylight.value(at: 120).color.opacity(0.45), .clear]),
-                        center: at, startRadius: 0, endRadius: halo.width / 2))
-                    context.fill(Path(ellipseIn: disc), with: .color(SomaDataScale.daylight.value(at: 120).color))
-                    context.stroke(Path(ellipseIn: disc), with: .color(colors.surface.color), lineWidth: 2)
-                } else {
-                    context.fill(Path(ellipseIn: disc), with: .color(colors.surface.color))
-                    context.stroke(Path(ellipseIn: disc.insetBy(dx: 1, dy: 1)),
-                                   with: .color(colors.inkSecondary.color), lineWidth: 1.5)
-                }
-            }
-            .frame(height: metrics.environmentSunPathHeight)
-
-            HStack {
-                SunTime(symbol: "sunrise.fill", time: rise)
-                Spacer(minLength: 0)
-                SunTime(symbol: "sunset.fill", time: set)
-            }
-        }
-        .accessibilityHidden(true)
-    }
-}
-
-private struct SunTime: View {
-    let symbol: String
-    let time: String?
-
-    @Environment(\.somaTheme) private var theme
-
-    var body: some View {
-        HStack(spacing: 4) {
-            Image(systemName: symbol)
-                .symbolRenderingMode(.palette)
-                .foregroundStyle(SomaDataScale.daylight.value(at: 60).color, theme.colors.inkSecondary.color)
-            Text(verbatim: time ?? "-")
-                .foregroundStyle(time == nil ? theme.colors.inkSecondary.color : theme.colors.inkPrimary.color)
-        }
-        .somaFont(theme.typography.captionValue)
-    }
-}
-
 // MARK: - Thermometer pill
 
 /// The temperature now and the day's range as a pill: the number, then the
@@ -456,8 +336,6 @@ public struct SomaWeatherPill: View {
                 SomaArcGauge(scale: .daylight, value: 48, band: 40...85) {
                     Text(verbatim: "48")
                 }
-                SomaSunPath(progress: 0.62, rise: "07:05", set: "18:51")
-                SomaSunPath(progress: nil, rise: nil, set: nil)
                 SomaScaleBar(scale: .uvIndex, value: 6, ticks: [0, 3, 6, 8, 11])
                 SomaScaleBar(scale: .airQuality, value: nil, ticks: [0, 50, 100, 150, 200, 300])
                 SomaScaleBar(scale: .soundLevel, value: 64, style: .level, limit: 70)

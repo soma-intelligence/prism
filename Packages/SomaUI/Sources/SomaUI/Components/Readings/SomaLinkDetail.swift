@@ -11,11 +11,12 @@ import SwiftUI
 
 // MARK: - Headline
 
-/// The sheet's top: the link's title, the effect large and signed in its
-/// status colour, and the day counts small under it.
+/// The sheet's top: what the link says in plain words ("After a long night,
+/// your morning energy is higher"), the effect large and signed in its
+/// status colour with its unit spelled out, and the day counts small under
+/// it.
 public struct SomaLinkHeadline: View {
-    private let driver: String
-    private let outcome: String
+    private let title: String
     private let value: String?
     private let unit: String
     private let caption: String?
@@ -24,12 +25,13 @@ public struct SomaLinkHeadline: View {
     @Environment(\.somaTheme) private var theme
 
     /// - Parameters:
-    ///   - value: the effect, signed: "−11". Nil for a link still waiting,
-    ///     which shows the title alone.
+    ///   - title: the link as a sentence, or its plain name while it waits.
+    ///   - value: the effect, signed: "\u{2212}11". Nil for a link still
+    ///     waiting, which shows the title alone.
+    ///   - unit: spelled out: "points", "minutes".
     ///   - caption: the day counts: "9 vs 41 nights".
-    public init(driver: String, outcome: String, value: String?, unit: String, caption: String?, tone: SomaLinkTone) {
-        self.driver = driver
-        self.outcome = outcome
+    public init(title: String, value: String?, unit: String, caption: String?, tone: SomaLinkTone) {
+        self.title = title
         self.value = value
         self.unit = unit
         self.caption = caption
@@ -42,16 +44,10 @@ public struct SomaLinkHeadline: View {
         let colors = theme.colors
 
         VStack(alignment: .leading, spacing: metrics.linkCardSpacing) {
-            HStack(spacing: metrics.linkCardSpacing * 0.75) {
-                Text(verbatim: driver)
-                Image(systemName: "arrow.right")
-                    .foregroundStyle(colors.inkSecondary.color)
-                Text(verbatim: outcome)
-            }
-            .somaFont(type.title)
-            .foregroundStyle(colors.inkPrimary.color)
-            .lineLimit(1)
-            .minimumScaleFactor(0.8)
+            Text(verbatim: title)
+                .somaFont(type.title)
+                .foregroundStyle(colors.inkPrimary.color)
+                .fixedSize(horizontal: false, vertical: true)
 
             if let value {
                 HStack(alignment: .firstTextBaseline, spacing: metrics.linkCardSpacing * 0.5) {
@@ -74,7 +70,7 @@ public struct SomaLinkHeadline: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(verbatim: "\(driver), \(outcome)"))
+        .accessibilityLabel(Text(verbatim: title))
         .accessibilityValue(Text(verbatim: [value.map { "\($0) \(unit)" }, caption].compactMap { $0 }.joined(separator: ", ")))
     }
 }
@@ -100,7 +96,7 @@ public struct SomaLinkComparison: View {
     ///   - low: the outcome on each low (or untagged) day.
     ///   - highLabel: the high row's name: "With", "Long".
     ///   - lowLabel: the low row's name: "Without", "Short".
-    ///   - gap: the difference, as the headline states it: "−11 pts".
+    ///   - gap: the difference, as the headline states it: "−11 points".
     public init(high: [Double], low: [Double], highLabel: String, lowLabel: String, gap: String, tone: SomaLinkTone) {
         self.high = high
         self.low = low

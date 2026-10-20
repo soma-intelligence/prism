@@ -15,4 +15,21 @@ public extension SomaPreviewSamples {
         .quads: .fatigued, .hamstrings: .fatigued, .calves: .fatigued, .adductors: .fatigued,
         .glutes: .depleted,
     ]
+
+    /// The six groups as the freshness card reads them: a leg day this
+    /// morning, arms yesterday, the rest of the upper body rested, and no
+    /// back session in the month.
+    static var muscleReadings: [SomaMuscleReading] {
+        let now = Date()
+        return [
+            SomaMuscleReading(group: .chest, state: .recovered, lastWorked: now.addingTimeInterval(-4 * 86_400)),
+            SomaMuscleReading(group: .shoulders, state: .recovered, lastWorked: now.addingTimeInterval(-4 * 86_400)),
+            SomaMuscleReading(group: .arms, state: .fatigued, lastWorked: now.addingTimeInterval(-30 * 3_600),
+                              freshAt: now.addingTimeInterval(14 * 3_600)),
+            SomaMuscleReading(group: .core, state: .recovered, lastWorked: now.addingTimeInterval(-3 * 86_400)),
+            SomaMuscleReading(group: .back, state: .none),
+            SomaMuscleReading(group: .legs, state: .depleted, lastWorked: now.addingTimeInterval(-5 * 3_600),
+                              freshAt: now.addingTimeInterval(52 * 3_600)),
+        ]
+    }
 }

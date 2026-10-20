@@ -198,19 +198,8 @@ struct EnvironmentSky: Equatable {
     var day: EnvironmentSun.Day?
     var place: EnvironmentSun.Place?
 
-    var progress: Double? { day?.progress(at: now) }
-
     func rise(_ words: PulseWording) -> String? { day.map { words.time($0.rise) } }
     func set(_ words: PulseWording) -> String? { day.map { words.time($0.set) } }
-
-    /// Daylight left before sunset, hours and minutes: "2 h 10".
-    var left: String? {
-        guard let day else { return nil }
-        let seconds = day.set.timeIntervalSince(now)
-        guard seconds > 0 else { return "0 min" }
-        let minutes = Int((seconds / 60).rounded())
-        return minutes < 60 ? "\(minutes) min" : "\(minutes / 60) h \(String(format: "%02d", minutes % 60))"
-    }
 
     static func make(now: Date, place: EnvironmentSun.Place?, calendar: Calendar = .current) -> EnvironmentSky {
         EnvironmentSky(

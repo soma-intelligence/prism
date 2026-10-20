@@ -106,14 +106,22 @@ struct WeatherPage: View {
     }
 }
 
-/// Choosing a place with Apple Maps' search: the current choice, places you
-/// slept lately, and search results as you type.
+/// Choosing a place with Apple Maps' search: where you are now when the
+/// sheet is given it, the current choice, places you slept lately, and
+/// search results as you type.
+///
+/// A precise picker (where you slept) searches addresses as well as cities
+/// and keeps each result's own spot and street; the Weather page's picker
+/// keeps cities.
 struct CityPickerSheet: View {
     let eyebrow: String
     let title: LocalizedStringResource
     let current: SleepPlaceStore.Place?
     let recent: [SleepPlaceStore.Place]
     var footnote: LocalizedStringResource?
+    /// The device's own spot, offered first; nil leaves it out.
+    var here: SleepPlaceStore.Place?
+    var isPrecise = false
     let pick: (SleepPlaceStore.Place?) -> Void
 
     @State private var query = ""
@@ -124,12 +132,15 @@ struct CityPickerSheet: View {
 
     init(eyebrow: String, title: LocalizedStringResource, current: SleepPlaceStore.Place?,
          recent: [SleepPlaceStore.Place], footnote: LocalizedStringResource? = nil,
+         here: SleepPlaceStore.Place? = nil, isPrecise: Bool = false,
          pick: @escaping (SleepPlaceStore.Place?) -> Void) {
         self.eyebrow = eyebrow
         self.title = title
         self.current = current
         self.recent = recent
         self.footnote = footnote
+        self.here = here
+        self.isPrecise = isPrecise
         self.pick = pick
     }
 
@@ -140,7 +151,7 @@ struct CityPickerSheet: View {
         ScoreSheet(eyebrow: eyebrow, title: title) {
             HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass").foregroundStyle(colors.inkSecondary.color)
-                TextField("Search a city", text: $query)
+                TextField(isPrecise ? "Search an address or a city" : "Search a city", text: $query)
                     .somaFont(type.body)
                     .autocorrectionDisabled()
                     .onSubmit { Task { await search() } }
@@ -150,6 +161,9 @@ struct CityPickerSheet: View {
             .background(RoundedRectangle(cornerRadius: theme.metrics.browseGroupCornerRadius, style: .continuous)
                 .fill(colors.surface.color))
 
+            if let here, results.isEmpty, here != current {
+                section("Where you are now", [here])
+            }
             if !results.isEmpty {
                 section("Results", results)
             } else if searching {
@@ -189,6 +203,17 @@ struct CityPickerSheet: View {
         }
     }
 
+    /// A precise result's name: its street and its city, or whichever of
+    /// the two the search gave.
+    nonisolated static func preciseName(street: String?, city: String?) -> String? {
+        switch (street, city) {
+        case let (street?, city?) where street != city: "\(street), \(city)"
+        case let (street?, _): street
+        case let (nil, city?): city
+        default: nil
+        }
+    }
+
     private func search() async {
         let request = MKLocalSearch.Request()
         request.naturalLanguageQuery = query
@@ -200,8 +225,10 @@ struct CityPickerSheet: View {
             return
         }
         var seen: Set<String> = []
+        let isPrecise = isPrecise
         results = response.mapItems.compactMap { item -> SleepPlaceStore.Place? in
-            let name = item.addressRepresentations?.cityName ?? item.name
+            let city = item.addressRepresentations?.cityName
+            let name = isPrecise ? Self.preciseName(street: item.name, city: city) : city ?? item.name
             guard let name, seen.insert(name).inserted else { return nil }
             let coordinate = item.location.coordinate
             return SleepPlaceStore.Place(name: name, latitude: coordinate.latitude, longitude: coordinate.longitude)

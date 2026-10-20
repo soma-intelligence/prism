@@ -6,152 +6,96 @@
 import SwiftUI
 import SomaUI
 
-/// Track, Rituals: what the person does to settle, and what each thing does
-/// for them, measured on their own days. The stats lead and each ritual is a
-/// row with its effect; no headline and no explaining copy (owner, 2026-10-03).
+/// Track, Rituals: two short routines that bookend the day, a morning one and
+/// an evening one, each a few steps to tick.
 ///
-/// Rituals are breathing sessions and walks from Apple Health, and the
-/// Journal tags that behave like rituals (Meditation, Sauna, a tag of the
-/// person's own that names one). Each is measured with ``EffectMath`` on the
-/// same evening's HRV, or on the next night's deep sleep for one done at
-/// bedtime.
+/// One line says what the page is for. Each ritual is a card: today's
+/// progress, the last two weeks as a strip of days, the run of days kept, its
+/// steps to tick, and one line on what keeping it does for the person, read
+/// from Apple Health with ``EffectMath`` (a morning ritual on that evening's
+/// HRV, an evening one on the next night's deep sleep). Steps are added,
+/// removed and reordered in Customize.
 ///
 /// It draws no navigation chrome: the Track page embeds it under its own top
-/// bar. Needs `HealthDashboard` and `JournalStore` in the environment.
+/// bar. Needs `HealthDashboard`, `JournalStore` and `AppRouter` in the
+/// environment.
 struct TrackRitualsView: View {
     @Environment(HealthDashboard.self) private var health
-    @Environment(JournalStore.self) private var journal
+    @Environment(AppRouter.self) private var router
     @Environment(\.somaTheme) private var theme
 
     @State private var inputs: MindInputs?
-    @State private var sheet: TrackRitualsSheet?
+    @State private var breathes = false
+
+    private let store = TrackRitualStore.shared
+    private let calendar = Calendar.current
 
     var body: some View {
-        let model = MindRituals.make(
-            from: inputs ?? MindInputs(now: Date()),
-            journal: MindJournal(journal),
-            calendar: .current
-        )
+        let metrics = theme.metrics
+        let today = Date.now
 
-        TabPartScaffold(
-            aspect: .mind,
-            stats: [
-                SomaStat("This week", value: model.thisWeek.map { "\($0)" }),
-                SomaStat("Best effect", value: model.bestEffect),
-                SomaStat("Streak", value: model.streak.map { "\($0)" }),
-            ]
-        ) {
-            if !model.rituals.isEmpty {
-                TrackRitualList(rituals: model.rituals)
-            }
+        ScrollView {
+            VStack(alignment: .leading, spacing: metrics.leadSpacing * 0.75) {
+                TrackLeadText(
+                    lead: "Two small routines that bookend your day.",
+                    rest: "Tick each step as you go. Soma counts the days you keep and shows what they do for you."
+                )
+                .padding(.horizontal, metrics.scoreLabelSpacing)
 
-            SomaActionCard(
-                eyebrow: "A ritual for tonight",
-                title: model.tonight?.offer ?? "Breathe for 10 minutes",
-                detail: model.tonightDetail,
-                actionTitle: "Start",
-                action: {
-                    if let tonight = model.tonight, tonight.kind != .breathe {
-                        sheet = .ritual(tonight.offer)
-                    } else {
-                        sheet = .breathe
-                    }
-                }
-            ) {
-                SomaOrb(aspect: model.tonight?.reading == .deepSleep ? .sleep : .mind, scale: .mini)
-            }
-
-            Button {
-                sheet = .newRitual
-            } label: {
-                Text("Try a new ritual")
-                    .somaFont(theme.typography.body)
-                    .foregroundStyle(theme.colors.inkPrimary.color)
-                    .frame(maxWidth: .infinity, minHeight: theme.metrics.minimumTapTarget + 4)
-                    .background(Capsule().fill(theme.colors.surface.color))
-                    .overlay(
-                        Capsule().strokeBorder(
-                            theme.colors.inkPrimary.color.opacity(theme.metrics.hairlineOpacity),
-                            lineWidth: 0.5
-                        )
+                ForEach(TrackRitualMoment.allCases) { moment in
+                    TrackRitualCard(
+                        summary: TrackRitualSummary.make(moment, store: store, inputs: inputs, today: today, calendar: calendar),
+                        ritual: store.ritual(moment),
+                        isDone: { store.isDone($0, on: today) },
+                        toggle: { step in
+                            store.toggle(step, on: today)
+                        },
+                        breathe: { breathes = true },
+                        edit: { router.trackSection = .customize }
                     )
-                    .contentShape(.capsule)
+                }
+
+                HStack {
+                    Spacer()
+                    Button {
+                        router.trackSection = .customize
+                    } label: {
+                        SomaQuietPill("Edit rituals", systemImage: "slider.horizontal.3")
+                    }
+                    .buttonStyle(.somaGlassPressDim)
+                    Spacer()
+                }
+
+                ToolsEntryTile()
+
+                MindHealthStatus(status: health.status)
             }
-            .buttonStyle(SomaGlassPressStyle())
-
-            ToolsEntryTile()
-
-            MindHealthStatus(status: health.status)
+            .padding(.horizontal, metrics.pagePadding)
+            .padding(.top, metrics.cardSpacing)
+            .padding(.bottom, metrics.pagePadding)
+            .frame(maxWidth: metrics.pageMaxWidth, alignment: .leading)
+            .frame(maxWidth: .infinity)
         }
+        .background(theme.colors.canvas.color.ignoresSafeArea())
         .refreshable { inputs = await MindLoad.inputs(health) }
         .task {
             guard inputs == nil else { return }
             inputs = await MindLoad.inputs(health)
         }
-        .sheet(item: $sheet) { sheet in
-            switch sheet {
-            case .breathe:
-                MindBreatheSheet()
-            case .ritual(let name):
-                NotWiredPage(
-                    eyebrow: "Rituals",
-                    title: "\(name)",
-                    message: "Not built yet."
-                )
-            case .newRitual:
-                NotWiredPage(
-                    eyebrow: "Rituals",
-                    title: "Try a new ritual",
-                    message: "Not built yet."
-                )
-            }
+        .sheet(isPresented: $breathes) {
+            MindBreatheSheet()
         }
     }
 }
 
-/// What the Rituals part can open over itself.
-enum TrackRitualsSheet: Identifiable {
-    case breathe
-    case ritual(String)
-    case newRitual
-
-    var id: String {
-        switch self {
-        case .breathe: "breathe"
-        case .ritual(let name): "ritual-\(name)"
-        case .newRitual: "new-ritual"
-        }
-    }
-}
-
-private struct TrackRitualList: View {
-    let rituals: [MindRitual]
-
-    @Environment(\.somaTheme) private var theme
-    @Environment(\.displayScale) private var displayScale
-
-    var body: some View {
-        let metrics = theme.metrics
-        let hairline = theme.colors.inkPrimary.color.opacity(metrics.hairlineOpacity)
-        let caption: LocalizedStringResource = rituals.allSatisfy { $0.reading == .deepSleep }
-            ? "Effect the night after" : "Effect the same evening"
-
-        SomaCard {
-            VStack(alignment: .leading, spacing: metrics.moveRowSpacing) {
-                SomaCardHeader("Your rituals", caption: caption)
-                ForEach(Array(rituals.enumerated()), id: \.element.id) { index, ritual in
-                    if index > 0 {
-                        Rectangle().fill(hairline).frame(height: 1 / displayScale)
-                    }
-                    TrackRitualRow(ritual: ritual)
-                }
-            }
-        }
-    }
-}
-
-private struct TrackRitualRow: View {
-    let ritual: MindRitual
+/// One ritual on its card.
+private struct TrackRitualCard: View {
+    let summary: TrackRitualSummary
+    let ritual: TrackRitual
+    let isDone: (TrackRitualStep) -> Bool
+    let toggle: (TrackRitualStep) -> Void
+    let breathe: () -> Void
+    let edit: () -> Void
 
     @Environment(\.somaTheme) private var theme
 
@@ -159,28 +103,75 @@ private struct TrackRitualRow: View {
         let metrics = theme.metrics
         let type = theme.typography
         let colors = theme.colors
-        let aspect: SomaAspect = ritual.reading == .deepSleep ? .sleep : .mind
+        let tone = summary.moment.tone
 
-        HStack(spacing: metrics.moveRowGap) {
-            SomaOrb(aspect: aspect, scale: .mini)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(ritual.title)
-                    .somaFont(type.body)
-                    .foregroundStyle(colors.inkPrimary.color)
-                Text(ritual.detail)
-                    .somaFont(type.caption)
-                    .foregroundStyle(colors.inkSecondary.color)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            VStack(alignment: .trailing, spacing: 6) {
-                Text(ritual.value ?? "-")
-                    .somaFont(type.rowValue)
-                    .foregroundStyle(ritual.isCost ? colors.danger.color : colors.inkPrimary.color)
-                SomaEffectBar(fraction: ritual.fraction, aspect: aspect, isCost: ritual.isCost)
-                    .frame(width: metrics.miniOrbDiameter * 1.75)
+        SomaCard {
+            VStack(alignment: .leading, spacing: metrics.cardSpacing) {
+                HStack(alignment: .center, spacing: metrics.browseRowSpacing) {
+                    SomaTrackGlyph(summary.moment.glyph, tone: tone, style: .row)
+                    Text(summary.moment.title)
+                        .somaFont(type.title)
+                        .foregroundStyle(colors.inkPrimary.color)
+                        .accessibilityAddTraits(.isHeader)
+                    Spacer(minLength: metrics.cardSpacing)
+                    Text(summary.progressText)
+                        .somaFont(type.rowValue)
+                        .monospacedDigit()
+                        .foregroundStyle(summary.isKeptToday ? tone.color : colors.inkSecondary.color)
+                        .contentTransition(.numericText())
+                }
+
+                if ritual.steps.isEmpty {
+                    Button(action: edit) {
+                        Text("No steps yet. Add a few in Customize.")
+                            .somaFont(type.body)
+                            .foregroundStyle(colors.inkSecondary.color)
+                            .frame(maxWidth: .infinity, minHeight: metrics.ritualStepMinHeight, alignment: .leading)
+                            .contentShape(.rect)
+                    }
+                    .buttonStyle(.somaGlassPressDim)
+                } else {
+                    VStack(alignment: .leading, spacing: metrics.scoreLabelSpacing * 2) {
+                        SomaRitualDays(shares: summary.shares, tone: tone)
+                        HStack {
+                            Text("Last \(TrackRitualSummary.days) days")
+                            Spacer()
+                            Text(summary.streakText ?? "\(summary.keptThisWeek) of 7 this week")
+                        }
+                        .somaFont(type.tabLabel)
+                        .foregroundStyle(colors.inkSecondary.color)
+                    }
+
+                    VStack(spacing: 0) {
+                        ForEach(Array(ritual.steps.enumerated()), id: \.element.id) { index, step in
+                            if index > 0 { TrackHairline() }
+                            SomaRitualStep(step.title, glyph: step.kind, tone: tone, isDone: isDone(step)) {
+                                toggle(step)
+                            } trailing: {
+                                if step.kind == .breathe && !isDone(step) {
+                                    Button(action: breathe) {
+                                        Text("Start")
+                                            .somaFont(type.callout)
+                                            .foregroundStyle(colors.inkPrimary.color)
+                                            .padding(.horizontal, metrics.quietPillPadding * 0.75)
+                                            .frame(minHeight: metrics.quietPillHeight * 0.8)
+                                            .background(Capsule().fill(colors.surfaceRecessed.color))
+                                            .contentShape(.capsule)
+                                    }
+                                    .buttonStyle(.somaGlassPress)
+                                }
+                            }
+                        }
+                    }
+
+                    TrackHairline()
+                    Text(summary.effectText)
+                        .somaFont(type.caption)
+                        .foregroundStyle(colors.inkSecondary.color)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
         }
-        .accessibilityElement(children: .combine)
     }
 }
 
@@ -189,5 +180,6 @@ private struct TrackRitualRow: View {
         TrackRitualsView()
     }
     .environment(HealthDashboard())
+    .environment(AppRouter())
     .environment(JournalStore(url: nil))
 }

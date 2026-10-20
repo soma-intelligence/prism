@@ -9,8 +9,9 @@ import Observation
 /// Where each night was slept, the bedroom as the person describes it, and
 /// the city the Weather page shows.
 ///
-/// Soma reads no location of its own, so every place here was set by hand,
-/// and a place set by hand is never replaced. Kept on the device as one JSON
+/// Every place here was set by hand, from a search or from where the device
+/// was when it was set, at that exact spot, and a place set by hand is never
+/// replaced. Kept on the device as one JSON
 /// file in Application Support, beside the Journal.
 @MainActor
 @Observable

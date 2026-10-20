@@ -49,8 +49,11 @@ struct BodyOverviewInputs: Sendable, Equatable {
     var leanMass: [HealthReading] = []
     /// VO2 max over the last sixteen weeks.
     var vo2Max: [HealthReading] = []
-    /// Age in whole years, from the date of birth in Health.
+    /// Age in whole years, from the date of birth in Health, else from the
+    /// birthday in your profile.
     var age: Int?
+    /// The sex fitness age is read with: your answer in the app, else Health's.
+    var sex: BodyFitnessAge.Sex = .unknown
 
     static let metrics = [BodyMetric.leanBodyMass, BodyMetric.vo2Max, BodyMetric.dateOfBirth]
 
@@ -59,7 +62,16 @@ struct BodyOverviewInputs: Sendable, Equatable {
         async let lean = BodyMetric.samples(BodyMetric.leanBodyMass, from: start, to: now, in: source)
         async let vo2 = BodyMetric.samples(BodyMetric.vo2Max, from: start, to: now, in: source)
         async let age = BodyMetric.age(in: source)
-        return BodyOverviewInputs(now: now, leanMass: await lean, vo2Max: await vo2, age: await age)
+        let profile = SomaProfileStore.shared.profile
+        return BodyOverviewInputs(
+            now: now,
+            leanMass: await lean,
+            vo2Max: await vo2,
+            age: await age ?? profile.age(on: now, calendar: calendar),
+            sex: BodyFitnessAge.Sex(
+                CardiometabolicProfileStore.shared.profile.sex ?? profile.sex.flatMap(LabSex.init) ?? LabHealth.biologicalSex()
+            )
+        )
     }
 }
 
@@ -73,9 +85,10 @@ struct BodyOverview: Equatable {
     var leanTrend: SomaTrend?
     var vo2Max: String?
     var vo2Trend: SomaTrend?
-    /// Your age, the line a fitness age is read against. Health knows it
-    /// before a Soma visit does.
+    /// Your age, the line a fitness age is read against.
     var age: Int?
+    /// Fitness age from the latest VO2 max, or what it needs.
+    var fitnessAge = BodyFitnessAge.Stat()
 
     static func make(from inputs: BodyOverviewInputs, calendar: Calendar = .current, locale: Locale = .current) -> BodyOverview {
         let lean = BodyMath.change(inputs.leanMass, now: inputs.now, calendar: calendar)
@@ -84,12 +97,13 @@ struct BodyOverview: Equatable {
         var page = BodyOverview(
             eyebrow: "Body",
             headline: "Your body composition.",
-            reason: "Nothing measured yet. Lean mass comes from Apple Health, and a Soma visit adds fitness age, lean mass by region and grip. This page fills from there.",
+            reason: "Nothing measured yet. Lean mass comes from a smart scale and fitness age from your watch’s VO2 max, both through Apple Health.",
             leanMass: BodyMath.format(lean?.latest, decimals: 1, locale: locale),
             leanTrend: BodyMath.trend(lean?.delta, tolerance: 0.1),
             vo2Max: BodyMath.format(vo2?.latest, decimals: 0, locale: locale),
             vo2Trend: BodyMath.trend(vo2?.delta, tolerance: 0.5),
-            age: inputs.age
+            age: inputs.age,
+            fitnessAge: BodyFitnessAge.stat(vo2Max: vo2?.latest, age: inputs.age, sex: inputs.sex)
         )
 
         if let lean, let delta = lean.delta {
@@ -99,18 +113,18 @@ struct BodyOverview: Equatable {
             switch BodyMath.trend(delta, tolerance: 0.1) {
             case .up:
                 page.headline = "You’ve built lean mass."
-                page.reason = "Lean mass rose \(amount) kg in eight weeks, to \(now) kg. A Soma visit can show where it went."
+                page.reason = "Lean mass rose \(amount) kg in eight weeks, to \(now) kg."
             case .down:
                 page.headline = "Lean mass slipped a little."
                 page.reason = "Lean mass fell \(amount) kg in eight weeks, to \(now) kg. Strength work twice a week is what holds it."
             case nil:
                 page.headline = "Lean mass is holding."
-                page.reason = "Lean mass has stayed near \(now) kg for eight weeks. A Soma visit can show how it sits by region."
+                page.reason = "Lean mass has stayed near \(now) kg for eight weeks."
             }
         } else if let now = page.leanMass {
             page.eyebrow = "Lean mass"
             page.headline = "Your body composition."
-            page.reason = "Lean mass reads \(now) kg. In eight weeks there is a trend to show, and a Soma visit can show where it sits."
+            page.reason = "Lean mass reads \(now) kg. In eight weeks there’s a trend to show."
         }
 
         return page

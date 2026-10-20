@@ -197,7 +197,7 @@ struct TrackJournalView: View {
                             Text("\(answered) of \(tags.count)")
                                 .somaFont(theme.typography.caption)
                                 .monospacedDigit()
-                                .foregroundStyle(answered == tags.count ? section.hue.color : theme.colors.inkSecondary.color)
+                                .foregroundStyle(answered == tags.count ? section.tone.color : theme.colors.inkSecondary.color)
                         }
                     }
                     .padding(.horizontal, metrics.scoreLabelSpacing)
@@ -216,9 +216,9 @@ struct TrackJournalView: View {
         case .tag(let tag):
             let style = TrackTagStyle.of(tag.id)
             SomaHabitRow(
-                symbol: style.symbol,
+                glyph: style.glyph,
                 title: tag.title,
-                hue: style.hue,
+                tone: style.tone,
                 answer: Binding(
                     get: { journal.day(selected).answer(tag.id) },
                     set: { journal.answer(tag.id, $0, on: selected) }
@@ -226,7 +226,7 @@ struct TrackJournalView: View {
             )
         case .quantity(let quantity):
             let amount = quantity.amount(on: selected, log: log)
-            SomaHabitRow(symbol: quantity.symbol, title: quantity.title, hue: quantity.hue,
+            SomaHabitRow(glyph: quantity.glyph, title: quantity.title, tone: quantity.tone,
                          value: amount.value, unit: amount.unit) {
                 opened = quantity.route
             }
@@ -247,8 +247,8 @@ struct TrackJournalView: View {
     private struct AutoRow: Identifiable {
         var id: String { title }
         var title: String
-        var symbol: String
-        var hue: SomaHealthHue
+        var glyph: SomaTrackGlyph.Kind
+        var tone: SomaTrackTone
         var detail: String?
         var mark: SomaHabitMark.State
     }
@@ -266,17 +266,17 @@ struct TrackJournalView: View {
         let usual = measured.usualVariability
 
         return [
-            AutoRow(title: "7 h of sleep", symbol: "bed.double.fill", hue: .sleep,
+            AutoRow(title: "7 h of sleep", glyph: .sleep, tone: .dusk,
                     detail: slept.map(TrackJournalFormat.hours), mark: mark(slept, goal: Goal.sleepHours)),
-            AutoRow(title: "8,000 steps", symbol: "figure.walk", hue: .activity,
+            AutoRow(title: "8,000 steps", glyph: .steps, tone: .moss,
                     detail: totals.steps.map(TrackFormat.whole), mark: mark(totals.steps, goal: Goal.steps)),
-            AutoRow(title: "30 min outdoors", symbol: "sun.max.fill", hue: .mobility,
+            AutoRow(title: "30 min outdoors", glyph: .daylight, tone: .sand,
                     detail: totals.daylightMinutes.map { "\(TrackFormat.whole($0)) min" },
                     mark: mark(totals.daylightMinutes, goal: Goal.daylightMinutes)),
-            AutoRow(title: "30 min exercise", symbol: "figure.run", hue: .nutrition,
+            AutoRow(title: "30 min exercise", glyph: .exercise, tone: .sage,
                     detail: totals.exerciseMinutes.map { "\(TrackFormat.whole($0)) min" },
                     mark: mark(totals.exerciseMinutes, goal: Goal.exerciseMinutes)),
-            AutoRow(title: "HRV at usual", symbol: "waveform.path.ecg", hue: .mind,
+            AutoRow(title: "HRV at usual", glyph: .hrv, tone: .tide,
                     detail: variability.map { "\(TrackFormat.whole($0)) ms" },
                     mark: usual.map { mark(variability, goal: $0) } ?? .missing),
         ]
@@ -288,8 +288,8 @@ struct TrackJournalView: View {
             sectionHeading("Automatic")
                 .padding(.leading, metrics.scoreLabelSpacing)
             SomaHabitStack(autoRows) { row in
-                SomaHabitRow(symbol: row.symbol, title: row.title, detail: row.detail,
-                             hue: row.hue, mark: row.mark)
+                SomaHabitRow(glyph: row.glyph, title: row.title, detail: row.detail,
+                             tone: row.tone, mark: row.mark)
             }
         }
     }
@@ -350,19 +350,19 @@ enum TrackJournalQuantity: String, CaseIterable {
         }
     }
 
-    var symbol: String {
+    var glyph: SomaTrackGlyph.Kind {
         switch self {
-        case .caffeine: "cup.and.saucer.fill"
-        case .drinks: "drop.fill"
+        case .caffeine: .coffee
+        case .drinks: .drink
         }
     }
 
     var section: TrackTagStyle.Section { .daytime }
 
-    var hue: SomaHealthHue {
+    var tone: SomaTrackTone {
         switch self {
-        case .caffeine: section.hue
-        case .drinks: .medications
+        case .caffeine: section.tone
+        case .drinks: .tide
         }
     }
 
@@ -501,7 +501,7 @@ private struct TrackWeekStrip: View {
 
 // MARK: - How you felt
 
-/// The day's feeling on one row of seven coloured stops. The chosen stop's
+/// The day's feeling on one row of seven stops along the calm ramp. The chosen stop's
 /// name sits beside the label, in its own colour.
 private struct TrackFeelingRow: View {
     let feeling: Int?
@@ -560,7 +560,7 @@ private struct TrackFeelMeasureCard: View {
                     Text(enough ? "\(agreed)/\(points.count)" : "-")
                         .somaFont(type.metricCompact)
                         .monospacedDigit()
-                        .foregroundStyle(enough ? colors.statusNormal.color : colors.inkSecondary.color)
+                        .foregroundStyle(enough ? SomaTrackTone.sage.color : colors.inkSecondary.color)
                     Text(enough ? "agree" : "\(points.count) of \(TrackJournal.feelMinimum) days")
                         .somaFont(type.caption)
                         .foregroundStyle(colors.inkSecondary.color)
@@ -644,7 +644,7 @@ private struct TrackFeelMeasureCard: View {
 // MARK: - What your tags do
 
 /// Each tag's move on the reading it lands on, as a signed number over a
-/// small centred bar: green for the better, red for a cost.
+/// small centred bar: sage for the better, clay for a cost.
 private struct TrackEffectsCard: View {
     let effects: [TrackTagEffect]
 
@@ -687,10 +687,10 @@ private struct TrackEffectsCard: View {
         // No move, or one that rounds to nothing, stays in the ink.
         let tone = effect.fraction == nil || effect.valueText.hasPrefix("0")
             ? colors.inkSecondary.color
-            : (effect.isCost ? colors.statusAlert.color : colors.statusNormal.color)
+            : (effect.isCost ? SomaTrackTone.clay.color : SomaTrackTone.sage.color)
 
         return HStack(alignment: .center, spacing: metrics.cardSpacing) {
-            SomaGlyphDisc(symbol: style.symbol, hue: style.hue)
+            SomaTrackGlyph(style.glyph, tone: style.tone, style: .row)
             VStack(alignment: .leading, spacing: metrics.scoreLabelSpacing) {
                 Text(effect.title)
                     .somaFont(type.body)

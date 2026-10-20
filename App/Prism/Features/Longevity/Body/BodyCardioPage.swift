@@ -29,14 +29,6 @@ struct BodyCardioPage: View {
                 SomaStat("HR recovery", value: page.recovery, unit: "bpm", trend: page.recoveryTrend),
             ]
         ) {
-            SomaChartCard(
-                eyebrow: "Fitness age",
-                value: nil,
-                unit: "years in 12 weeks",
-                note: "Comes from a Soma visit."
-            ) {
-                BodyEmptyWaterfall()
-            }
             BodyZonesCard(zones: page.zones)
             BodyRunCard(run: page.run)
             MetricRowsCard(eyebrow: "More on your heart", rows: [

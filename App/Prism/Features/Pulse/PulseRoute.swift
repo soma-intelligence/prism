@@ -26,14 +26,35 @@ enum PulseRoute: Hashable {
         }
     }
 
-    @ViewBuilder
     var page: some View {
+        content.notesVisit(topic)
+    }
+
+    @ViewBuilder
+    private var content: some View {
         switch self {
         case .category(let title):
             if let category = BodyCatalog.categories.first(where: { $0.title == title }) {
                 BodyCategoryPage(category: category)
             } else {
                 NotWiredPage(eyebrow: "Readings", title: LocalizedStringResource(stringLiteral: title), message: "This group of readings is not in the catalog.")
+            }
+        }
+    }
+
+    /// What Explore reads this page as interest in, if anything.
+    private var topic: ArticleTopic? {
+        switch self {
+        case .category(let title):
+            switch title {
+            case "Activity", "Mobility": .movement
+            case "Body Measurements": .longevity
+            case "Heart", "Vitals": .heart
+            case "Mental Wellbeing": .mind
+            case "Nutrition": .nutrition
+            case "Respiratory": .recovery
+            case "Sleep": .sleep
+            default: nil
             }
         }
     }

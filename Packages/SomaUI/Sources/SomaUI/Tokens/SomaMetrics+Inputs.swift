@@ -80,4 +80,21 @@ public extension SomaMetrics {
     /// A chosen chip's wash and rim in the feeling's colour.
     var chipTintOpacity: Double { 0.24 }
     var chipTintRimOpacity: Double { 0.7 }
+
+    /// A mood face in the row of five: its side, how much heavier its line
+    /// is than a glyph's, the soft fill when chosen, how far the chosen one
+    /// rises and the others step back, and the gap to its word.
+    var moodFaceSide: CGFloat { 40 }
+    var moodFaceStrokeScale: CGFloat { 1.1 }
+    var moodFaceFill: Double { 0.18 }
+    var moodFaceChosenScale: CGFloat { 1.08 }
+    var moodFaceQuietOpacity: Double { 0.55 }
+    var moodFaceLabelGap: CGFloat { 6 }
+
+    /// The mood log sheet: the chosen face drawn large at its head, the gap
+    /// between a prompt and its chips, and the inset of the note field.
+    var moodLogFaceSide: CGFloat { moodFaceSide * 2.2 }
+    var moodLogPromptSpacing: CGFloat { cardHeaderSpacing * 2 }
+    var noteFieldHorizontalInset: CGFloat { cardPadding - 2 }
+    var noteFieldVerticalInset: CGFloat { cardPadding - 4 }
 }

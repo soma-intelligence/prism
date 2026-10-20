@@ -145,9 +145,7 @@ struct TrackEveningView: View {
                                 Text("\(SomaArcDial<EmptyView>.number(item.amount)) \(item.unit.symbol)")
                                     .somaFont(type.rowValue)
                                     .foregroundStyle(colors.inkSecondary.color)
-                                Image(systemName: taken == nil ? "circle" : "checkmark.circle.fill")
-                                    .font(.system(size: metrics.browseGlyphSize, weight: .regular))
-                                    .foregroundStyle(taken == nil ? colors.inkSecondary.color : colors.accent.color)
+                                SomaRitualCheck(isDone: taken != nil, tone: .dusk)
                             }
                             .frame(minHeight: metrics.minimumTapTarget * 0.8)
                             .contentShape(.rect)

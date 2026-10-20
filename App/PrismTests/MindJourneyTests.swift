@@ -290,4 +290,18 @@ struct MindJourneyTests {
         store.deleteAll()
         #expect(store.notes.isEmpty && !store.consent.isGiven && store.forecasts.isEmpty)
     }
+
+    @Test("A fast double tap on Log mood keeps one mood; the same feeling later, or another, is its own")
+    func doubleTapLogsOnce() {
+        let store = MindStore(url: nil)
+        let entry = MindMoodEntry(date: at(9), kind: .momentary, valence: 0.5, labels: ["calm"], note: nil)
+        store.add(entry)
+        store.add(MindMoodEntry(date: at(9).addingTimeInterval(0.3), kind: .momentary, valence: 0.5, labels: ["calm"], note: nil))
+        #expect(store.moods.count == 1)
+
+        store.add(MindMoodEntry(date: at(9).addingTimeInterval(0.5), kind: .momentary, valence: -0.5, labels: [], note: nil))
+        #expect(store.moods.count == 2)
+        store.add(MindMoodEntry(date: at(9, 5), kind: .momentary, valence: -0.5, labels: [], note: nil))
+        #expect(store.moods.count == 3)
+    }
 }

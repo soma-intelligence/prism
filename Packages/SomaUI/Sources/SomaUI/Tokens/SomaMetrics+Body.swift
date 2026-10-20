@@ -30,4 +30,17 @@ public extension SomaMetrics {
     var bodySessionDotDiameter: CGFloat { 12 }
     /// The thumbnail that leads an action card on the Body tab.
     var bodyActionThumbnail: CGFloat { 44 }
+
+    /// Muscle freshness: the legend's dot and the gap between its items,
+    /// the group pills (height, inset, corner, gap, and how strongly the
+    /// chosen one is tinted), and how much of its tone a muscle outside the
+    /// chosen group keeps as it steps back.
+    var muscleLegendDot: CGFloat { 8 }
+    var muscleLegendSpacing: CGFloat { 16 }
+    var musclePillHeight: CGFloat { 36 }
+    var musclePillPadding: CGFloat { 10 }
+    var musclePillCornerRadius: CGFloat { 12 }
+    var musclePillSpacing: CGFloat { 8 }
+    var musclePillSelectedTint: Double { 0.16 }
+    var muscleMapBackTone: Double { 0.22 }
 }

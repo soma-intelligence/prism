@@ -167,7 +167,10 @@ private struct PulseTodayBuilder {
             ),
             restingDays: (-13...0).map { resting.daily[day($0)] },
             restingBand: resting.band,
-            bodyCard: PulseToday.Card(value: nil, summary: words.bodySummary(age: inputs.age)),
+            bodyCard: {
+                let fitness = BodyFitnessAge.stat(vo2Max: inputs.vo2Max, age: inputs.age, sex: inputs.sex)
+                return PulseToday.Card(value: fitness.value, summary: words.bodySummary(fitness))
+            }(),
             age: inputs.age,
             hasData: !inputs.isEmpty
         )

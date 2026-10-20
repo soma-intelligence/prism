@@ -28,7 +28,7 @@ struct DataDiagnosticsPage: View {
 
         ListScaffold(eyebrow: "Data and diagnostics", title: "Sources and sync") {
             SettingsSection("Where your numbers come from") {
-                SomaBrowseGroup([SettingsItem].items("health", "pod", "blood", "journal")) { item in
+                SomaBrowseGroup([SettingsItem].items("health", "blood", "journal")) { item in
                     sourceRow(item.id)
                 }
             }
@@ -80,9 +80,6 @@ struct DataDiagnosticsPage: View {
                               detail: String(localized: "\(HealthMetricCatalog.all.count) kinds"))
             }
             .buttonStyle(.plain)
-        case "pod":
-            SomaBrowseRow(symbol: "square.split.bottomrightquarter", title: String(localized: "Soma visits"),
-                          detail: String(localized: "None yet"), opensSomething: false)
         case "blood":
             SomaBrowseRow(symbol: "drop", title: String(localized: "Blood panels"),
                           detail: bloodDetail, opensSomething: false)

@@ -157,6 +157,64 @@ public struct HealthKitSampleSource: HealthSampleSource {
         return samples.compactMap { reading(from: $0, metric: metric) }
     }
 
+    /// Every day's sum in one statistics collection query, bucketed by
+    /// calendar day and with the sources merged the way the Health app
+    /// merges them (a step a phone and a watch both counted counts once).
+    public func dailyTotals(_ metric: HealthMetric, from: Date, to: Date, calendar: Calendar) async throws -> [HealthReading] {
+        guard metric.aggregation == .cumulative else {
+            throw HealthReadError.unsupportedQuery(metric.identifier)
+        }
+        guard isAvailable else { throw HealthReadError.unavailable }
+        guard let type = Self.quantityType(metric) else {
+            throw HealthReadError.unknownMetric(metric.identifier)
+        }
+        guard let unit = metric.unit.hkUnit else {
+            throw HealthReadError.unsupportedQuery(metric.identifier)
+        }
+
+        let anchor = calendar.startOfDay(for: from)
+        guard anchor < to else { return [] }
+        let predicate = HKQuery.predicateForSamples(withStart: anchor, end: to)
+
+        let identifier = metric.identifier
+        let canonical = metric.unit
+        let readings: [HealthReading] = try await withCheckedThrowingContinuation { continuation in
+            let query = HKStatisticsCollectionQuery(
+                quantityType: type,
+                quantitySamplePredicate: predicate,
+                options: .cumulativeSum,
+                anchorDate: anchor,
+                intervalComponents: DateComponents(day: 1)
+            )
+            query.initialResultsHandler = { _, collection, error in
+                if let error {
+                    // No samples in range is an empty answer, not a failure.
+                    if (error as NSError).code == HKError.errorNoData.rawValue {
+                        continuation.resume(returning: [])
+                    } else {
+                        continuation.resume(throwing: HealthReadError.underlying("\(error)"))
+                    }
+                    return
+                }
+                var found: [HealthReading] = []
+                collection?.enumerateStatistics(from: anchor, to: to) { statistics, _ in
+                    guard let sum = statistics.sumQuantity() else { return }
+                    found.append(HealthReading(
+                        metric: identifier,
+                        value: sum.doubleValue(for: unit),
+                        unit: canonical,
+                        start: statistics.startDate,
+                        end: min(statistics.endDate, to)
+                    ))
+                }
+                continuation.resume(returning: found)
+            }
+            store.execute(query)
+        }
+
+        return readings.sorted { $0.start < $1.start }
+    }
+
     // MARK: - Statistics
 
     private func statistic(
@@ -432,6 +490,10 @@ public struct HealthKitSampleSource: HealthSampleSource {
         to: Date,
         limit: Int
     ) async throws -> [HealthReading] {
+        throw HealthReadError.unavailable
+    }
+
+    public func dailyTotals(_ metric: HealthMetric, from: Date, to: Date, calendar: Calendar) async throws -> [HealthReading] {
         throw HealthReadError.unavailable
     }
 }

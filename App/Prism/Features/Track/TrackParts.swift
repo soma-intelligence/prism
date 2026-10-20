@@ -57,12 +57,12 @@ struct TrackFlowLayout: Layout {
     }
 }
 
-/// Where a tag sits in the Journal and the picture it wears: a section of
-/// the day and an SF Symbol. The section gives the colour: evening indigo,
-/// daytime orange, training green, a person's own habits violet.
+/// Where a tag sits in the Journal and the line glyph it wears: a section of
+/// the day and a ``SomaTrackGlyph``. The section gives the calm tone: evening
+/// dusk, daytime sand, training moss, a person's own habits stone.
 ///
-/// The starter tags each have their own; a tag of the person's own goes under
-/// Habits with a plain tag glyph.
+/// The starter tags each have their own glyph; a tag of the person's own goes
+/// under Habits with a plain tag.
 struct TrackTagStyle: Equatable {
     enum Section: Int, CaseIterable, Identifiable, Comparable {
         case evening, daytime, training, habits
@@ -80,34 +80,34 @@ struct TrackTagStyle: Equatable {
 
         static func < (lhs: Section, rhs: Section) -> Bool { lhs.rawValue < rhs.rawValue }
 
-        var hue: SomaHealthHue {
+        var tone: SomaTrackTone {
             switch self {
-            case .daytime: .mobility
-            case .training: .nutrition
-            case .evening: .sleep
-            case .habits: .symptoms
+            case .daytime: .sand
+            case .training: .moss
+            case .evening: .dusk
+            case .habits: .stone
             }
         }
     }
 
     var section: Section
-    var symbol: String
+    var glyph: SomaTrackGlyph.Kind
 
-    var hue: SomaHealthHue { section.hue }
+    var tone: SomaTrackTone { section.tone }
 
     static func of(_ tagID: String) -> TrackTagStyle {
         switch tagID {
-        case "coffee-late": TrackTagStyle(section: .daytime, symbol: "cup.and.saucer.fill")
-        case "meditation": TrackTagStyle(section: .daytime, symbol: "wind")
-        case "travel": TrackTagStyle(section: .daytime, symbol: "airplane")
-        case "nap": TrackTagStyle(section: .daytime, symbol: "powersleep")
-        case "supplements": TrackTagStyle(section: .daytime, symbol: "pills.fill")
-        case "hard-training": TrackTagStyle(section: .training, symbol: "figure.run")
-        case "sauna": TrackTagStyle(section: .training, symbol: "flame.fill")
-        case "alcohol": TrackTagStyle(section: .evening, symbol: "wineglass.fill")
-        case "late-meal": TrackTagStyle(section: .evening, symbol: "fork.knife")
-        case "screens-in-bed": TrackTagStyle(section: .evening, symbol: "iphone")
-        default: TrackTagStyle(section: .habits, symbol: "tag.fill")
+        case "coffee-late": TrackTagStyle(section: .daytime, glyph: .coffee)
+        case "meditation": TrackTagStyle(section: .daytime, glyph: .meditation)
+        case "travel": TrackTagStyle(section: .daytime, glyph: .travel)
+        case "nap": TrackTagStyle(section: .daytime, glyph: .nap)
+        case "supplements": TrackTagStyle(section: .daytime, glyph: .supplement)
+        case "hard-training": TrackTagStyle(section: .training, glyph: .training)
+        case "sauna": TrackTagStyle(section: .training, glyph: .sauna)
+        case "alcohol": TrackTagStyle(section: .evening, glyph: .alcohol)
+        case "late-meal": TrackTagStyle(section: .evening, glyph: .lateMeal)
+        case "screens-in-bed": TrackTagStyle(section: .evening, glyph: .screens)
+        default: TrackTagStyle(section: .habits, glyph: .tag)
         }
     }
 }

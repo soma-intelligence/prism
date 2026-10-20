@@ -65,11 +65,12 @@ public enum SomaCueTone: Sendable, Equatable {
 
 // MARK: - Sparkline
 
-/// A small line of recent values with a soft fill under it and a ring on the
-/// last one, drawn at the end of a row. The usual band, when
-/// there is one, sits behind it as a faint green strip, whatever the line's
-/// hue. Gaps are skipped, not drawn
-/// as zero.
+/// A small line of recent values, drawn the way a metric's page draws its
+/// chart (``SomaMetricChart``): the usual band as a quiet ground of ink, the
+/// line bent through the known values in the metric's hue softened toward
+/// grey, a fill that fades to nothing at the foot, and the latest value as a
+/// dot in the full hue. Days without a reading are skipped, never drawn as
+/// zero.
 public struct SomaSparkline: View {
     private let values: [Double?]
     private let tint: Color?
@@ -88,32 +89,71 @@ public struct SomaSparkline: View {
     }
 
     public var body: some View {
-        let color = tint ?? theme.colors.inkPrimary.color
-        let pen = SomaPen(theme)
-        let inset = theme.metrics.chartRingDiameter / 2 + 1
-        // Days without a reading are skipped, not drawn as a break: a trend
-        // this small reads as one continuous line, and a
-        // week with two readings would otherwise be two stray strokes.
-        let values: [Double] = values.compactMap { $0 }
+        let metrics = theme.metrics
+        let colors = theme.colors
+        let hue = tint ?? colors.inkPrimary.color
+        let line = hue.mix(with: colors.inkSecondary.color, by: metrics.sparkLineMix)
+        let surface = colors.surface.color
+        let ground = colors.inkPrimary.color.opacity(metrics.metricChartBandOpacity * 1.4)
+        let dot = metrics.sparkEndDot
+        let stroke = metrics.sparkLine
+        let fillOpacity = metrics.metricChartFillOpacity
+        let samples = metrics.sparkSamples
+        // A trend this small reads as one continuous line: a week with two
+        // readings would otherwise be two stray strokes.
+        let known: [Double?] = values.compactMap { $0 }
         let band = band
 
         Canvas { context, size in
-            let known = values + (band.map { [$0.lowerBound, $0.upperBound] } ?? [])
-            guard let low = known.min(), let high = known.max(), values.count > 1 else { return }
-            let span = high - low == 0 ? 1 : high - low
+            let numbers = known.compactMap { $0 }
+            guard numbers.count > 1 else {
+                // One reading: its dot alone, at the latest end.
+                if !numbers.isEmpty {
+                    let centre = CGPoint(x: size.width - dot, y: size.height / 2)
+                    context.fill(Path(ellipseIn: CGRect(x: centre.x - dot / 2, y: centre.y - dot / 2, width: dot, height: dot)), with: .color(hue))
+                }
+                return
+            }
+            let all = numbers + (band.map { [$0.lowerBound, $0.upperBound] } ?? [])
+            let low = all.min() ?? 0
+            let high = all.max() ?? 1
+            let pad = max((high - low) * 0.14, abs(high) * 0.002, 0.0001)
+            let domain = (low - pad)...(high + pad)
+            let inset = dot / 2 + 1
             let plot = CGRect(origin: .zero, size: size).insetBy(dx: inset, dy: inset)
-            func y(_ value: Double) -> CGFloat { plot.maxY - plot.height * CGFloat((value - low) / span) }
-            let points: [CGPoint?] = values.enumerated().map { index, value in
-                CGPoint(x: plot.minX + plot.width * CGFloat(index) / CGFloat(values.count - 1), y: y(value))
-            }
+            func y(_ share: Double) -> CGFloat { plot.maxY - plot.height * CGFloat(share) }
+
             if let band {
-                pen.band(context, top: y(band.upperBound), bottom: y(band.lowerBound),
-                         in: CGRect(x: 0, y: 0, width: size.width, height: size.height))
+                let top = y(SomaChartMath.height(band.upperBound, in: domain))
+                let bottom = y(SomaChartMath.height(band.lowerBound, in: domain))
+                let rect = CGRect(x: 0, y: min(top, bottom), width: size.width, height: max(abs(bottom - top), 2))
+                context.fill(Path(roundedRect: rect, cornerRadius: min(rect.height / 2, 3)), with: .color(ground))
             }
-            if filled { pen.fill(context, points, floor: size.height, color: color) }
-            pen.line(context, points, color: color)
-            if let last = points.compactMap({ $0 }).last {
-                pen.ring(context, at: last, color: color)
+
+            let curve = SomaChartMath.curve(known, domain: domain, count: samples)
+            guard curve.samples.count > 1 else { return }
+            let points = curve.samples.enumerated().map { index, share -> CGPoint in
+                let along = Double(index) / Double(curve.samples.count - 1)
+                return CGPoint(x: plot.minX + plot.width * CGFloat(along), y: y(share))
+            }
+            var path = Path()
+            path.addLines(points)
+            if filled, let first = points.first, let last = points.last {
+                var area = path
+                area.addLine(to: CGPoint(x: last.x, y: size.height))
+                area.addLine(to: CGPoint(x: first.x, y: size.height))
+                area.closeSubpath()
+                let top = points.map(\.y).min() ?? 0
+                context.fill(area, with: .linearGradient(
+                    Gradient(colors: [hue.opacity(fillOpacity), hue.opacity(0)]),
+                    startPoint: CGPoint(x: 0, y: top), endPoint: CGPoint(x: 0, y: size.height)
+                ))
+            }
+            context.stroke(path, with: .color(line), style: StrokeStyle(lineWidth: stroke, lineCap: .round, lineJoin: .round))
+            if let last = points.last {
+                let rect = CGRect(x: last.x - dot / 2, y: last.y - dot / 2, width: dot, height: dot)
+                context.fill(Path(ellipseIn: rect.insetBy(dx: -1.5, dy: -1.5)), with: .color(surface))
+                context.fill(Path(ellipseIn: rect), with: .color(hue))
             }
         }
         .accessibilityHidden(true)

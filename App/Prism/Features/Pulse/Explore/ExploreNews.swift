@@ -31,10 +31,11 @@ struct ExploreNewsRail: View {
                         NavigationLink(value: item) {
                             SomaArticleCard(title: item.title, topic: item.topic?.title ?? item.sourceName,
                                             caption: "\(item.sourceName) · \(item.age)",
-                                            hue: item.topic?.hue ?? .other, symbol: "newspaper.fill",
+                                            tone: item.topic?.tone ?? .stone, mark: .track(.read),
                                             seed: item.id, imageURL: item.imageURL, style: .tile)
                                 .frame(width: metrics.articleRailCardWidth)
                                 .zoomSource(item.id)
+                                .somaScrollEdge(.horizontal)
                         }
                         .buttonStyle(TilePressStyle())
                     }
@@ -65,7 +66,7 @@ struct NewsReader: View {
 
         ExploreScroll(scrolls: scrolls) {
             VStack(alignment: .leading, spacing: metrics.articleTextSpacing * 2) {
-                SomaArticleCover(hue: item.topic?.hue ?? .other, symbol: "newspaper.fill", seed: item.id,
+                SomaArticleCover(tone: item.topic?.tone ?? .stone, mark: .track(.read), seed: item.id,
                                  imageURL: item.imageURL, size: .reader)
                     .padding(.bottom, metrics.leadSpacing)
 

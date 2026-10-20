@@ -5,97 +5,51 @@
 
 import SwiftUI
 
-// The journal's parts are coloured by what they are about, with the Health
-// category hues (``SomaHealthHue``): water cyan, a meal green, an evening
-// indigo. Those are data colours. What a person chooses (a tag switched on,
-// the stop they picked) stays in the ink, so the accent rule holds.
-
-// MARK: - Glyph disc
-
-/// A symbol on a disc tinted with a Health hue: the picture that leads a
-/// habit row.
-public struct SomaGlyphDisc: View {
-    private let symbol: String
-    private let hue: SomaHealthHue
-
-    @Environment(\.somaTheme) private var theme
-
-    public init(symbol: String, hue: SomaHealthHue) {
-        self.symbol = symbol
-        self.hue = hue
-    }
-
-    public var body: some View {
-        let metrics = theme.metrics
-        let diameter = metrics.journalRowDisc
-
-        Image(systemName: symbol)
-            .font(.system(size: metrics.journalRowGlyph, weight: .semibold))
-            .foregroundStyle(hue.color)
-            .frame(width: diameter, height: diameter)
-            .background(
-                Circle().fill(
-                    LinearGradient(
-                        colors: [hue.start.color, hue.end.color],
-                        startPoint: .topLeading, endPoint: .bottomTrailing
-                    )
-                    .opacity(metrics.journalDiscOpacity)
-                )
-            )
-            .accessibilityHidden(true)
-    }
-}
+// The journal's parts are coloured by what they are about, with the calm
+// Track tones (``SomaTrackTone``): an evening dusk, water a tide, a meal sage.
+// Those are data colours, muted on purpose. What a person chooses (a no, the
+// stop they picked) stays in the ink, so the accent rule holds.
 
 // MARK: - Quick add tile
 
-/// One thing to add: its glyph in its hue on a tile washed with the same
-/// hue, the name under it. Four sit in a row, the way the + menu of a journal
-/// lays its actions out.
+/// One thing to add: its line glyph on a softly tinted square, the name under
+/// it, on a plain card. Four sit in a row; the colour stays in the badge, so a
+/// grid of them reads calm.
 public struct SomaGlyphTile: View {
     private let title: String
-    private let symbol: String
-    private let hue: SomaHealthHue
+    private let glyph: SomaTrackGlyph.Kind
+    private let tone: SomaTrackTone?
     private let action: () -> Void
 
     @Environment(\.somaTheme) private var theme
 
-    public init(_ title: String, symbol: String, hue: SomaHealthHue, action: @escaping () -> Void) {
+    /// - Parameter tone: nil draws the glyph in the ink on a recessed square,
+    ///   for a tile that is a control (More, Less) rather than an entry.
+    public init(_ title: String, glyph: SomaTrackGlyph.Kind, tone: SomaTrackTone?, action: @escaping () -> Void) {
         self.title = title
-        self.symbol = symbol
-        self.hue = hue
+        self.glyph = glyph
+        self.tone = tone
         self.action = action
     }
 
     public var body: some View {
         let metrics = theme.metrics
+        let colors = theme.colors
         let shape = RoundedRectangle(cornerRadius: metrics.journalTileCornerRadius, style: .continuous)
 
         Button(action: action) {
             VStack(spacing: metrics.journalTileLabelSpacing) {
-                Image(systemName: symbol)
-                    .font(.system(size: metrics.journalTileGlyph, weight: .semibold))
-                    .foregroundStyle(
-                        LinearGradient(colors: [hue.start.color, hue.end.color], startPoint: .top, endPoint: .bottom)
-                    )
-                    .frame(height: metrics.journalTileGlyph * 1.3)
+                SomaTrackGlyph(glyph, tone: tone, style: .badge)
                 Text(title)
                     .somaFont(theme.typography.tabLabel)
-                    .foregroundStyle(theme.colors.inkPrimary.color)
+                    .foregroundStyle(colors.inkPrimary.color)
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
             }
             .padding(.horizontal, metrics.scoreLabelSpacing)
-            .frame(maxWidth: .infinity, minHeight: metrics.journalTileHeight)
-            .background(
-                shape.fill(
-                    LinearGradient(
-                        colors: [hue.start.color, hue.end.color],
-                        startPoint: .topLeading, endPoint: .bottomTrailing
-                    )
-                    .opacity(metrics.journalTileWashOpacity)
-                )
-            )
-            .overlay(shape.strokeBorder(hue.color.opacity(metrics.journalTileRimOpacity), lineWidth: 0.5))
+            .frame(maxWidth: .infinity, minHeight: metrics.journalTileHeight + 10)
+            .background(shape.fill(colors.surface.color))
+            .overlay(shape.strokeBorder(colors.inkPrimary.color.opacity(metrics.hairlineOpacity), lineWidth: 0.5))
             .contentShape(shape)
         }
         .buttonStyle(.somaGlassPress)
@@ -105,18 +59,17 @@ public struct SomaGlyphTile: View {
 
 // MARK: - Habit mark
 
-/// The compact control at the trailing edge of a habit row.
+/// The compact mark at the trailing edge of a row Health fills in.
 public struct SomaHabitMark: View {
     public enum State: Equatable, Sendable {
-        /// A switch that is off: an empty ring.
+        /// A switch that is off: an empty square.
         case off
-        /// A switch the person turned on: a disc in the ink and a check. A
-        /// choice, so it never takes a data colour.
+        /// A switch the person turned on: the ink and a check. A choice, so
+        /// it never takes a data colour.
         case on
-        /// A goal Health measured as met: a disc in the row's hue and a
-        /// check.
+        /// A goal Health measured as met: the row's tone and a check.
         case met
-        /// A goal part of the way there, 0...1: an arc in the row's hue.
+        /// A goal part of the way there, 0...1: an arc in the row's tone.
         case progress(Double)
         /// Nothing was measured: a dash, never an empty ring that reads as
         /// zero.
@@ -124,39 +77,39 @@ public struct SomaHabitMark: View {
     }
 
     private let state: State
-    private let hue: SomaHealthHue
+    private let tone: SomaTrackTone
 
     @Environment(\.somaTheme) private var theme
 
-    public init(_ state: State, hue: SomaHealthHue) {
+    public init(_ state: State, tone: SomaTrackTone) {
         self.state = state
-        self.hue = hue
+        self.tone = tone
     }
 
     public var body: some View {
         let metrics = theme.metrics
         let colors = theme.colors
         let diameter = metrics.journalMarkDiameter
+        let square = RoundedRectangle(cornerRadius: metrics.ritualCheckCornerRadius, style: .continuous)
 
         Group {
             switch state {
             case .off:
-                Circle()
-                    .strokeBorder(colors.inkSecondary.color.opacity(metrics.journalMarkIdleOpacity), lineWidth: metrics.journalMarkLine)
+                square.strokeBorder(colors.inkSecondary.color.opacity(metrics.journalMarkIdleOpacity), lineWidth: metrics.journalMarkLine * 0.75)
             case .on:
-                check(fill: colors.inkPrimary.color, ink: colors.canvas.color)
+                check(fill: colors.inkPrimary.color, ink: colors.surface.color)
             case .met:
-                check(fill: hue.color, ink: SomaHealthHue.ink.color)
+                check(fill: tone.color, ink: colors.surface.color)
             case .progress(let fraction):
                 ZStack {
                     Circle()
-                        .stroke(hue.color.opacity(metrics.journalDiscOpacity), lineWidth: metrics.journalMarkLine * 1.5)
+                        .stroke(tone.color.opacity(metrics.trackBadgeTint * 1.4), lineWidth: metrics.journalMarkLine * 1.25)
                     Circle()
                         .trim(from: 0, to: min(max(fraction, 0), 1))
-                        .stroke(hue.color, style: StrokeStyle(lineWidth: metrics.journalMarkLine * 1.5, lineCap: .round))
+                        .stroke(tone.color, style: StrokeStyle(lineWidth: metrics.journalMarkLine * 1.25, lineCap: .round))
                         .rotationEffect(.degrees(-90))
                 }
-                .padding(metrics.journalMarkLine * 0.75)
+                .padding(metrics.journalMarkLine)
             case .missing:
                 Text("-")
                     .somaFont(theme.typography.rowValue)
@@ -168,70 +121,79 @@ public struct SomaHabitMark: View {
     }
 
     private func check(fill: Color, ink: Color) -> some View {
-        Circle()
+        let metrics = theme.metrics
+        return RoundedRectangle(cornerRadius: metrics.ritualCheckCornerRadius, style: .continuous)
             .fill(fill)
             .overlay {
-                Image(systemName: "checkmark")
-                    .font(.system(size: theme.metrics.journalMarkGlyph, weight: .bold))
-                    .foregroundStyle(ink)
+                SomaAnswerMarkShape(isYes: true)
+                    .stroke(ink, style: StrokeStyle(lineWidth: metrics.trackAnswerGlyphStroke, lineCap: .round, lineJoin: .round))
+                    .frame(width: metrics.journalMarkGlyph, height: metrics.journalMarkGlyph)
             }
     }
 }
 
-// MARK: - Answer
+// MARK: - Answer switch
 
-/// A yes or no answer on the trailing edge of a habit card: three glyphs in one graphite capsule, a cross, a dash
-/// and a check. The chosen one sits in a raised pill a step lighter than the
-/// track, and the pill slides between them.
+/// A done or not done answer on the trailing edge of a habit card: two square
+/// cells in one recessed track, a cross and a check.
 ///
-/// The dash is the resting place: an unanswered day sits on it, and choosing
-/// it clears the answer. A check takes the row's hue, because a yes is what
-/// the row is about; a cross takes the alert colour held low, a real answer
-/// that does not shout. Every change lands with a selection haptic.
-public struct SomaTriStateControl: View {
+/// Unanswered, both sit flat and faint. A yes fills its cell with the row's
+/// tone and draws its check; a no raises its cell in the ink's quiet step and
+/// draws its cross. The chosen cell slides between the two on a short spring;
+/// tapping the chosen one again clears the answer. Under Reduce Motion the
+/// state simply changes. Every change lands with a selection haptic.
+public struct SomaAnswerSwitch: View {
     @Binding private var value: Bool?
-    private let hue: SomaHealthHue
+    private let tone: SomaTrackTone
 
-    @Namespace private var pill
+    @Namespace private var cell
     @Environment(\.somaTheme) private var theme
     @Environment(\.colorScheme) private var scheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    public init(value: Binding<Bool?>, hue: SomaHealthHue) {
+    public init(value: Binding<Bool?>, tone: SomaTrackTone) {
         self._value = value
-        self.hue = hue
+        self.tone = tone
     }
 
-    /// The three answers in the order they are drawn: no, none, yes.
+    /// The answers in the order VoiceOver steps through them: no, none, yes.
     public static let order: [Bool?] = [false, nil, true]
 
     /// What VoiceOver says the answer is.
     public static func spokenValue(_ value: Bool?) -> String {
         switch value {
-        case true?: "Yes"
-        case false?: "No"
+        case true?: "Done"
+        case false?: "Not done"
         case nil: "Not answered"
         }
     }
 
-    /// The answer one step along the control, `steps` to the right when
-    /// positive: what a swipe up or down does under VoiceOver. Held at the
-    /// ends rather than wrapping, the way an adjustable control behaves.
+    /// The answer one step along, `steps` toward yes when positive: what a
+    /// swipe up or down does under VoiceOver. Held at the ends rather than
+    /// wrapping, the way an adjustable control behaves.
     public static func step(_ value: Bool?, by steps: Int) -> Bool? {
         let index = order.firstIndex(of: value) ?? 1
         return order[min(max(index + steps, 0), order.count - 1)]
+    }
+
+    /// What a tap on one cell leaves: that answer, or none when it was
+    /// already chosen.
+    public static func tapping(_ answer: Bool, on value: Bool?) -> Bool? {
+        value == answer ? nil : answer
     }
 
     public var body: some View {
         let metrics = theme.metrics
 
         HStack(spacing: 0) {
-            ForEach(Self.order.indices, id: \.self) { index in
-                segment(Self.order[index])
-            }
+            segment(false)
+            segment(true)
         }
-        .padding(metrics.journalChoiceInset)
-        .background(Capsule().fill(theme.colors.surfaceRecessed.color))
+        .padding(metrics.trackAnswerInset)
+        .background(
+            RoundedRectangle(cornerRadius: metrics.trackAnswerCornerRadius, style: .continuous)
+                .fill(theme.colors.surfaceRecessed.color)
+        )
         .sensoryFeedback(.selection, trigger: value)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text("Answer"))
@@ -247,69 +209,105 @@ public struct SomaTriStateControl: View {
 
     private func choose(_ answer: Bool?) {
         guard answer != value else { return }
-        if reduceMotion { value = answer } else { withAnimation(theme.motion.selection) { value = answer } }
+        if reduceMotion { value = answer } else { withAnimation(theme.motion.trackAnswer) { value = answer } }
     }
 
-    private func segment(_ answer: Bool?) -> some View {
+    private func segment(_ answer: Bool) -> some View {
         let metrics = theme.metrics
+        let motion = theme.motion
+        let colors = theme.colors
         let isChosen = value == answer
+        let inner = metrics.trackAnswerCornerRadius - metrics.trackAnswerInset
+        let idle = colors.inkSecondary.color.opacity(metrics.trackAnswerIdleOpacity)
+        let ink = answer ? colors.surface.color : colors.inkPrimary.color
+        let glyph = SomaAnswerMarkShape(isYes: answer)
+        let stroke = StrokeStyle(lineWidth: metrics.trackAnswerGlyphStroke, lineCap: .round, lineJoin: .round)
 
         return Button {
-            choose(answer)
+            choose(Self.tapping(answer, on: value))
         } label: {
-            Image(systemName: Self.symbol(answer))
-                .font(.system(size: metrics.journalChoiceGlyph, weight: .semibold))
-                .foregroundStyle(glyphColor(answer, isChosen: isChosen))
-                .frame(width: metrics.journalChoiceWidth, height: metrics.journalChoiceHeight)
-                .background {
-                    if isChosen {
-                        raisedPill.matchedGeometryEffect(id: "pill", in: pill)
-                    }
+            ZStack {
+                glyph
+                    .stroke(idle, style: stroke)
+                    .opacity(isChosen ? 0 : 1)
+                glyph
+                    .trim(from: 0, to: isChosen ? 1 : 0)
+                    .stroke(ink, style: stroke)
+                    .animation(reduceMotion ? nil : (isChosen ? motion.trackMarkDraw : motion.trackPress), value: isChosen)
+            }
+            .frame(width: metrics.trackAnswerGlyph, height: metrics.trackAnswerGlyph)
+            .frame(width: metrics.trackAnswerCellWidth, height: metrics.trackAnswerCellHeight)
+            .background {
+                if isChosen {
+                    chosenCell(answer, radius: inner)
+                        .matchedGeometryEffect(id: "cell", in: cell)
+                        .transition(reduceMotion ? .identity : .scale(scale: motion.trackAnswerFrom).combined(with: .opacity))
                 }
-                // Taller to a thumb than to the eye: the reach is added for
-                // the hit test and taken back for the layout.
-                .padding(.vertical, metrics.journalChoiceReach)
-                .contentShape(.rect)
-                .padding(.vertical, -metrics.journalChoiceReach)
+            }
+            // Taller to a thumb than to the eye: the reach is added for the
+            // hit test and taken back for the layout.
+            .padding(.vertical, metrics.trackAnswerReach)
+            .contentShape(.rect)
+            .padding(.vertical, -metrics.trackAnswerReach)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(SomaAnswerPressStyle())
+        .accessibilityLabel(Text(answer ? "Done" : "Not done"))
     }
 
-    /// The chosen segment's pill: a wash of ink over the track on the dark
-    /// ground, the card's own surface with a soft shadow on the light one.
     @ViewBuilder
-    private var raisedPill: some View {
+    private func chosenCell(_ answer: Bool, radius: CGFloat) -> some View {
         let metrics = theme.metrics
         let colors = theme.colors
-        if scheme == .dark {
-            Capsule()
-                .fill(colors.inkPrimary.color.opacity(metrics.journalChoiceLiftOpacity))
-                .overlay(Capsule().strokeBorder(colors.inkPrimary.color.opacity(metrics.hairlineOpacity), lineWidth: 0.5))
+        let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
+        if answer {
+            shape.fill(tone.color)
+        } else if scheme == .dark {
+            shape.fill(colors.inkPrimary.color.opacity(metrics.trackAnswerNoOpacity))
         } else {
-            Capsule()
-                .fill(colors.surface.color)
+            shape.fill(colors.surface.color)
                 .shadow(color: colors.inkPrimary.color.opacity(metrics.journalChoiceShadowOpacity),
                         radius: metrics.journalChoiceShadowRadius, y: 0.5)
         }
     }
+}
 
-    private static func symbol(_ answer: Bool?) -> String {
-        switch answer {
-        case true?: "checkmark"
-        case false?: "xmark"
-        case nil: "minus"
-        }
+/// A cell giving way under the finger: a small sink, no dim.
+private struct SomaAnswerPressStyle: ButtonStyle {
+    @Environment(\.somaTheme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed && !reduceMotion ? theme.motion.trackPressScale : 1)
+            .animation(reduceMotion ? nil : theme.motion.trackPress, value: configuration.isPressed)
+    }
+}
+
+/// A check or a cross as a line on a 24 unit grid, so it can draw itself.
+public struct SomaAnswerMarkShape: Shape {
+    public let isYes: Bool
+
+    public init(isYes: Bool) {
+        self.isYes = isYes
     }
 
-    private func glyphColor(_ answer: Bool?, isChosen: Bool) -> Color {
-        let metrics = theme.metrics
-        let colors = theme.colors
-        guard isChosen else { return colors.inkSecondary.color.opacity(metrics.journalChoiceIdleOpacity) }
-        switch answer {
-        case true?: return hue.color
-        case false?: return colors.statusAlert.color.opacity(metrics.journalChoiceNoOpacity)
-        case nil: return colors.inkPrimary.color
+    public func path(in rect: CGRect) -> Path {
+        let side = min(rect.width, rect.height)
+        let scale = side / 24
+        let placement = CGAffineTransform(translationX: rect.midX - side / 2, y: rect.midY - side / 2)
+            .scaledBy(x: scale, y: scale)
+        var path = Path()
+        if isYes {
+            path.move(to: CGPoint(x: 4, y: 12.5))
+            path.addLine(to: CGPoint(x: 9.5, y: 18))
+            path.addLine(to: CGPoint(x: 20, y: 6.5))
+        } else {
+            path.move(to: CGPoint(x: 6, y: 6))
+            path.addLine(to: CGPoint(x: 18, y: 18))
+            path.move(to: CGPoint(x: 18, y: 6))
+            path.addLine(to: CGPoint(x: 6, y: 18))
         }
+        return path.applying(placement)
     }
 }
 
@@ -317,8 +315,8 @@ public struct SomaTriStateControl: View {
 
 /// The trailing edge of a habit card that counts rather than answers: the
 /// day's amount and its unit, a dash before the unit while nothing is
-/// logged, then an arrow in the same graphite capsule as
-/// ``SomaTriStateControl``. The card itself is the button; the arrow says so.
+/// logged, then an arrow in the same recessed square as
+/// ``SomaAnswerSwitch``. The card itself is the button; the arrow says so.
 public struct SomaHabitQuantity: View {
     private let value: String?
     private let unit: String
@@ -344,11 +342,14 @@ public struct SomaHabitQuantity: View {
                 .lineLimit(1)
                 .fixedSize()
             Image(systemName: "arrow.right")
-                .font(.system(size: metrics.journalChoiceGlyph, weight: .semibold))
+                .font(.system(size: metrics.trackAnswerGlyph, weight: .semibold))
                 .foregroundStyle(colors.inkPrimary.color)
-                .frame(width: metrics.journalChoiceWidth + metrics.journalChoiceInset * 2,
-                       height: metrics.journalChoiceHeight + metrics.journalChoiceInset * 2)
-                .background(Capsule().fill(colors.surfaceRecessed.color))
+                .frame(width: metrics.trackAnswerCellWidth + metrics.trackAnswerInset * 2,
+                       height: metrics.trackAnswerCellHeight + metrics.trackAnswerInset * 2)
+                .background(
+                    RoundedRectangle(cornerRadius: metrics.trackAnswerCornerRadius, style: .continuous)
+                        .fill(colors.surfaceRecessed.color)
+                )
                 .accessibilityHidden(true)
         }
     }
@@ -356,16 +357,16 @@ public struct SomaHabitQuantity: View {
 
 // MARK: - Habit row
 
-/// One habit: a tinted glyph, its name, an optional value, and a compact
-/// control on the trailing edge. Sits on its own card in a
-/// ``SomaHabitStack``, or in a ``SomaBrowseGroup``, which gives it the
+/// One habit: its line glyph on a tinted square, its name, an optional
+/// value, and a compact control on the trailing edge. Sits on its own card in
+/// a ``SomaHabitStack``, or in a ``SomaBrowseGroup``, which gives it the
 /// surface and the hairlines; its glyph fills the group's glyph column so
 /// the separators start under the title.
 public struct SomaHabitRow<Trailing: View>: View {
-    private let symbol: String
+    private let glyph: SomaTrackGlyph.Kind
     private let title: String
     private let detail: String?
-    private let hue: SomaHealthHue
+    private let tone: SomaTrackTone
     private let isSelected: Bool
     private let action: (() -> Void)?
     private let answer: Binding<Bool?>?
@@ -379,32 +380,32 @@ public struct SomaHabitRow<Trailing: View>: View {
     ///   - action: what a tap anywhere on the row does. Nil for a row that
     ///     only reports.
     public init(
-        symbol: String,
+        glyph: SomaTrackGlyph.Kind,
         title: String,
         detail: String? = nil,
-        hue: SomaHealthHue,
+        tone: SomaTrackTone,
         isSelected: Bool = false,
         action: (() -> Void)? = nil,
         @ViewBuilder trailing: () -> Trailing
     ) {
-        self.init(symbol: symbol, title: title, detail: detail, hue: hue,
+        self.init(glyph: glyph, title: title, detail: detail, tone: tone,
                   isSelected: isSelected, action: action, answer: nil, trailing: trailing())
     }
 
     private init(
-        symbol: String,
+        glyph: SomaTrackGlyph.Kind,
         title: String,
         detail: String?,
-        hue: SomaHealthHue,
+        tone: SomaTrackTone,
         isSelected: Bool,
         action: (() -> Void)?,
         answer: Binding<Bool?>?,
         trailing: Trailing
     ) {
-        self.symbol = symbol
+        self.glyph = glyph
         self.title = title
         self.detail = detail
-        self.hue = hue
+        self.tone = tone
         self.isSelected = isSelected
         self.action = action
         self.answer = answer
@@ -426,7 +427,7 @@ public struct SomaHabitRow<Trailing: View>: View {
         let colors = theme.colors
 
         return HStack(spacing: metrics.browseRowSpacing) {
-            SomaGlyphDisc(symbol: symbol, hue: hue)
+            SomaTrackGlyph(glyph, tone: tone, style: .row)
                 .frame(width: metrics.browseGlyphColumn)
             Text(title)
                 .somaFont(theme.typography.body)
@@ -447,13 +448,13 @@ public struct SomaHabitRow<Trailing: View>: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .frame(minHeight: metrics.journalRowMinHeight)
         .contentShape(.rect)
-        .modifier(SomaHabitAccessibility(title: title, answer: answer, animation: theme.motion.selection))
+        .modifier(SomaHabitAccessibility(title: title, answer: answer, animation: theme.motion.trackAnswer))
     }
 }
 
 /// How VoiceOver reads a habit row. A row that answers is one adjustable
 /// element, its name for a label and its answer for a value, so a swipe up
-/// or down answers without hunting for three small buttons. Any other row
+/// or down answers without hunting for two small buttons. Any other row
 /// reads its parts together.
 private struct SomaHabitAccessibility: ViewModifier {
     let title: String
@@ -467,7 +468,7 @@ private struct SomaHabitAccessibility: ViewModifier {
             content
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(Text(title))
-                .accessibilityValue(Text(SomaTriStateControl.spokenValue(answer.wrappedValue)))
+                .accessibilityValue(Text(SomaAnswerSwitch.spokenValue(answer.wrappedValue)))
                 .accessibilityAdjustableAction { direction in
                     let steps: Int
                     switch direction {
@@ -475,7 +476,7 @@ private struct SomaHabitAccessibility: ViewModifier {
                     case .decrement: steps = -1
                     @unknown default: return
                     }
-                    let next = SomaTriStateControl.step(answer.wrappedValue, by: steps)
+                    let next = SomaAnswerSwitch.step(answer.wrappedValue, by: steps)
                     if reduceMotion { answer.wrappedValue = next } else { withAnimation(animation) { answer.wrappedValue = next } }
                 }
         } else {
@@ -485,44 +486,38 @@ private struct SomaHabitAccessibility: ViewModifier {
 }
 
 public extension SomaHabitRow where Trailing == SomaHabitMark {
-    /// A row whose trailing control is a ``SomaHabitMark`` in the row's hue.
+    /// A row whose trailing control is a ``SomaHabitMark`` in the row's tone.
     init(
-        symbol: String,
+        glyph: SomaTrackGlyph.Kind,
         title: String,
         detail: String? = nil,
-        hue: SomaHealthHue,
+        tone: SomaTrackTone,
         mark: SomaHabitMark.State,
         action: (() -> Void)? = nil
     ) {
-        self.init(
-            symbol: symbol,
-            title: title,
-            detail: detail,
-            hue: hue,
-            isSelected: mark == .on,
-            action: action
-        ) {
-            SomaHabitMark(mark, hue: hue)
+        self.init(glyph: glyph, title: title, detail: detail, tone: tone,
+                  isSelected: mark == .on, action: action) {
+            SomaHabitMark(mark, tone: tone)
         }
     }
 }
 
-public extension SomaHabitRow where Trailing == SomaTriStateControl {
-    /// A row that asks a yes or no question: a ``SomaTriStateControl`` on
-    /// its trailing edge, and the whole row one adjustable element for
+public extension SomaHabitRow where Trailing == SomaAnswerSwitch {
+    /// A row that asks a done or not done question: a ``SomaAnswerSwitch``
+    /// on its trailing edge, and the whole row one adjustable element for
     /// VoiceOver.
-    init(symbol: String, title: String, hue: SomaHealthHue, answer: Binding<Bool?>) {
-        self.init(symbol: symbol, title: title, detail: nil, hue: hue, isSelected: false,
+    init(glyph: SomaTrackGlyph.Kind, title: String, tone: SomaTrackTone, answer: Binding<Bool?>) {
+        self.init(glyph: glyph, title: title, detail: nil, tone: tone, isSelected: false,
                   action: nil, answer: answer,
-                  trailing: SomaTriStateControl(value: answer, hue: hue))
+                  trailing: SomaAnswerSwitch(value: answer, tone: tone))
     }
 }
 
 public extension SomaHabitRow where Trailing == SomaHabitQuantity {
     /// A row that counts: the day's amount, its unit and an arrow, the whole
     /// row opening where the amount is logged.
-    init(symbol: String, title: String, hue: SomaHealthHue, value: String?, unit: String, action: @escaping () -> Void) {
-        self.init(symbol: symbol, title: title, hue: hue, action: action) {
+    init(glyph: SomaTrackGlyph.Kind, title: String, tone: SomaTrackTone, value: String?, unit: String, action: @escaping () -> Void) {
+        self.init(glyph: glyph, title: title, tone: tone, action: action) {
             SomaHabitQuantity(value: value, unit: unit)
         }
     }
@@ -531,8 +526,7 @@ public extension SomaHabitRow where Trailing == SomaHabitQuantity {
 // MARK: - Habit stack
 
 /// Habit rows each on a card of their own, a short gap between them: a list
-/// of separate things to answer rather than
-/// one grouped table.
+/// of separate things to answer rather than one grouped table.
 public struct SomaHabitStack<Data: RandomAccessCollection, Row: View>: View
 where Data.Element: Identifiable {
     private let data: Data
@@ -563,7 +557,7 @@ where Data.Element: Identifiable {
 // MARK: - Status gradient
 
 /// The theme's status colours as one scale, from its alert red through amber
-/// to its normal green: a feeling, a share of a day logged.
+/// to its normal green: for the scales that need to warn.
 public enum SomaStatusScale {
     /// The colour at `position` in 0...1.
     public static func color(at position: Double, theme: SomaTheme) -> Color {
@@ -583,8 +577,8 @@ public enum SomaStatusScale {
 
 // MARK: - Progress ring
 
-/// A small ring filling clockwise along the status scale, red at the start
-/// to green at full, with a view at its centre: how much of a day is logged.
+/// A small ring filling clockwise along the calm ramp, clay at the start to
+/// sage at full, with a view at its centre: how much of a day is logged.
 public struct SomaProgressRing<Center: View>: View {
     private let fraction: Double
     private let center: Center
@@ -601,19 +595,14 @@ public struct SomaProgressRing<Center: View>: View {
         let metrics = theme.metrics
         let colors = theme.colors
         let line = metrics.journalRingLine
-        let gradient = AngularGradient(
-            colors: SomaStatusScale.stops(theme),
-            center: .center,
-            startAngle: .degrees(0),
-            endAngle: .degrees(360 * max(fraction, 0.01))
-        )
 
         ZStack {
             Circle()
                 .stroke(colors.surfaceRecessed.color, lineWidth: line)
             Circle()
                 .trim(from: 0, to: fraction)
-                .stroke(gradient, style: StrokeStyle(lineWidth: line, lineCap: .round))
+                .stroke(SomaEnergyRamp.calm.value(at: fraction).color,
+                        style: StrokeStyle(lineWidth: line, lineCap: .round))
                 .rotationEffect(.degrees(-90))
                 .animation(reduceMotion ? nil : theme.motion.selection, value: fraction)
             center
@@ -631,10 +620,10 @@ public extension SomaProgressRing where Center == EmptyView {
 
 // MARK: - Feeling scale
 
-/// Seven stops from very unpleasant to very pleasant along the status scale,
-/// red through amber to green. The value is the control: a tap sets the
-/// stop, a second tap clears it. The chosen stop is drawn whole and marked
-/// with an ink dot; the others fade.
+/// Seven stops from very unpleasant to very pleasant along the calm ramp,
+/// clay through sand to sage. The value is the control: a tap sets the stop,
+/// a second tap clears it. The chosen stop is drawn whole and marked with a
+/// dot; the others fade.
 public struct SomaFeelingScale: View {
     @Binding private var value: Int?
     private let names: [String]
@@ -652,17 +641,15 @@ public struct SomaFeelingScale: View {
 
     /// The colour of one stop, 0...6.
     public static func color(_ stop: Int, theme: SomaTheme) -> Color {
-        SomaStatusScale.color(at: Double(min(max(stop, 0), 6)) / 6, theme: theme)
+        SomaEnergyRamp.calm.value(at: Double(min(max(stop, 0), 6)) / 6).color
     }
 
     public var body: some View {
         let metrics = theme.metrics
 
         HStack(spacing: metrics.journalFeelStopSpacing) {
-            Image(systemName: "cloud.rain.fill")
-                .font(.system(size: metrics.journalRowGlyph, weight: .semibold))
-                .foregroundStyle(Self.color(0, theme: theme))
-                .accessibilityHidden(true)
+            SomaTrackGlyph(.cloud, tone: nil, style: .caption)
+                .opacity(0.6)
             ForEach(0..<7, id: \.self) { stop in
                 Button {
                     let next = value == stop ? nil : stop
@@ -674,10 +661,8 @@ public struct SomaFeelingScale: View {
                 .accessibilityLabel(Text(stop < names.count ? names[stop] : "\(stop + 1)"))
                 .accessibilityAddTraits(value == stop ? .isSelected : [])
             }
-            Image(systemName: "sun.max.fill")
-                .font(.system(size: metrics.journalRowGlyph, weight: .semibold))
-                .foregroundStyle(Self.color(6, theme: theme))
-                .accessibilityHidden(true)
+            SomaTrackGlyph(.daylight, tone: nil, style: .caption)
+                .opacity(0.6)
         }
         .frame(minHeight: metrics.minimumTapTarget)
     }
@@ -688,12 +673,12 @@ public struct SomaFeelingScale: View {
         let isChosen = value == stop
         let idle = value == nil ? metrics.journalFeelRestOpacity : metrics.journalFeelIdleOpacity
 
-        return RoundedRectangle(cornerRadius: metrics.journalFeelStopHeight / 3, style: .continuous)
+        return RoundedRectangle(cornerRadius: metrics.journalFeelStopHeight / 3.5, style: .continuous)
             .fill(hue.opacity(isChosen ? 1 : idle))
             .overlay {
                 if isChosen {
                     Circle()
-                        .fill(SomaHealthHue.ink.color)
+                        .fill(theme.colors.surface.color)
                         .frame(width: metrics.aspectDotSize * 1.4, height: metrics.aspectDotSize * 1.4)
                 }
             }

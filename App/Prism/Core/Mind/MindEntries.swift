@@ -94,9 +94,19 @@ nonisolated struct MindMoodEntry: Codable, Equatable, Sendable, Identifiable {
     var associations: [String] = []
     /// Whether Apple Health holds it too, so a read back does not count it twice.
     var isInHealth = false
+    /// A few words the person added, kept on the phone with the mood.
+    var note: String?
 
     /// The seven stops of the slider, from very unpleasant to very pleasant.
     static let stops = 7
+
+    /// The same feeling, words and note as `other`, logged within `window`
+    /// seconds of it.
+    func isRepeat(of other: MindMoodEntry, within window: TimeInterval) -> Bool {
+        kind == other.kind && valence == other.valence && labels == other.labels
+            && associations == other.associations && note == other.note
+            && abs(other.date.timeIntervalSince(date)) < window
+    }
 
     static func valence(stop: Int) -> Double {
         let clamped = min(max(stop, 0), stops - 1)

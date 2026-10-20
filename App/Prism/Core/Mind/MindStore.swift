@@ -61,7 +61,14 @@ final class MindStore {
         save()
     }
 
+    /// Two logs of the same feeling this close together are one tap
+    /// landing twice, not two moods.
+    static let repeatWindow: TimeInterval = 2
+
+    /// Keeps a mood. The same feeling, words and note logged again within
+    /// ``repeatWindow`` of the last is a double tap and is kept once.
     func add(_ entry: MindMoodEntry) {
+        if let last = moods.last, last.isRepeat(of: entry, within: Self.repeatWindow) { return }
         moods.append(entry)
         save()
     }

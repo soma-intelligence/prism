@@ -8,8 +8,13 @@ import CoreLocation
 import MapKit
 import Observation
 
-/// Where you are, for the Environment lens: a place rounded to about a
-/// kilometre, and its name.
+/// Where you are, for the Environment lens: the device's own position for
+/// the map, the same place rounded to about a kilometre for everything that
+/// asks a service, and its name.
+///
+/// Only the map reads ``exact``, and the map draws on the device. The name
+/// lookup sends the rounded place, and the weather client rounds it again to
+/// a tenth of a degree, so what leaves the device is what it always was.
 ///
 /// Uses the Location answer the app already has. When Location was never
 /// asked, the lens shows one button that asks for it in context, the first
@@ -30,6 +35,9 @@ final class EnvironmentLocation: NSObject, @preconcurrency CLLocationManagerDele
 
     private(set) var access: Access
     private(set) var place: EnvironmentSun.Place?
+    /// The device's own position, unrounded, for drawing on the map only.
+    /// Nil when the place is the Weather city or Location is off.
+    private(set) var exact: EnvironmentSun.Place?
     /// Whether ``place`` is the device's own rather than the Weather city.
     private(set) var isHere = false
 
@@ -39,7 +47,7 @@ final class EnvironmentLocation: NSObject, @preconcurrency CLLocationManagerDele
         access = Self.access(manager.authorizationStatus)
         super.init()
         manager.delegate = self
-        manager.desiredAccuracy = kCLLocationAccuracyKilometer
+        manager.desiredAccuracy = kCLLocationAccuracyNearestTenMeters
     }
 
     /// Asks for Location while in use. Only when it was never asked.
@@ -59,10 +67,13 @@ final class EnvironmentLocation: NSObject, @preconcurrency CLLocationManagerDele
     func refresh() async {
         if access == .allowed, let here = await fix() {
             isHere = true
-            place = await named(here)
+            let named = await named(Self.rounded(here.latitude, here.longitude))
+            place = named
+            exact = EnvironmentSun.Place(latitude: here.latitude, longitude: here.longitude, name: named.name)
             return
         }
         isHere = false
+        exact = nil
         if let city = SleepPlaceStore.shared.weatherCity {
             place = EnvironmentSun.Place(latitude: city.latitude, longitude: city.longitude, name: city.name)
         } else {
@@ -78,11 +89,12 @@ final class EnvironmentLocation: NSObject, @preconcurrency CLLocationManagerDele
         }
     }
 
-    /// One coarse fix: the last known one, or the first update within a few
-    /// seconds.
+    /// One fix, as the device gives it: the last known one, or the first
+    /// update within a few seconds. Rounded by the caller before it is used
+    /// for anything but the map.
     private func fix() async -> EnvironmentSun.Place? {
         if let known = manager.location {
-            return Self.rounded(known.coordinate.latitude, known.coordinate.longitude)
+            return EnvironmentSun.Place(latitude: known.coordinate.latitude, longitude: known.coordinate.longitude)
         }
         let fix: (Double, Double)? = await withTaskGroup(of: (Double, Double)?.self) { group in
             group.addTask {
@@ -103,20 +115,22 @@ final class EnvironmentLocation: NSObject, @preconcurrency CLLocationManagerDele
             group.cancelAll()
             return first
         }
-        return fix.map { Self.rounded($0.0, $0.1) }
+        return fix.map { EnvironmentSun.Place(latitude: $0.0, longitude: $0.1) }
     }
 
-    private static func rounded(_ latitude: Double, _ longitude: Double) -> EnvironmentSun.Place {
+    nonisolated static func rounded(_ latitude: Double, _ longitude: Double) -> EnvironmentSun.Place {
         let coarse = CoarseCoordinate.rounded(latitude: latitude, longitude: longitude)
         return EnvironmentSun.Place(latitude: coarse.latitude, longitude: coarse.longitude)
     }
 
     // MARK: Names
 
-    /// The place with its name: "Neighbourhood, City", or the city alone.
+    /// The rounded place with its name: the city it is in. Never the name of
+    /// whatever building sits at the rounded point, which can be a kilometre
+    /// from where you are.
     private func named(_ place: EnvironmentSun.Place) async -> EnvironmentSun.Place {
         var place = place
-        let key = String(format: "environment.place.%.2f,%.2f", place.latitude, place.longitude)
+        let key = String(format: "environment.city.%.2f,%.2f", place.latitude, place.longitude)
         if let cached = UserDefaults.standard.string(forKey: key) {
             place.name = cached
             return place
@@ -124,14 +138,7 @@ final class EnvironmentLocation: NSObject, @preconcurrency CLLocationManagerDele
         let location = CLLocation(latitude: place.latitude, longitude: place.longitude)
         guard let request = MKReverseGeocodingRequest(location: location),
               let item = try? await request.mapItems.first else { return place }
-        let city = item.addressRepresentations?.cityName
-        let local = item.name
-        let name: String? = switch (local, city) {
-        case let (local?, city?) where local != city: "\(local), \(city)"
-        case let (_, city?): city
-        case let (local?, nil): local
-        default: nil
-        }
+        let name = item.addressRepresentations?.cityName
         if let name { UserDefaults.standard.set(name, forKey: key) }
         place.name = name
         return place

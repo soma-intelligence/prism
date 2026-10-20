@@ -24,7 +24,9 @@ struct ComponentPlayground: View {
     @State private var openConditions: Set<String> = ["rest"]
     @State private var orbAspect: SomaAspect = .mind
     @State private var doneMoves: Set<SomaAspect> = []
+    @State private var ritualDone: Set<String> = []
     @State private var journalFeeling: Int? = SomaPreviewSamples.feeling
+    @State private var mood: SomaMood? = .good
     @State private var journalAnswers: [String: Bool] = SomaPreviewSamples.journalQuestions.reduce(into: [:]) { $0[$1.id] = $1.answer }
     @State private var moodFeeling: Int? = SomaPreviewSamples.feeling
 
@@ -69,7 +71,7 @@ struct ComponentPlayground: View {
                         LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: theme.metrics.journalTileSpacing), count: 4),
                                   spacing: theme.metrics.journalTileSpacing) {
                             ForEach(SomaPreviewSamples.journalTiles) { tile in
-                                SomaGlyphTile(tile.id, symbol: tile.symbol, hue: tile.hue) {}
+                                SomaGlyphTile(tile.id, glyph: tile.glyph, tone: tile.tone) {}
                             }
                         }
                     }
@@ -77,19 +79,19 @@ struct ComponentPlayground: View {
 
                 entry("Journal: SomaHabitRow, SomaHabitMark") {
                     SomaBrowseGroup(SomaPreviewSamples.journalHabits) { habit in
-                        SomaHabitRow(symbol: habit.symbol, title: habit.id, detail: habit.detail,
-                                     hue: habit.hue, mark: habit.mark) {}
+                        SomaHabitRow(glyph: habit.glyph, title: habit.id, detail: habit.detail,
+                                     tone: habit.tone, mark: habit.mark) {}
                     }
                 }
 
-                entry("Journal: SomaHabitStack, SomaTriStateControl, SomaHabitQuantity") {
+                entry("Journal: SomaHabitStack, SomaAnswerSwitch, SomaHabitQuantity") {
                     VStack(spacing: theme.metrics.journalCardSpacing) {
                         SomaHabitStack(SomaPreviewSamples.journalQuantities) { quantity in
-                            SomaHabitRow(symbol: quantity.symbol, title: quantity.id, hue: quantity.hue,
+                            SomaHabitRow(glyph: quantity.glyph, title: quantity.id, tone: quantity.tone,
                                          value: quantity.value, unit: quantity.unit) {}
                         }
                         SomaHabitStack(SomaPreviewSamples.journalQuestions) { question in
-                            SomaHabitRow(symbol: question.symbol, title: question.id, hue: question.hue,
+                            SomaHabitRow(glyph: question.glyph, title: question.id, tone: question.tone,
                                          answer: $journalAnswers[question.id])
                         }
                     }
@@ -99,10 +101,81 @@ struct ComponentPlayground: View {
                     SomaFeelingScale(value: $journalFeeling, names: SomaPreviewSamples.feelingNames)
                 }
 
+                entry("Track: SomaTrackGlyph, SomaTrackTone") {
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: theme.metrics.journalTileSpacing), count: 6),
+                              spacing: theme.metrics.journalTileSpacing) {
+                        ForEach(Array(SomaTrackGlyph.Kind.allCases.enumerated()), id: \.element) { index, kind in
+                            SomaTrackGlyph(kind, tone: SomaTrackTone.allCases[index % SomaTrackTone.allCases.count], style: .badge)
+                        }
+                    }
+                }
+
+                entry("Explore: SomaArticleCover, SomaArticleCard, SomaShelfHeader, SomaTopicChip") {
+                    let samples = SomaPreviewSamples.articles
+                    VStack(alignment: .leading, spacing: theme.metrics.cardSpacing) {
+                        HStack(spacing: theme.metrics.articleTextSpacing * 2) {
+                            SomaTopicChip("All", tone: nil, isOn: true) {}
+                            SomaTopicChip("Sleep", tone: .dusk, isOn: false) {}
+                        }
+                        SomaShelfHeader("For you")
+                        if let first = samples.first {
+                            SomaArticleCard(title: first.title, topic: first.topic, caption: first.caption, reason: first.reason,
+                                            tone: first.tone, mark: first.mark, seed: first.seed, style: .feature)
+                        }
+                        ForEach(samples.dropFirst().prefix(2)) { sample in
+                            SomaArticleCard(title: sample.title, topic: sample.topic, caption: sample.caption, reason: sample.reason,
+                                            tone: sample.tone, mark: sample.mark, seed: sample.seed, style: .row)
+                                .somaCardArrival(index: 0, isShown: true)
+                        }
+                        SomaShelfHeader("Covers", action: "See all") {}
+                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: theme.metrics.articleGridSpacing) {
+                            ForEach(samples.dropFirst(3)) { sample in
+                                SomaArticleCard(title: sample.title, topic: sample.topic, caption: sample.caption,
+                                                tone: sample.tone, mark: sample.mark, seed: sample.seed, style: .tile)
+                            }
+                        }
+                    }
+                }
+
+                entry("Rituals: SomaRitualDays, SomaRitualStep, SomaRitualCheck") {
+                    VStack(alignment: .leading, spacing: theme.metrics.cardSpacing) {
+                        SomaRitualDays(shares: SomaPreviewSamples.ritualDays, tone: .sand)
+                        ForEach(SomaPreviewSamples.ritualSteps) { step in
+                            SomaRitualStep(step.id, glyph: step.glyph, tone: .sand,
+                                           isDone: ritualDone.contains(step.id) != step.isDone) {
+                                if ritualDone.contains(step.id) { ritualDone.remove(step.id) } else { ritualDone.insert(step.id) }
+                            }
+                        }
+                    }
+                }
+
                 entry("SomaMark") {
                     HStack(spacing: 16) {
                         SomaMark(accessibilityLabel: "Soma")
                         SomaMark(accessibilityLabel: "Soma", role: .caption)
+                    }
+                }
+
+                entry("SomaAspectGlyph") {
+                    VStack(alignment: .leading, spacing: 16) {
+                        HStack(spacing: 20) {
+                            ForEach(SomaAspect.allCases) { SomaAspectGlyph($0) }
+                        }
+                        HStack(spacing: 12) {
+                            ForEach(SomaAspect.allCases) { SomaAspectGlyph($0, style: .badge) }
+                        }
+                    }
+                }
+
+                entry("SomaAspectTile, SomaQuietPill") {
+                    VStack(spacing: 16) {
+                        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3), spacing: 10) {
+                            ForEach(SomaAspect.allCases) { SomaAspectTile(aspect: $0) }
+                        }
+                        HStack(spacing: 10) {
+                            SomaQuietPill("Edit Today", systemImage: "slider.horizontal.3")
+                            SomaQuietPill("All measures", systemImage: "magnifyingglass")
+                        }
                     }
                 }
 
@@ -147,7 +220,8 @@ struct ComponentPlayground: View {
                         SomaArcGauge(scale: .daylight, value: SomaPreviewSamples.daylightMinutes, band: SomaPreviewSamples.daylightUsual) {
                             Text(verbatim: "\(Int(SomaPreviewSamples.daylightMinutes))").somaFont(theme.typography.metric)
                         }
-                        SomaSunPath(progress: SomaPreviewSamples.sunProgress, rise: SomaPreviewSamples.sunrise, set: SomaPreviewSamples.sunset)
+                        SomaSunPath(rise: SomaPreviewSamples.sunrise, set: SomaPreviewSamples.sunset, now: SomaPreviewSamples.sunNow)
+                        SomaSunPath(rise: nil, set: nil, now: .now)
                         SomaScaleBar(scale: .uvIndex, value: SomaPreviewSamples.uvIndex, ticks: [0, 3, 6, 8, 11])
                         SomaScaleBar(scale: .airQuality, value: nil, ticks: [0, 50, 100, 150, 200, 300])
                         SomaScaleBar(scale: .soundLevel, value: SomaPreviewSamples.soundAround, style: .level, limit: 70)
@@ -164,6 +238,23 @@ struct ComponentPlayground: View {
                         SomaRingScore(aspect: .mind, value: 25, trend: .down),
                         SomaRingScore(aspect: .activity, value: nil),
                     ])
+                }
+
+                entry("SomaEnergyGauge, SomaEnergyCell, SomaEnergyTimeline") {
+                    VStack(alignment: .leading, spacing: 16) {
+                        SomaEnergyGauge(level: Int(SomaPreviewSamples.energyLevel * 100), line: "Enough left for a quiet evening.")
+                        SomaCard {
+                            SomaEnergyTimeline(points: SomaPreviewSamples.energyDay, now: 0.7,
+                                               ticks: [.init(x: 0, label: "23:34"), .init(x: 0.5, label: "12:00")],
+                                               charged: 36, drained: 43)
+                        }
+                        HStack(spacing: 12) {
+                            SomaEnergyCell(level: 18)
+                            SomaEnergyCell(level: 52)
+                            SomaEnergyCell(level: 88)
+                            SomaEnergyCell(level: nil)
+                        }
+                    }
                 }
 
                 entry("SomaEnergyTicks") {
@@ -224,6 +315,41 @@ struct ComponentPlayground: View {
                     }
                 }
 
+                entry("SomaNightCard") {
+                    VStack(spacing: 12) {
+                        SomaNightCard(runs: SomaPreviewSamples.night, asleep: 6.6 * 3_600, bed: "23:34", wake: "06:39",
+                                      line: "Deep sleep came first, and it held.", empty: "Stages draw here.")
+                        SomaNightCard(runs: [], asleep: nil, bed: nil, wake: nil, line: nil,
+                                      empty: "Stages draw here from a night your watch records.")
+                    }
+                }
+
+                entry("Metric page: SomaMetricHero, SomaMetricChart") {
+                    VStack(alignment: .leading, spacing: theme.metrics.leadSpacing) {
+                        SomaMetricHero(caption: "Today so far", value: "7,020", unit: "steps",
+                                       meaning: "148 steps to a usual day", tone: .neutral)
+                        SomaMetricChart(buckets: SomaPreviewSamples.metricStepBuckets, style: .bars, hue: .activity,
+                                        domain: 0...10_500, bandLabels: ("7,100", "9,400"),
+                                        summaryLabel: "Daily average, last 30 days", summaryValue: "8,288", unit: "steps")
+                        SomaMetricChart(buckets: SomaPreviewSamples.metricRestingBuckets, style: .line, hue: .heart,
+                                        domain: 50...68, bandLabels: ("54", "62"),
+                                        summaryLabel: "Average, this week", summaryValue: "59", unit: "bpm")
+                    }
+                }
+
+                entry("SomaFactStrip, SomaSourceList") {
+                    VStack(spacing: theme.metrics.cardSpacing) {
+                        SomaFactStrip(SomaPreviewSamples.metricFacts)
+                        SomaSourceList(SomaPreviewSamples.metricSources)
+                    }
+                }
+
+                entry("SomaInfoSheet") {
+                    SomaInfoSheet(title: "Steps", sections: SomaPreviewSamples.metricInfo)
+                        .frame(height: 360)
+                        .clipShape(.rect(cornerRadius: theme.metrics.cardCornerRadius))
+                }
+
                 entry("SomaSleepPeriodRow") {
                     SomaCard {
                         SomaSleepPeriodRow(bed: "23:34", wake: "06:39")
@@ -250,17 +376,17 @@ struct ComponentPlayground: View {
                 entry("SomaLinkCard") {
                     VStack(spacing: theme.metrics.cardSpacing) {
                         ForEach(SomaPreviewSamples.links) { link in
-                            SomaLinkCard(driver: link.driver, outcome: link.outcome, value: link.value, unit: link.unit,
-                                         caption: link.caption, tone: link.tone, high: link.high, low: link.low)
+                            SomaLinkCard(headline: link.headline, detail: link.detail, highLabel: link.highLabel,
+                                         lowLabel: link.lowLabel, tone: link.tone, high: link.high, low: link.low)
                         }
-                        SomaLinkPendingRow(title: "Needs more days", names: SomaPreviewSamples.pendingLinks)
+                        SomaLinkPendingRow(title: "Still learning", names: SomaPreviewSamples.pendingLinks)
                     }
                 }
 
                 entry("SomaLinkDetail") {
                     let link = SomaPreviewSamples.links[0]
                     VStack(alignment: .leading, spacing: theme.metrics.cardSpacing) {
-                        SomaLinkHeadline(driver: link.driver, outcome: link.outcome, value: link.value, unit: link.unit,
+                        SomaLinkHeadline(title: link.headline, value: link.value, unit: link.unit,
                                          caption: link.caption, tone: link.tone)
                         SomaCard {
                             SomaLinkComparison(high: link.high, low: link.low, highLabel: "With", lowLabel: "Without",
@@ -277,13 +403,37 @@ struct ComponentPlayground: View {
                             SomaLinkProgress(fraction: SomaPreviewSamples.linkProgress.fraction,
                                              label: SomaPreviewSamples.linkProgress.label)
                         }
-                        SomaLinkPendingRow(title: "Needs more days", names: SomaPreviewSamples.pendingLinks) { _ in }
+                        SomaLinkPendingRow(title: "Still learning", names: SomaPreviewSamples.pendingLinks) { _ in }
                     }
                 }
 
                 entry("SomaMuscleMap") {
                     SomaCard {
                         SomaMuscleMap(SomaPreviewSamples.muscleStates)
+                    }
+                }
+
+                entry("SomaMuscleFreshness") {
+                    VStack(spacing: theme.metrics.cardSpacing) {
+                        SomaMuscleFreshness(SomaPreviewSamples.muscleReadings)
+                        SomaMuscleFreshness(SomaMuscleGroup.allCases.map { SomaMuscleReading(group: $0, state: .none) })
+                    }
+                }
+
+                entry("SomaMoodFaces, SomaMoodFace") {
+                    SomaCard {
+                        VStack(spacing: 16) {
+                            SomaMoodFaces(selection: $mood)
+                            HStack(spacing: 12) {
+                                ForEach(SomaMood.allCases) { SomaMoodFace($0, isFilled: true, side: 48) }
+                            }
+                        }
+                    }
+                }
+
+                entry("SomaMindGlyph") {
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 4), spacing: 12) {
+                        ForEach(SomaMindGlyph.Kind.allCases) { SomaMindGlyph($0) }
                     }
                 }
 

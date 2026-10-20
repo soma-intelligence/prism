@@ -32,7 +32,7 @@ extension HomeTodayCard {
     /// Whether the card belongs under "Your aspects" rather than at the top.
     var isAspect: Bool {
         switch self {
-        case .tonight, .energy, .today: false
+        case .tonight, .sleep, .energy, .today: false
         default: true
         }
     }
@@ -100,19 +100,47 @@ private struct HomeCycleCard: View {
     }
 }
 
-/// The two rows at Today's foot: Edit Today and All categories.
+/// Today's foot: the six aspects as a grid of tiles, each zooming into its
+/// page of readings, and under them two quiet pills, one to choose Today's
+/// cards and one to search every measure.
 struct HomeTodayFoot: View {
     let open: (HomeSheetRoute) -> Void
 
-    private struct Row: Identifiable {
-        var id: String { title }
-        var title: String
-        var route: HomeSheetRoute
-    }
+    @Environment(\.somaTheme) private var theme
+
+    /// Head to toe, the way All categories lists them.
+    static let order: [SomaAspect] = [.sleep, .mind, .heart, .activity, .gut, .body]
 
     var body: some View {
-        SomaBrowseGroup([Row(title: "Edit Today", route: .editToday), Row(title: "All categories", route: .allCategories)], hasGlyphs: false) { row in
-            SomaBrowseRow(title: row.title) { open(row.route) }
+        let metrics = theme.metrics
+        let columns = Array(repeating: GridItem(.flexible(), spacing: metrics.aspectTileSpacing), count: 3)
+
+        VStack(alignment: .leading, spacing: metrics.cardSpacing) {
+            Text("Categories")
+                .somaFont(theme.typography.title)
+                .foregroundStyle(theme.colors.inkPrimary.color)
+                .accessibilityAddTraits(.isHeader)
+
+            LazyVGrid(columns: columns, spacing: metrics.aspectTileSpacing) {
+                ForEach(Self.order) { aspect in
+                    TileLink(value: PulseRoute.aspect(aspect)) {
+                        SomaAspectTile(aspect: aspect)
+                    }
+                    .accessibilityHint(Text("Opens its readings"))
+                }
+            }
+
+            HStack(spacing: metrics.aspectTileSpacing) {
+                Button { open(.editToday) } label: {
+                    SomaQuietPill("Edit Today", systemImage: "slider.horizontal.3")
+                }
+                Button { open(.allCategories) } label: {
+                    SomaQuietPill("All measures", systemImage: "magnifyingglass")
+                }
+            }
+            .buttonStyle(TilePressStyle())
+            .frame(maxWidth: .infinity)
+            .padding(.top, metrics.cardSpacing)
         }
     }
 }

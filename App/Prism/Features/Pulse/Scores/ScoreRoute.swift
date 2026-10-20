@@ -30,8 +30,23 @@ enum ScoreRoute: Hashable {
         }
     }
 
-    @ViewBuilder
     var page: some View {
+        content.notesVisit(topic)
+    }
+
+    /// What Explore reads this page as interest in, if anything.
+    private var topic: ArticleTopic? {
+        switch self {
+        case .recovery, .energy: .recovery
+        case .strain: .movement
+        case .stress: .mind
+        case .sleep: .sleep
+        case .weather, .peakWindow: nil
+        }
+    }
+
+    @ViewBuilder
+    private var content: some View {
         switch self {
         case .recovery: RecoveryPage()
         case .strain: StrainPage()

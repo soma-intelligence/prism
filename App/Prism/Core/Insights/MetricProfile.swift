@@ -109,6 +109,14 @@ struct MetricProfile: Sendable, Equatable {
         "HKQuantityTypeIdentifierHeartRateRecoveryOneMinute": entry(true, chart: .points, sparse: true, period: .threeMonths, spread: 3, step: 3, weight: 0.7),
         "HKQuantityTypeIdentifierStepCount": entry(true, chart: .bars, accumulates: true, spread: 1000, share: 0.2, step: 1000, weight: 0.7),
         "HKQuantityTypeIdentifierWalkingSpeed": entry(true, spread: 0.2, step: 0.2, weight: 0.6),
+        "HKQuantityTypeIdentifierWalkingHeartRateAverage": entry(false, spread: 2, step: 2, weight: 0.7),
+        // Walking, as the phone and the watch read it.
+        "HKQuantityTypeIdentifierAppleWalkingSteadiness": entry(true, chart: .points, sparse: true, period: .threeMonths, spread: 3, step: 3, weight: 0.6),
+        "HKQuantityTypeIdentifierWalkingStepLength": entry(true, spread: 1.5, step: 1.5, weight: 0.5),
+        "HKQuantityTypeIdentifierWalkingAsymmetryPercentage": entry(false, spread: 1, step: 1, weight: 0.5),
+        "HKQuantityTypeIdentifierWalkingDoubleSupportPercentage": entry(false, spread: 1, step: 1, weight: 0.5),
+        "HKQuantityTypeIdentifierSixMinuteWalkTestDistance": entry(true, chart: .points, sparse: true, period: .sixMonths, spread: 15, step: 15, weight: 0.6),
+        "HKQuantityTypeIdentifierStairAscentSpeed": entry(true, chart: .points, sparse: true, period: .threeMonths, spread: 0.03, step: 0.03, weight: 0.5),
         // Sleep, as hours asleep a night.
         sleep: entry(true, band: 7...9, chart: .bars, spread: 0.4, step: 0.3),
         // Body composition: sparse, projected.
@@ -132,8 +140,8 @@ struct MetricProfile: Sendable, Equatable {
         "soma.score.bedtime": MetricProfile(risingIsGood: nil, chart: .line),
         "soma.score.wakeTime": MetricProfile(risingIsGood: nil, chart: .line),
         // Daily totals.
-        "HKQuantityTypeIdentifierActiveEnergyBurned": MetricProfile(risingIsGood: true, chart: .bars, accumulates: true),
-        "HKQuantityTypeIdentifierAppleExerciseTime": MetricProfile(risingIsGood: true, chart: .bars, accumulates: true),
+        "HKQuantityTypeIdentifierActiveEnergyBurned": entry(true, chart: .bars, accumulates: true, spread: 60, share: 0.15, step: 50, weight: 0.6),
+        "HKQuantityTypeIdentifierAppleExerciseTime": entry(true, chart: .bars, accumulates: true, spread: 8, share: 0.2, step: 5, weight: 0.6),
         "HKQuantityTypeIdentifierAppleStandTime": MetricProfile(risingIsGood: true, chart: .bars, accumulates: true),
     ]
 }

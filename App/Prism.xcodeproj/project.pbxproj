@@ -709,7 +709,7 @@
 				<key>INFOPLIST_KEY_NSHealthUpdateUsageDescription</key>
 				<string>Soma saves what you log in Track to Apple Health when you allow it: a weight, a height, a drink, a meal, mindful minutes, a mood.</string>
 				<key>INFOPLIST_KEY_NSLocationWhenInUseUsageDescription</key>
-				<string>Soma uses your approximate location for the day’s weather, UV, sunrise and sunset. It is never shared.</string>
+				<string>Soma uses your location for the day’s weather, UV, sunrise and sunset, and to show where you are and where you slept on a map. Only a rounded place is used to ask for the weather.</string>
 				<key>INFOPLIST_KEY_NSMotionUsageDescription</key>
 				<string>Soma reads your steps and movement from this iPhone to track your day when your watch is not on.</string>
 				<key>INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]</key>
@@ -823,7 +823,7 @@
 				<key>INFOPLIST_KEY_NSHealthUpdateUsageDescription</key>
 				<string>Soma saves what you log in Track to Apple Health when you allow it: a weight, a height, a drink, a meal, mindful minutes, a mood.</string>
 				<key>INFOPLIST_KEY_NSLocationWhenInUseUsageDescription</key>
-				<string>Soma uses your approximate location for the day’s weather, UV, sunrise and sunset. It is never shared.</string>
+				<string>Soma uses your location for the day’s weather, UV, sunrise and sunset, and to show where you are and where you slept on a map. Only a rounded place is used to ask for the weather.</string>
 				<key>INFOPLIST_KEY_NSMotionUsageDescription</key>
 				<string>Soma reads your steps and movement from this iPhone to track your day when your watch is not on.</string>
 				<key>INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]</key>

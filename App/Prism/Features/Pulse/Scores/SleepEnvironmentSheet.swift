@@ -163,6 +163,15 @@ struct SleepPlaceLedgerSheet: View {
         var score: Double?
     }
 
+    /// Where the device is now, as a place to sleep: its own spot, named by
+    /// the city the Environment lens already looked up. Nil without the
+    /// device's position.
+    static func here(_ location: EnvironmentLocation) -> SleepPlaceStore.Place? {
+        guard let exact = location.exact else { return nil }
+        return SleepPlaceStore.Place(name: exact.name ?? String(localized: "Where you were"),
+                                     latitude: exact.latitude, longitude: exact.longitude)
+    }
+
     var body: some View {
         let type = theme.typography
         let colors = theme.colors
@@ -198,7 +207,8 @@ struct SleepPlaceLedgerSheet: View {
         }
         .sheet(item: $picking) { night in
             CityPickerSheet(eyebrow: "Sleep · Places", title: "Where did you sleep?",
-                            current: places.place(forNightEnding: night.day), recent: places.recentPlaces) { place in
+                            current: places.place(forNightEnding: night.day), recent: places.recentPlaces,
+                            here: Self.here(EnvironmentLocation.shared), isPrecise: true) { place in
                 places.setPlace(place, forNightEnding: night.day)
             }
         }

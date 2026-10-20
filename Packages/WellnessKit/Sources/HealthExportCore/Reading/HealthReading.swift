@@ -135,6 +135,47 @@ public protocol HealthSampleSource: Sendable {
 
     /// Raw samples, newest first.
     func samples(_ metric: HealthMetric, from: Date, to: Date, limit: Int) async throws -> [HealthReading]
+
+    /// One sum a calendar day, from the start of `from`'s day up to `to`,
+    /// oldest first. Each reading spans its day (the last one ends at `to`),
+    /// and a day with nothing recorded is left out rather than read as zero.
+    /// Cumulative quantities only.
+    ///
+    /// The default asks ``total(_:from:to:)`` once a day. A source with a
+    /// cheaper way to bucket (HealthKit's statistics collection) reads every
+    /// day in one query.
+    func dailyTotals(_ metric: HealthMetric, from: Date, to: Date, calendar: Calendar) async throws -> [HealthReading]
+}
+
+public extension HealthSampleSource {
+    func dailyTotals(_ metric: HealthMetric, from: Date, to: Date, calendar: Calendar) async throws -> [HealthReading] {
+        guard metric.aggregation == .cumulative else {
+            throw HealthReadError.unsupportedQuery(metric.identifier)
+        }
+        var readings: [HealthReading] = []
+        for day in HealthDays.starts(from: from, to: to, calendar: calendar) {
+            let end = min(calendar.date(byAdding: .day, value: 1, to: day) ?? to, to)
+            if let total = try await total(metric, from: day, to: end) {
+                readings.append(HealthReading(metric: total.metric, value: total.value, unit: total.unit, start: day, end: end))
+            }
+        }
+        return readings
+    }
+}
+
+/// Calendar days over an interval.
+public enum HealthDays {
+    /// The start of every day from `from`'s day up to, not including, `to`.
+    public static func starts(from: Date, to: Date, calendar: Calendar) -> [Date] {
+        var days: [Date] = []
+        var day = calendar.startOfDay(for: from)
+        while day < to {
+            days.append(day)
+            guard let next = calendar.date(byAdding: .day, value: 1, to: day) else { break }
+            day = next
+        }
+        return days
+    }
 }
 
 public extension HealthSampleSource {

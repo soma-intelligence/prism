@@ -134,9 +134,10 @@ struct CauseLinksTests {
         #expect(link?.valueText == "\u{2212}13")
         #expect(link?.tone == .cost)
         #expect(link?.caption == "10 vs 50 nights")
-        #expect(link?.title == "Alcohol \u{2192} Sleep")
+        #expect(link?.headline == "After drinking, your sleep score is lower")
+        #expect(link?.plainTitle == "Alcohol and sleep")
         // HRV has no data: held back, named once in the pending row.
-        #expect(output.pendingNames.contains("Alcohol \u{2192} HRV"))
+        #expect(output.pendingNames.contains("Alcohol and HRV"))
         // A tag never logged is left out altogether.
         #expect(!output.pendingNames.contains { $0.hasPrefix("Sauna") })
     }
@@ -145,7 +146,7 @@ struct CauseLinksTests {
         let output = CauseLinks.compute(LinkSeries(), calendar: calendar)
         #expect(output.shown.isEmpty)
         #expect(output.pending.count == CauseLinks.levels.count)
-        #expect(output.pendingNames.contains("Strain \u{2192} Recovery"))
+        #expect(output.pendingNames.contains("Hard days and recovery"))
     }
 
     @Test func strainIsSetAgainstTheNextDaysRecovery() {
@@ -170,7 +171,7 @@ struct CauseLinksTests {
             series.sleepOnset[day(n + 1)] = 24 - light / 120
         }
         let link = CauseLinks.compute(series, calendar: calendar).shown.first { $0.outcome == .sleepOnset }
-        #expect(link?.outcome.unit == "min")
+        #expect(link?.outcome.unitWords == "minutes")
         #expect(link?.tone == .neutral)
         #expect((link?.effect ?? 0) < -30)
     }
@@ -192,5 +193,35 @@ struct CauseLinksTests {
         #expect(link(2.44, .restingHeart).valueText == "+2.4")
         #expect(link(0.4, .sleepScore).valueText == "+0.4")
         #expect(link(-0.4, .sleepOnset).valueText == "\u{2212}24")
+    }
+
+    @Test func cardsSayALinkInPlainWords() {
+        func link(_ driver: LinkDriver, _ outcome: LinkOutcome, _ delta: Double?) -> CauseLink {
+            CauseLink(driver: driver, outcome: outcome,
+                      result: LinkMath.Result(high: [1, 2, 3], low: [1, 2], delta: delta, spread: 1, noise: 0, verdict: .shown))
+        }
+        let energy = link(.sleepLength, .energy, 5.2)
+        #expect(energy.headline == "After a long night, your morning energy is higher")
+        #expect(energy.plainDetail == "About 5 points, across 5 nights")
+        #expect(energy.driver.sideLabels == ("Long nights", "Short nights"))
+
+        #expect(link(.strain, .recovery, -6).headline == "After a hard day, your recovery is lower")
+        #expect(link(.daylight, .sleepOnset, -0.4).headline == "After a bright day, you fall asleep earlier")
+        #expect(link(.daylight, .sleepOnset, -0.4).plainDetail == "About 24 minutes, across 5 days")
+        #expect(link(.tag("alcohol"), .sleepScore, -11).headline == "After drinking, your sleep score is lower")
+        #expect(link(.tag("alcohol"), .sleepScore, -11).driver.sideLabels == ("Alcohol", "Without"))
+
+        // No difference yet: named, never stated.
+        #expect(link(.steps, .sleepScore, nil).headline == "Active days and sleep")
+        #expect(link(.steps, .sleepScore, nil).plainDetail == "5 days so far")
+    }
+
+    @Test func noCardWordsCarryArrowsOrUnitsShorthand() {
+        for link in CauseLinks.preview.shown + CauseLinks.preview.pending {
+            for words in [link.headline, link.plainDetail, link.plainTitle] {
+                #expect(!words.contains("\u{2192}"))
+                #expect(!words.contains(" pts"))
+            }
+        }
     }
 }

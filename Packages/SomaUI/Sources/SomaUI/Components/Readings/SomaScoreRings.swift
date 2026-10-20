@@ -29,14 +29,20 @@ public struct SomaRingScore: Identifiable, Sendable {
 /// drawn to its value in the aspect's colour over a faint track of the same
 /// colour, the number in the middle with a small mark when it moved, the
 /// name under it.
+///
+/// Given a namespace, each ring marks itself as the source of a zoom, by its
+/// aspect, so the page it opens grows out of it (iOS only; elsewhere the push
+/// is the ordinary one).
 public struct SomaScoreRings: View {
     private let scores: [SomaRingScore]
+    private let zoom: Namespace.ID?
     private let onSelect: ((SomaAspect) -> Void)?
 
     @Environment(\.somaTheme) private var theme
 
-    public init(_ scores: [SomaRingScore], onSelect: ((SomaAspect) -> Void)? = nil) {
+    public init(_ scores: [SomaRingScore], zoom: Namespace.ID? = nil, onSelect: ((SomaAspect) -> Void)? = nil) {
         self.scores = scores
+        self.zoom = zoom
         self.onSelect = onSelect
     }
 
@@ -45,7 +51,10 @@ public struct SomaScoreRings: View {
             ForEach(scores) { score in
                 if let onSelect {
                     Button { onSelect(score.aspect) } label: {
-                        SomaScoreRing(score: score).frame(maxWidth: .infinity).contentShape(.rect)
+                        SomaScoreRing(score: score)
+                            .zoomSource(score.aspect, in: zoom)
+                            .frame(maxWidth: .infinity)
+                            .contentShape(.rect)
                     }
                     .buttonStyle(.plain)
                 } else {
@@ -53,6 +62,21 @@ public struct SomaScoreRings: View {
                 }
             }
         }
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func zoomSource(_ aspect: SomaAspect, in namespace: Namespace.ID?) -> some View {
+#if os(iOS)
+        if let namespace {
+            matchedTransitionSource(id: aspect, in: namespace)
+        } else {
+            self
+        }
+#else
+        self
+#endif
     }
 }
 

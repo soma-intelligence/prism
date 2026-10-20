@@ -42,6 +42,44 @@ nonisolated enum MuscleFreshness {
         return result
     }
 
+    /// Each group as the freshness card reads it: its state, the end of the
+    /// last session that worked it, and when it should read rested again
+    /// (the moment what is left in it falls under half a usual day).
+    static func readings(_ workouts: [FitnessWorkout], now: Date) -> [SomaMuscleReading] {
+        var month: [Group: Double] = [:]
+        var lingering: [Group: Double] = [:]
+        var last: [Group: Date] = [:]
+        for workout in workouts where workout.end <= now {
+            let work = MuscleWork(workouts: [workout])
+            let left = pow(0.5, now.timeIntervalSince(workout.end) / halfLife)
+            for (group, points) in work.points where points > 0 {
+                month[group, default: 0] += points
+                lingering[group, default: 0] += points * left
+                last[group] = max(last[group] ?? workout.end, workout.end)
+            }
+        }
+        return Group.allCases.map { group in
+            let target = somaGroup(group)
+            guard let total = month[group], total > 0 else { return SomaMuscleReading(group: target, state: .none) }
+            let ratio = (lingering[group] ?? 0) / (total / days)
+            let state: SomaMuscleState = ratio > 2 ? .depleted : ratio > 0.5 ? .fatigued : .recovered
+            let freshAt = ratio > 0.5 ? now.addingTimeInterval(halfLife * log2(ratio / 0.5)) : nil
+            return SomaMuscleReading(group: target, state: state, lastWorked: last[group], freshAt: freshAt)
+        }
+    }
+
+    /// The design system's name for a group.
+    static func somaGroup(_ group: Group) -> SomaMuscleGroup {
+        switch group {
+        case .legs: .legs
+        case .core: .core
+        case .back: .back
+        case .arms: .arms
+        case .shoulders: .shoulders
+        case .chest: .chest
+        }
+    }
+
     /// Which group a drawn muscle belongs to.
     static func group(of muscle: SomaMuscle) -> Group {
         switch muscle {
@@ -59,3 +97,24 @@ nonisolated enum MuscleFreshness {
         Dictionary(uniqueKeysWithValues: SomaMuscle.allCases.map { ($0, groups[group(of: $0)] ?? .none) })
     }
 }
+
+#if DEBUG
+extension MuscleFreshness {
+    /// The freshness card under `-pulse.preview YES`: a leg day this
+    /// morning, arms yesterday, the rest of the upper body rested, and no
+    /// back session in the month.
+    static var preview: [SomaMuscleReading] {
+        let now = Date()
+        return [
+            SomaMuscleReading(group: .chest, state: .recovered, lastWorked: now.addingTimeInterval(-4 * 86_400)),
+            SomaMuscleReading(group: .shoulders, state: .recovered, lastWorked: now.addingTimeInterval(-4 * 86_400)),
+            SomaMuscleReading(group: .arms, state: .fatigued, lastWorked: now.addingTimeInterval(-30 * 3_600),
+                              freshAt: now.addingTimeInterval(14 * 3_600)),
+            SomaMuscleReading(group: .core, state: .recovered, lastWorked: now.addingTimeInterval(-3 * 86_400)),
+            SomaMuscleReading(group: .back, state: .none),
+            SomaMuscleReading(group: .legs, state: .depleted, lastWorked: now.addingTimeInterval(-5 * 3_600),
+                              freshAt: now.addingTimeInterval(52 * 3_600)),
+        ]
+    }
+}
+#endif

@@ -103,7 +103,7 @@ struct PulseInsights: Equatable, Sendable {
     /// nights from the scores already read.
     static func read(health: HealthDashboard, now: Date, calendar: Calendar) async -> PulseInsights? {
         guard let source = await health.prepare(BodyBiomarkers.metrics) else { return nil }
-        let readings = await BodyBiomarkers.read(from: source, now: now, calendar: calendar)
+        let readings = await BodyBiomarkers.read(BodyBiomarkerSpec.interpreted, from: source, now: now, calendar: calendar)
         return make(readings: readings, sleepHours: health.scores?.detail.sleepHours ?? [], now: now, calendar: calendar)
     }
 }

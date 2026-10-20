@@ -115,8 +115,10 @@ struct EnvironmentLensContent: View {
 
 // MARK: - Light
 
-/// Today's minutes in daylight as a ring against the usual band, the usual
-/// and what is left of the sun beside it, and the sun's path under both.
+/// The sun's day where you are, as one curve from midnight to midnight:
+/// the day's arc over the horizon, sunrise and sunset with their times, the
+/// sun where it stands now and how long the daylight lasts. Under it, your
+/// own minutes in daylight today against your usual, and when you were out.
 private struct EnvironmentDaylightCard: View {
     let report: EnvironmentReport
     let sky: EnvironmentSky
@@ -125,40 +127,30 @@ private struct EnvironmentDaylightCard: View {
 
     var body: some View {
         let metrics = theme.metrics
-        let type = theme.typography
         let colors = theme.colors
-        let words = PulseWording(calendar: .current, locale: .current)
         let status = EnvironmentMeasure.daylight.status(report.daylight, report: report, colors: colors)
 
         EnvironmentCardFrame(title: "Daylight", status: status) {
-            HStack(alignment: .center, spacing: metrics.cardSpacing) {
-                SomaArcGauge(scale: .daylight, value: report.daylight, band: report.daylightUsual) {
-                    VStack(spacing: 0) {
-                        Text(verbatim: report.daylight.map(EnvironmentMeasure.daylight.format) ?? "-")
-                            .somaFont(type.metric)
-                            .foregroundStyle(colors.inkPrimary.color)
-                        Text("min")
-                            .somaFont(type.caption)
-                            .foregroundStyle(colors.inkSecondary.color)
-                    }
-                }
-                VStack(alignment: .leading, spacing: metrics.cardSpacing) {
-                    EnvironmentFigure(label: "Usual", value: report.daylightUsual.map {
-                        "\(Int($0.lowerBound)) to \(Int($0.upperBound))"
-                    }, unit: "min")
-                    EnvironmentFigure(label: "Sun left", value: sky.left, unit: nil)
-                    EnvironmentFigure(label: "Outside", value: report.firstOutside.map { first in
-                        report.lastOutside.map { "\(first) to \($0)" } ?? first
-                    }, unit: nil)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
+            SomaSunPath(rise: sky.day?.rise, set: sky.day?.set, now: sky.now)
+                .padding(.top, 2)
+            Rectangle()
+                .fill(colors.inkPrimary.color.opacity(metrics.hairlineOpacity))
+                .frame(height: 0.5)
+            HStack(alignment: .top, spacing: metrics.cardSpacing) {
+                EnvironmentFigure(label: "You, in daylight", value: report.daylight.map(EnvironmentMeasure.daylight.format), unit: "min")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                EnvironmentFigure(label: "Usual", value: report.daylightUsual.map {
+                    "\(Int($0.lowerBound)) to \(Int($0.upperBound))"
+                }, unit: "min")
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
-            SomaSunPath(progress: sky.progress, rise: sky.rise(words), set: sky.set(words))
-                .padding(.top, 4)
+            if let first = report.firstOutside {
+                Text("Outside \(report.lastOutside.map { "\(first) to \($0)" } ?? first)")
+                    .somaFont(theme.typography.caption)
+                    .foregroundStyle(colors.inkSecondary.color)
+            }
         }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Daylight")
-        .accessibilityValue(report.daylight.map { "\(Int($0.rounded())) minutes" } ?? "-")
+        .accessibilityElement(children: .combine)
     }
 }
 

@@ -8,10 +8,10 @@ import SomaUI
 import HealthScoring
 import HealthExportCore
 
-/// The energy bank: the battery at the level now, what sleep
-/// charged and the day drained, the day as one coloured curve over its
-/// night, workouts and peak window, the events that moved it, and the links
-/// to its history and how it is built.
+/// The energy bank: the level now in its charge cell, the day as a row of
+/// hours that filled or drew down with what sleep charged and the day
+/// drained, the events that moved it, and the links to its history and how
+/// it is built.
 ///
 /// Words are kept to labels and one short line of coaching; a missing value
 /// is a dash or an empty track.
@@ -53,23 +53,18 @@ struct EnergyBankColumn: View {
         Group {
             EnergyHero(page: page, versusYesterday: day.versusYesterday)
                 .padding(.top, theme.metrics.heroTopPadding)
-            HStack(spacing: theme.metrics.cardSpacing) {
-                SomaBankDelta(value: page.charged, title: "Charged")
-                SomaBankDelta(value: page.drained, title: "Drained")
-            }
-            if page.lead.value != nil {
-                EnergyCoaching(text: page.lead.headline, level: page.lead.value)
-            }
             SomaCard {
-                VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: theme.metrics.cardSpacing) {
                     HStack(alignment: .firstTextBaseline) {
                         Text("Today")
                             .somaFont(theme.typography.cardTitle)
                             .foregroundStyle(theme.colors.inkPrimary.color)
+                            .accessibilityAddTraits(.isHeader)
                         Spacer()
                         EnergyHigh(level: page.high, at: page.highAt)
                     }
-                    SomaBankDayChart(points: day.points, bands: day.bands, now: day.now, ticks: day.ticks)
+                    SomaEnergyTimeline(points: day.points, now: day.now, ticks: day.ticks,
+                                       charged: page.charged, drained: page.drained)
                 }
             }
             SomaCard {
@@ -93,7 +88,8 @@ struct EnergyBankColumn: View {
 
 // MARK: - Head
 
-/// The battery, then where sleep charged it to and when, and the morning's
+/// The level as the hero: the charge cell, the number and the one line of
+/// coaching, then where sleep charged it to and when, and the morning's
 /// charge against yesterday's.
 private struct EnergyHero: View {
     let page: ScorePages.Energy
@@ -105,23 +101,10 @@ private struct EnergyHero: View {
         let type = theme.typography
         let colors = theme.colors
 
-        VStack(spacing: 14) {
-            SomaBankBattery(level: page.lead.value)
-            HStack(spacing: 12) {
-                HStack(spacing: 4) {
-                    Image(systemName: "bolt.fill")
-                        .somaFont(type.caption)
-                        .foregroundStyle(colors.statusNormal.color)
-                    Text(verbatim: page.opened.map { "\($0)%" } ?? "-")
-                        .somaFont(type.captionValue)
-                        .foregroundStyle(colors.inkPrimary.color)
-                    if let at = page.openedAt {
-                        Text(verbatim: ScoreMath.clock(at))
-                            .somaFont(type.captionValue)
-                            .foregroundStyle(colors.inkSecondary.color)
-                    }
-                }
-                .accessibilityElement(children: .combine)
+        VStack(alignment: .leading, spacing: theme.metrics.leadSpacing) {
+            SomaEnergyGauge(level: page.lead.value, line: page.lead.value == nil ? nil : page.lead.headline)
+            HStack(spacing: theme.metrics.cardSpacing) {
+                EnergyFact(lead: "Woke with", level: page.opened, at: page.openedAt)
                 if let versusYesterday, versusYesterday != 0 {
                     HStack(spacing: theme.metrics.trendMarkSpacing) {
                         SomaTrendMark(trend: versusYesterday > 0 ? .up : .down)
@@ -136,29 +119,7 @@ private struct EnergyHero: View {
                 }
             }
         }
-        .frame(maxWidth: .infinity)
-    }
-}
-
-/// The one line of coaching, its glyph in the colour of the level.
-private struct EnergyCoaching: View {
-    let text: String
-    let level: Int?
-
-    @Environment(\.somaTheme) private var theme
-
-    var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "sparkles")
-                .somaFont(theme.typography.callout)
-                .foregroundStyle(SomaEnergyRamp.standard.value(at: Double(level ?? 0) / 100).color)
-            Text(verbatim: text)
-                .somaFont(theme.typography.callout)
-                .foregroundStyle(theme.colors.inkPrimary.color)
-                .lineLimit(2)
-        }
-        .frame(maxWidth: .infinity)
-        .accessibilityElement(children: .combine)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -167,25 +128,41 @@ private struct EnergyHigh: View {
     let level: Int?
     let at: Date?
 
+    var body: some View {
+        EnergyFact(lead: "Highest", level: level, at: at)
+    }
+}
+
+/// A level and when, said plainly: "Woke with 77 at 06:17", "Highest 77 at
+/// 14:05". The number in ink, the words around it quiet, a dash when there
+/// is no level, and no time when there is none.
+private struct EnergyFact: View {
+    let lead: LocalizedStringResource
+    let level: Int?
+    let at: Date?
+
     @Environment(\.somaTheme) private var theme
 
     var body: some View {
         let type = theme.typography
         let colors = theme.colors
-        HStack(spacing: 4) {
-            Text("High")
+        HStack(spacing: theme.metrics.energyFactSpacing) {
+            Text(lead)
                 .somaFont(type.caption)
                 .foregroundStyle(colors.inkSecondary.color)
             Text(verbatim: level.map(String.init) ?? "-")
                 .somaFont(type.captionValue)
-                .foregroundStyle(level.map { SomaEnergyRamp.standard.value(at: Double($0) / 100).color }
-                                 ?? colors.inkSecondary.color)
-            if let at {
+                .foregroundStyle(colors.inkPrimary.color)
+            if level != nil, let at {
+                Text("at")
+                    .somaFont(type.caption)
+                    .foregroundStyle(colors.inkSecondary.color)
                 Text(verbatim: ScoreMath.clock(at))
                     .somaFont(type.captionValue)
-                    .foregroundStyle(colors.inkSecondary.color)
+                    .foregroundStyle(colors.inkPrimary.color)
             }
         }
+        .lineLimit(1)
         .accessibilityElement(children: .combine)
     }
 }
@@ -230,8 +207,8 @@ private struct EnergyLinks: View {
 // MARK: - The day, worked out
 
 /// The page's day: the curve placed on a span that starts at last night's
-/// bedtime (or midnight) and ends at tonight's midnight, the bands behind
-/// it, the time axis, and the events that moved the bank.
+/// bedtime (or midnight) and ends at tonight's midnight, the time axis, and
+/// the events that moved the bank.
 nonisolated struct EnergyDay {
     struct Entry: Identifiable {
         var id: String { "\(title)\(span ?? "")" }
@@ -242,10 +219,9 @@ nonisolated struct EnergyDay {
         var points: Int?
     }
 
-    var points: [SomaBankDayChart.Point] = []
-    var bands: [SomaBankDayChart.Band] = []
+    var points: [SomaEnergyTimeline.Point] = []
     var now: Double?
-    var ticks: [SomaBankDayChart.Tick] = []
+    var ticks: [SomaEnergyTimeline.Tick] = []
     var entries: [Entry] = []
     var versusYesterday: Int?
     var peakDetail: String?
@@ -270,7 +246,7 @@ nonisolated struct EnergyDay {
             return point.level
         }
 
-        points = curve.map { SomaBankDayChart.Point(x: x($0.date), level: $0.level) }
+        points = curve.map { SomaEnergyTimeline.Point(x: x($0.date), level: $0.level) }
         if let last = curve.last { now = x(last.date) }
 
         if from < dayStart {
@@ -283,15 +259,10 @@ nonisolated struct EnergyDay {
             ticks.append(.init(x: x(date), label: ScoreMath.clock(date, calendar: calendar)))
         }
 
-        if let night, night.end > from {
-            bands.append(.init(mark: .sleep, start: x(max(night.start, from)), end: x(night.end), symbol: "moon.stars.fill"))
-        }
-
         let workouts = (inputs?.workouts ?? []).filter { $0.end > from && $0.start < dayEnd }
         var moved: [Entry] = []
         for workout in workouts {
             let activity = FitnessActivities.activity(Int(workout.value))
-            bands.append(.init(mark: .workout, start: x(max(workout.start, from)), end: x(workout.end), symbol: activity.symbol))
             let delta: Int? = {
                 guard let a = level(near: workout.start), let b = level(near: workout.end) else { return nil }
                 return Int((b - a).rounded())
@@ -302,8 +273,6 @@ nonisolated struct EnergyDay {
         }
 
         if let peak = ScorePages.peak(scores, inputs, calendar: calendar).day, let deep = peak.deepWork {
-            bands.append(.init(mark: .peak, start: x(dayStart.addingTimeInterval(deep.start * 3600)),
-                               end: x(dayStart.addingTimeInterval(deep.end * 3600)), symbol: "sparkles"))
             peakDetail = "\(ScoreMath.clock(deep.start)) to \(ScoreMath.clock(deep.end))"
         }
 
@@ -384,7 +353,7 @@ private struct EnergyAverage: View {
         VStack(spacing: 4) {
             Text(verbatim: value.map { "\(Int($0.rounded()))" } ?? "-")
                 .somaFont(theme.typography.bankDelta)
-                .foregroundStyle(value.map { SomaEnergyRamp.standard.value(at: $0 / 100).color } ?? colors.inkSecondary.color)
+                .foregroundStyle(value.map { SomaEnergyRamp.calm.value(at: $0 / 100).color } ?? colors.inkSecondary.color)
             Text(title)
                 .somaFont(theme.typography.caption)
                 .foregroundStyle(colors.inkSecondary.color)

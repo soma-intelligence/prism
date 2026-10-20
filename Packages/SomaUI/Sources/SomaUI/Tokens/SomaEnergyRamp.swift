@@ -40,6 +40,33 @@ public struct SomaEnergyRamp: Sendable, Equatable {
         Stop(location: 1.00, value: SomaColorValue(light: 0x24A148, dark: 0x4CD964)),
     ])
 
+    /// Empty to full in calm, natural tones: clay at the floor, then sand,
+    /// sage and a deep sage at the top. The energy bank reads its level off
+    /// this one; the bright ramp above stays for the scales that need to
+    /// warn.
+    public static let calm = SomaEnergyRamp(stops: [
+        Stop(location: 0.00, value: SomaColorValue(light: 0xC0694A, dark: 0xE08A6A)),
+        Stop(location: 0.35, value: SomaColorValue(light: 0xC99448, dark: 0xE3B46C)),
+        Stop(location: 0.65, value: SomaColorValue(light: 0x8C9F5C, dark: 0xADC27E)),
+        Stop(location: 1.00, value: SomaColorValue(light: 0x4E957B, dark: 0x72BE9F)),
+    ])
+
+    /// The level as one of three plain tones, never a blend between them:
+    /// clay under a third, sand to two thirds, sage above. A fill reads
+    /// cleaner in a tone than in the olive a sand and a sage mix to.
+    public static func tone(at share: Double) -> SomaColorValue {
+        switch share {
+        case ..<0.34: SomaColorValue(light: 0xC0694A, dark: 0xE08A6A)
+        case ..<0.67: SomaColorValue(light: 0xCF9E5A, dark: 0xE3B46C)
+        default: charge
+        }
+    }
+
+    /// The bank filling: sleep and rest putting charge back.
+    public static let charge = SomaColorValue(light: 0x4E957B, dark: 0x72BE9F)
+    /// The bank emptying: the day drawing on it.
+    public static let drain = SomaColorValue(light: 0xD3A673, dark: 0xC99A66)
+
     /// The colour at `share` of a full bank, `share` in 0...1, mixed between
     /// the two stops either side, in each appearance.
     public func value(at share: Double) -> SomaColorValue {

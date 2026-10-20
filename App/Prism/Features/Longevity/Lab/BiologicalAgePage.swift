@@ -180,13 +180,7 @@ struct ConfidenceSheet: View {
                     band: result.map { band($0.estimatedAge, spread: $0.confidence.spread) },
                     position: result.map { position($0.estimatedAge) }
                 ),
-                LabBandItem(id: "fitness", title: "Fitness age", detail: "from a Soma visit, none yet", value: nil),
-                LabBandItem(id: "lean", title: "Lean mass", detail: "from a Soma visit, none yet", value: nil),
             ])
-            SomaChartCard(eyebrow: "Fitness age", value: nil, unit: "give or take",
-                          note: "Your first visit draws this, and every visit narrows the band.") {
-                BodyFitnessAgeFrame(age: person.age)
-            }
         }
     }
 

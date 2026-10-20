@@ -80,30 +80,57 @@ enum ArticleTopic: String, CaseIterable, Codable, Sendable {
         }
     }
 
-    /// The Health hue the topic is painted in: the same colours Apple
-    /// Health gives these categories, so a sleep piece reads as sleep.
-    var hue: SomaHealthHue {
+    /// The calm tone the topic is painted in: the muted family Track and
+    /// Today use, so the library reads as part of the same app rather than
+    /// as a wall of Health's saturated category colours.
+    var tone: SomaTrackTone {
         switch self {
-        case .sleep: .sleep
-        case .heart: .heart
-        case .recovery: .respiratory
-        case .movement: .activity
-        case .nutrition: .nutrition
-        case .mind: .mind
-        case .longevity: .symptoms
+        case .sleep: .dusk
+        case .heart: .rose
+        case .recovery: .tide
+        case .movement: .moss
+        case .nutrition: .sand
+        case .mind: .sage
+        case .longevity: .clay
         }
     }
 
-    /// The glyph on a generated cover.
-    var symbol: String {
+    /// The line glyph on a generated cover, from the aspect and Track
+    /// families so a sleep piece wears the same crescent as Today's sleep.
+    var mark: SomaArticleCover.Mark {
         switch self {
-        case .sleep: "moon.stars.fill"
-        case .heart: "heart.fill"
-        case .recovery: "bolt.heart.fill"
-        case .movement: "figure.run"
-        case .nutrition: "leaf.fill"
-        case .mind: "wind"
-        case .longevity: "infinity"
+        case .sleep: .aspect(.sleep)
+        case .heart: .aspect(.heart)
+        case .recovery: .track(.hrv)
+        case .movement: .aspect(.activity)
+        case .nutrition: .aspect(.gut)
+        case .mind: .aspect(.mind)
+        case .longevity: .aspect(.body)
+        }
+    }
+
+    /// The topic as a person's own: "your sleep", for a reason line.
+    var yours: String {
+        switch self {
+        case .sleep: "your sleep"
+        case .heart: "your heart"
+        case .recovery: "your recovery"
+        case .movement: "your activity"
+        case .nutrition: "what you eat"
+        case .mind: "your mind"
+        case .longevity: "your body"
+        }
+    }
+
+    /// The topic an aspect of the person reads under.
+    init(aspect: SomaAspect) {
+        switch aspect {
+        case .sleep: self = .sleep
+        case .mind: self = .mind
+        case .heart: self = .heart
+        case .activity: self = .movement
+        case .gut: self = .nutrition
+        case .body: self = .longevity
         }
     }
 }

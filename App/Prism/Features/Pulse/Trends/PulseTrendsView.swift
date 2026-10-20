@@ -9,11 +9,12 @@ import SomaUI
 /// The Pulse tab's Trends page: cause and effect on the person's own days.
 ///
 /// Each card is one link (yesterday's strain and today's recovery, a night
-/// after alcohol and its sleep score), strongest first, the effect large and
-/// the high and low days drawn beside it. A link that has too few days, or
-/// whose difference sits inside the outcome's day to day noise, is never
-/// drawn: it is named in one "Needs more days" row at the foot (owner,
-/// 2026-10-03: link cause and effect, visuals first, fewer words).
+/// after alcohol and its sleep score), strongest first, said as a plain
+/// headline with one number under it and the two sides' averages on one
+/// track. A link that has too few days, or whose difference sits inside the
+/// outcome's day to day noise, is never drawn: it is named in one "Still
+/// learning" row at the foot (owner, 2026-10-03: link cause and effect,
+/// visuals first, fewer words; 2026-10-19: less scientific).
 ///
 /// Read from Health, the score engine and the Journal when the part opens and
 /// on pull to refresh.
@@ -81,11 +82,10 @@ struct PulseLinksList: View {
             ForEach(links.shown) { link in
                 Button { open = link } label: {
                     SomaLinkCard(
-                        driver: link.driver.name,
-                        outcome: link.outcome.name,
-                        value: link.valueText,
-                        unit: link.outcome.unit,
-                        caption: link.caption,
+                        headline: link.headline,
+                        detail: link.plainDetail,
+                        highLabel: link.driver.sideLabels.high,
+                        lowLabel: link.driver.sideLabels.low,
                         tone: link.tone,
                         high: link.result.high.map { $0 * link.outcome.scale },
                         low: link.result.low.map { $0 * link.outcome.scale }
@@ -96,8 +96,8 @@ struct PulseLinksList: View {
                 .accessibilityHint(Text("Opens the details"))
             }
             if !links.pending.isEmpty {
-                SomaLinkPendingRow(title: "Needs more days", names: links.pendingNames) { name in
-                    open = links.pending.first { $0.title == name }
+                SomaLinkPendingRow(title: "Still learning", names: links.pendingNames) { name in
+                    open = links.pending.first { $0.plainTitle == name }
                 }
             }
         }

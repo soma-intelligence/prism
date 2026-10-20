@@ -117,6 +117,15 @@ public enum SomaPreviewSamples {
     /// Today's energy level, as a share of the bank.
     public static let energyLevel = 0.42
 
+    /// A day of the bank on a span from last night's bedtime to midnight:
+    /// charged through the night, drawn down through the day, read every
+    /// half hour up to now.
+    public static let energyDay: [SomaEnergyTimeline.Point] = (0...33).map { index in
+        let x = Double(index) / 48
+        let level = x < 0.27 ? 22 + x / 0.27 * 36 : 58 - (x - 0.27) * 37
+        return SomaEnergyTimeline.Point(x: x, level: level)
+    }
+
     /// A record's grade on each step of the four mark scale, best first.
     public static let qualityGrades = [4, 3, 2, 1, 0]
 
@@ -154,7 +163,7 @@ public enum SomaPreviewSamples {
         AspectCard(aspect: .heart, value: "54", unit: "bpm resting",
                    summary: "4 below your usual, lowest at 03:40 last night."),
         AspectCard(aspect: .body, value: "41", unit: "fitness age, ± 3",
-                   summary: "From 6 Soma visits. You are 46."),
+                   summary: "From your watch's VO2 max. You are 46."),
     ]
 
     /// A fitness age on its track: the estimate, the span it may be off by,

@@ -10,68 +10,10 @@ import SomaUI
 // the theme; a plot with nothing to show still draws its frame, so the card
 // keeps its shape and says what fills it.
 
-// MARK: - Fitness age, before the first visit
+// MARK: - Body map
 
-/// The frame the fitness age plot draws into: its gridlines and your age as a
-/// dashed line to read the estimates against. The estimates come from pod
-/// visits, so until the first one the frame stays empty.
-struct BodyFitnessAgeFrame: View {
-    let age: Int?
-
-    @Environment(\.somaTheme) private var theme
-
-    var body: some View {
-        let metrics = theme.metrics
-        let type = theme.typography
-        let colors = theme.colors
-        let hairline = colors.inkPrimary.color.opacity(metrics.hairlineOpacity)
-
-        VStack(spacing: 8) {
-            GeometryReader { proxy in
-                let size = proxy.size
-                ZStack(alignment: .topLeading) {
-                    Path { path in
-                        for share in [0.12, 0.88] {
-                            path.move(to: CGPoint(x: 0, y: size.height * share))
-                            path.addLine(to: CGPoint(x: size.width, y: size.height * share))
-                        }
-                    }
-                    .stroke(hairline, lineWidth: 1)
-
-                    Path { path in
-                        path.move(to: CGPoint(x: 0, y: size.height * 0.4))
-                        path.addLine(to: CGPoint(x: size.width, y: size.height * 0.4))
-                    }
-                    .stroke(colors.inkSecondary.color, style: StrokeStyle(lineWidth: 1, dash: [3, 4]))
-
-                    Text(age.map { "Your age \($0)" } ?? "Your age -")
-                        .somaFont(type.caption)
-                        .foregroundStyle(colors.inkSecondary.color)
-                        .padding(.bottom, 4)
-                        .frame(width: size.width, alignment: .trailing)
-                        .offset(y: size.height * 0.4 - 20)
-                }
-            }
-            .frame(height: metrics.bodyPlotHeight - 24)
-
-            HStack {
-                ForEach(0..<6, id: \.self) { _ in
-                    Text(verbatim: "-")
-                        .frame(maxWidth: .infinity)
-                }
-            }
-            .somaFont(type.caption)
-            .foregroundStyle(colors.inkSecondary.color)
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text("Fitness age plot, empty until a Soma visit"))
-    }
-}
-
-// MARK: - Body map, before the first visit
-
-/// A figure drawn from plain shapes, with the five regions the pod reads
-/// labelled around it. Every change is a dash until a visit measures one.
+/// A figure drawn from plain shapes, with five regions labelled around it,
+/// each with its change or a dash.
 struct BodySilhouette: View {
     /// The change per region, in the order right arm, left arm, trunk, right
     /// leg, left leg; nil for a region not measured.
@@ -122,7 +64,7 @@ struct BodySilhouette: View {
         }
         .frame(height: metrics.bodyMapHeight)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text("Body map, empty until a Soma visit"))
+        .accessibilityLabel(Text("Body map by region"))
     }
 
     private func label(_ name: String, _ change: String?, trailingAt x: CGFloat, y: CGFloat) -> some View {
@@ -138,58 +80,6 @@ struct BodySilhouette: View {
             .foregroundStyle(theme.colors.inkSecondary.color)
             .fixedSize()
             .offset(x: x, y: y - 8)
-    }
-}
-
-// MARK: - Fitness age waterfall, before the first visit
-
-/// Where a waterfall from the fitness age before to the one now would stand:
-/// the two ends as empty columns and the run between them dashed.
-struct BodyEmptyWaterfall: View {
-    @Environment(\.somaTheme) private var theme
-
-    var body: some View {
-        let metrics = theme.metrics
-        let type = theme.typography
-        let colors = theme.colors
-        let hairline = colors.inkPrimary.color.opacity(metrics.hairlineOpacity)
-
-        VStack(spacing: 6) {
-            GeometryReader { proxy in
-                let size = proxy.size
-                let column: CGFloat = 38
-                ZStack(alignment: .topLeading) {
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(theme.aspects[.body].identity.color.opacity(metrics.chartContextOpacity * 0.5))
-                        .frame(width: column, height: size.height)
-                    RoundedRectangle(cornerRadius: 2)
-                        .strokeBorder(colors.inkSecondary.color.opacity(0.6), style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
-                        .frame(width: column, height: size.height * 0.6)
-                        .offset(x: size.width - column, y: size.height * 0.4)
-                    Path { path in
-                        path.move(to: CGPoint(x: column, y: 0))
-                        path.addLine(to: CGPoint(x: size.width - column, y: size.height * 0.4))
-                    }
-                    .stroke(colors.inkSecondary.color.opacity(0.6), style: StrokeStyle(lineWidth: 1, dash: [3, 4]))
-                    Path { path in
-                        path.move(to: CGPoint(x: 0, y: size.height))
-                        path.addLine(to: CGPoint(x: size.width, y: size.height))
-                    }
-                    .stroke(hairline, lineWidth: 1)
-                }
-            }
-            .frame(height: metrics.bodyPlotHeight - 30)
-
-            HStack {
-                Text("Before -")
-                Spacer()
-                Text("Now -")
-            }
-            .somaFont(type.caption)
-            .foregroundStyle(colors.inkSecondary.color)
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text("Fitness age waterfall, empty until a Soma visit"))
     }
 }
 
@@ -351,9 +241,7 @@ struct BodyDotColumns: View {
 #Preview("Body charts") {
     ScrollView {
         VStack(spacing: 24) {
-            BodyFitnessAgeFrame(age: 46)
             BodySilhouette()
-            BodyEmptyWaterfall()
             BodyBarRow(title: "Zone 2", subtitle: "Aerobic", fraction: 0.2, value: "38 min", aspect: .heart, isHighlighted: true, usual: 0.4...0.7)
             BodyLine(values: [120, 140, 150, 146, 152, 160, 158, 166]).frame(height: 90)
             BodyDotColumns(counts: [2, 2, 1, 2, 3, 2, 2, 2]).frame(height: 88)

@@ -78,22 +78,31 @@ struct MindMoodDay: Equatable, Sendable, Identifiable {
     var id: Date { day }
 }
 
-/// The colour of a feeling: violet for very unpleasant, through blue, to
-/// teal, to amber for very pleasant, the way State of Mind tints its scale.
+/// The colour of a feeling, on the calm ramp the mood faces wear: clay for
+/// very unpleasant, sand through the middle, sage for very pleasant.
 enum MindMoodPalette {
-    private static let stops: [(Double, SomaHealthHue)] = [
-        (-1, .symptoms), (-0.5, .cycle), (0, .hearing), (0.5, .mind), (1, .mobility),
-    ]
-
     static func color(_ valence: Double) -> Color {
-        let value = min(max(valence, -1), 1)
-        for index in 1..<stops.count where value <= stops[index].0 {
-            let (low, from) = stops[index - 1]
-            let (high, to) = stops[index]
-            let share = (value - low) / (high - low)
-            return from.color.mix(with: to.color, by: share)
-        }
-        return stops[stops.count - 1].1.color
+        SomaEnergyRamp.calm.value(at: (min(max(valence, -1), 1) + 1) / 2).color
+    }
+}
+
+/// The five faces of the quick mood log against Mind's seven stops: the same
+/// steps the evening question writes to the Journal.
+nonisolated enum MindQuickMood {
+    /// The stop a face logs: rough 0, low 2, okay 3, good 4, great 6.
+    static func stop(_ mood: SomaMood) -> Int {
+        CheckInEngine.feelingStop(fromStep: mood.rawValue + 1)
+    }
+
+    /// The face a logged valence reads as, the nearest of the five.
+    static func mood(valence: Double) -> SomaMood {
+        let stop = MindMoodEntry.stop(valence: valence)
+        return SomaMood.allCases.min { abs(Self.stop($0) - stop) < abs(Self.stop($1) - stop) } ?? .okay
+    }
+
+    /// Today's latest mood, for the line under the faces.
+    static func latestToday(_ entries: [MindMoodEntry], now: Date, calendar: Calendar) -> MindMoodEntry? {
+        entries.filter { calendar.isDate($0.date, inSameDayAs: now) }.max { $0.date < $1.date }
     }
 }
 

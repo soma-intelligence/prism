@@ -164,6 +164,9 @@ public struct SomaMetrics: Sendable, Equatable {
     public var orbDiameter: CGFloat
     /// Diameter of the small orb that leads a row.
     public var miniOrbDiameter: CGFloat
+    /// How far a finger can travel on the orb before the press lets go: past
+    /// it the touch is a scroll, not a press.
+    public var orbPressReach: CGFloat
     /// Room between the top bar and the orb, where its halo spreads.
     public var heroTopPadding: CGFloat
     /// Gap between the orb, its page dots and the hairline under them.
@@ -315,6 +318,7 @@ public struct SomaMetrics: Sendable, Equatable {
         cameraBandOpacity: Double = 0.55,
         orbDiameter: CGFloat = 230,
         miniOrbDiameter: CGFloat = 40,
+        orbPressReach: CGFloat = 10,
         heroTopPadding: CGFloat = 20,
         heroSpacing: CGFloat = 16,
         leadSpacing: CGFloat = 24,
@@ -424,6 +428,7 @@ public struct SomaMetrics: Sendable, Equatable {
         self.cameraBandOpacity = cameraBandOpacity
         self.orbDiameter = orbDiameter
         self.miniOrbDiameter = miniOrbDiameter
+        self.orbPressReach = orbPressReach
         self.heroTopPadding = heroTopPadding
         self.heroSpacing = heroSpacing
         self.leadSpacing = leadSpacing

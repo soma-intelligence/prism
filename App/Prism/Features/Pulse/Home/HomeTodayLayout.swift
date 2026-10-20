@@ -34,7 +34,7 @@ enum HomeTodayCard: String, CaseIterable, Codable, Identifiable, Sendable {
         case .tonight: "Soma’s suggestions for the evening"
         case .energy: "The day’s charge, 0 to 100"
         case .today: "The day as it happened"
-        case .sleep: "Last night and the week"
+        case .sleep: "Last night, stage by stage"
         case .heart: "Resting rate against your usual"
         case .body: "Fitness age and body composition"
         case .nutrition: "Meals, water and caffeine you log"
@@ -49,12 +49,12 @@ enum HomeTodayCard: String, CaseIterable, Codable, Identifiable, Sendable {
 /// a hidden card leaves the page and never the data.
 struct HomeTodayLayout: Equatable, Sendable {
     static let key = "pulse.todayLayout"
-    /// Soma's order. Sleep, Heart and Body start hidden (owner, 2026-10-03):
-    /// the scores and "What moved" already show their numbers against the
-    /// usual, and Body's fitness age waits on the pod.
+    /// Soma's order. Last night's sleep shows, drawn as its stages (owner,
+    /// 2026-10-19); Heart and Body start hidden: the scores and "What moved"
+    /// already show their numbers against the usual.
     static let standard = HomeTodayLayout(
-        shown: [.tonight, .energy, .today],
-        hidden: [.sleep, .heart, .body, .nutrition, .stand, .cycle, .environment]
+        shown: [.tonight, .sleep, .energy, .today],
+        hidden: [.heart, .body, .nutrition, .stand, .cycle, .environment]
     )
 
     var shown: [HomeTodayCard]

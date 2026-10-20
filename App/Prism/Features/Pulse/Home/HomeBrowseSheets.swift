@@ -145,7 +145,7 @@ struct HomeQuickAddSheet: View {
 // MARK: - All categories
 
 /// Every category of data, from Today's foot: a search over the 192 measures,
-/// the six aspects with today's scores, then cycle, environment and the
+/// the six aspects with their glyphs and today's scores, then cycle, environment and the
 /// medical card.
 struct HomeAllCategoriesSheet: View {
     @Environment(HealthDashboard.self) private var health
@@ -177,13 +177,14 @@ struct HomeAllCategoriesSheet: View {
                             if index > 0 { HomeHairline() }
                             NavigationLink(value: item.route) {
                                 HStack(spacing: theme.metrics.moveRowGap) {
-                                    PulseMiniOrb(aspect: item.aspect, diameter: theme.metrics.miniOrbDiameter)
+                                    SomaAspectGlyph(item.aspect, style: .badge)
                                     HomeValueRow(name: item.title, detail: item.detail, value: item.score.map(String.init))
                                     Image(systemName: "chevron.right")
                                         .foregroundStyle(theme.colors.inkSecondary.color)
                                         .accessibilityHidden(true)
                                 }
                                 .contentShape(.rect)
+                                .zoomSource(item.route)
                             }
                             .buttonStyle(.plain)
                         }
@@ -227,13 +228,16 @@ struct HomeAllCategoriesSheet: View {
             HStack(spacing: theme.metrics.moveRowGap) {
                 Image(systemName: symbol)
                     .foregroundStyle(theme.colors.inkSecondary.color)
-                    .frame(width: theme.metrics.miniOrbDiameter)
+                    .frame(width: theme.metrics.aspectBadgeSide, height: theme.metrics.aspectBadgeSide)
+                    .background(RoundedRectangle(cornerRadius: theme.metrics.aspectBadgeCornerRadius, style: .continuous)
+                        .fill(theme.colors.surfaceRecessed.color))
                 HomeValueRow(name: title, detail: detail, value: nil)
                 Image(systemName: "chevron.right")
                     .foregroundStyle(theme.colors.inkSecondary.color)
                     .accessibilityHidden(true)
             }
             .contentShape(.rect)
+            .zoomSource(value)
         }
         .buttonStyle(.plain)
     }

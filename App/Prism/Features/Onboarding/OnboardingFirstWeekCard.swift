@@ -16,7 +16,6 @@ struct OnboardingFirstWeekCard: View {
     @Environment(HealthDashboard.self) private var health
     @Environment(AppRouter.self) private var router
     @Environment(\.somaTheme) private var theme
-    @State private var isBooking = false
 
     var body: some View {
         if let nights = health.scores?.nightsRecorded {
@@ -70,29 +69,7 @@ struct OnboardingFirstWeekCard: View {
                     .contentShape(.rect)
                 }
                 .buttonStyle(.somaGlassPressDim)
-                divider
-                row(title: "A Soma visit", detail: "Optional, 20 minutes at a Soma studio") {
-                    Button {
-                        isBooking = true
-                    } label: {
-                        Text("Book")
-                            .somaFont(type.callout)
-                            .foregroundStyle(colors.onAccent.color)
-                            .padding(.horizontal, metrics.cardPadding)
-                            .frame(minHeight: metrics.minimumTapTarget * 0.75)
-                            .background(Capsule().fill(colors.accent.color))
-                            .contentShape(.capsule)
-                    }
-                    .buttonStyle(.somaGlassPress)
-                }
             }
-        }
-        .sheet(isPresented: $isBooking) {
-            NotWiredPage(
-                eyebrow: "A Soma visit",
-                title: "Book a visit",
-                message: "Booking a Soma visit isn’t connected yet. When it is, this is where you pick a time."
-            )
         }
     }
 

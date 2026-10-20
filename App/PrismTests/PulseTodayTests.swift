@@ -268,10 +268,16 @@ struct PulseTodayTests {
         #expect(today.events.map(\.title) == ["Walk", "Gym", "Now"])
     }
 
-    @Test("The body card says what a missing fitness age needs, and the age when Health has it")
+    @Test("The body card reads fitness age off the watch's VO2 max, or says it needs one")
     func bodyCard() {
-        #expect(page(PulseInputs(now: at(9), age: 46)).bodyCard.summary == "No fitness age yet. It comes from a Soma visit. You are 46.")
-        #expect(page(PulseInputs(now: at(9))).bodyCard.summary == "No fitness age yet. It comes from a Soma visit.")
+        let missing = page(PulseInputs(now: at(9), age: 46)).bodyCard
+        #expect(missing.value == nil)
+        #expect(missing.summary == "Fitness age needs a VO2 max from your watch.")
+        let read = page(PulseInputs(now: at(9), age: 46, vo2Max: 48, sex: .male)).bodyCard
+        #expect(read.value == "25")
+        #expect(read.summary == "21 under your age, read off your watch’s VO2 max.")
+        #expect(page(PulseInputs(now: at(9), vo2Max: 48, sex: .male)).bodyCard.summary == "Read off your watch’s VO2 max.")
+        #expect(!missing.summary.contains("visit"))
     }
 
     // MARK: - Done moves

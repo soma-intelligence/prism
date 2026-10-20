@@ -5,23 +5,22 @@
 
 import SwiftUI
 
-/// A filter capsule for one topic, led by a dot in the topic's Health hue.
+/// A filter capsule for one topic, led by a dot in the topic's calm tone.
 ///
-/// Chosen, the capsule fills with the hue and its label turns to the near
-/// black that Health sets on its tiles, which clears 4.5:1 on every hue. A
-/// chip without a hue is "All": chosen, it takes the accent, the way the
-/// rest of the app marks a selection.
+/// Chosen, any chip takes the accent the way the rest of the app marks a
+/// selection, and its dot steps aside: the tone names the topic, the accent
+/// says it is chosen. A chip without a tone is "All".
 public struct SomaTopicChip: View {
     private let title: String
-    private let hue: SomaHealthHue?
+    private let tone: SomaTrackTone?
     private let isOn: Bool
     private let action: () -> Void
 
     @Environment(\.somaTheme) private var theme
 
-    public init(_ title: String, hue: SomaHealthHue?, isOn: Bool, action: @escaping () -> Void) {
+    public init(_ title: String, tone: SomaTrackTone?, isOn: Bool, action: @escaping () -> Void) {
         self.title = title
-        self.hue = hue
+        self.tone = tone
         self.isOn = isOn
         self.action = action
     }
@@ -31,9 +30,9 @@ public struct SomaTopicChip: View {
 
         Button(action: action) {
             HStack(spacing: metrics.articleChipDot * 0.75) {
-                if let hue, !isOn {
+                if let tone, !isOn {
                     Circle()
-                        .fill(hue.color)
+                        .fill(tone.color)
                         .frame(width: metrics.articleChipDot, height: metrics.articleChipDot)
                 }
                 Text(title)
@@ -53,23 +52,22 @@ public struct SomaTopicChip: View {
 
     private var ink: Color {
         let colors = theme.colors
-        guard isOn else { return colors.inkPrimary.color }
-        return hue == nil ? colors.onAccent.color : SomaHealthHue.ink.color
+        return isOn ? colors.onAccent.color : colors.inkPrimary.color
     }
 
     private var fill: Color {
         let colors = theme.colors
         guard isOn else { return colors.surface.color }
-        return hue?.color ?? colors.accent.color
+        return colors.accent.color
     }
 }
 
 #Preview("Topic chips") {
     HStack(spacing: 8) {
-        SomaTopicChip("All", hue: nil, isOn: true) {}
-        SomaTopicChip("Sleep", hue: .sleep, isOn: false) {}
-        SomaTopicChip("Heart", hue: .heart, isOn: true) {}
-        SomaTopicChip("Mind", hue: .mind, isOn: false) {}
+        SomaTopicChip("All", tone: nil, isOn: false) {}
+        SomaTopicChip("Sleep", tone: .dusk, isOn: false) {}
+        SomaTopicChip("Heart", tone: .rose, isOn: true) {}
+        SomaTopicChip("Mind", tone: .sage, isOn: false) {}
     }
     .padding()
 }

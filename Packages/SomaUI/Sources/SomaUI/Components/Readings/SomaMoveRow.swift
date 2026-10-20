@@ -53,7 +53,7 @@ public struct SomaCardHeader: View {
     }
 }
 
-/// One next move: a small glyph in the colour of the aspect it serves, the
+/// One next move: the aspect's glyph in its colour, the
 /// move itself as the hero (a time set large under the few words that lead
 /// to it: "In bed by" over "11:00 PM"), and a slim check that fills with the
 /// aspect's colour once it is done.
@@ -87,14 +87,10 @@ public struct SomaMoveRow: View {
         let metrics = theme.metrics
         let type = theme.typography
         let colors = theme.colors
-        let hue = theme.aspects[aspect].identity.color
 
         HStack(alignment: .center, spacing: metrics.moveRowGap) {
-            Image(systemName: aspect.moveSymbol)
-                .somaFont(type.callout)
-                .foregroundStyle(hue)
+            SomaAspectGlyph(aspect)
                 .frame(width: metrics.checkDiameter)
-                .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 0) {
                 if let lead {
@@ -126,20 +122,6 @@ public struct SomaMoveRow: View {
             .accessibilityLabel(Text([lead, title].compactMap { $0 }.joined(separator: " ")))
             .accessibilityValue(Text(isDone ? "Done" : "Not done"))
             .accessibilityHint(Text(isDone ? "Marks it not done." : "Marks it done."))
-        }
-    }
-}
-
-extension SomaAspect {
-    /// The small glyph a move for this aspect wears.
-    var moveSymbol: String {
-        switch self {
-        case .body: "figure.stand"
-        case .mind: "brain.head.profile"
-        case .sleep: "moon.fill"
-        case .heart: "heart.fill"
-        case .gut: "leaf.fill"
-        case .activity: "figure.walk"
         }
     }
 }

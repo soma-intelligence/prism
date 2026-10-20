@@ -65,7 +65,7 @@ struct BodyStrength: Equatable {
         var page = BodyStrength(
             eyebrow: "Last eight weeks",
             headline: "Strength, week by week.",
-            reason: "Nothing here yet. Strength workouts from your watch fill the sessions below, and a Soma visit adds grip and lean mass by region.",
+            reason: "Nothing here yet. Strength workouts from your watch fill the sessions below.",
             leanMass: BodyMath.format(lean?.latest, decimals: 1, locale: locale),
             leanTrend: BodyMath.trend(lean?.delta, tolerance: 0.1),
             sessionsPerWeek: BodyMath.formatCount(average, locale: locale),

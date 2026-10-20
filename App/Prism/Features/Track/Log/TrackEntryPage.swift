@@ -46,13 +46,17 @@ struct TrackEntryPage<Content: View, Footer: View, Principal: View>: View {
         .scrollDisabled(!scrolls)
         .scrollBounceBehavior(.basedOnSize)
         .safeAreaInset(edge: .bottom) {
-            footer
-                .padding(.horizontal, metrics.pagePadding)
-                .padding(.top, metrics.cardSpacing)
-                .padding(.bottom, metrics.cardSpacing)
-                .frame(maxWidth: metrics.pageMaxWidth)
-                .frame(maxWidth: .infinity)
-                .background(colors.canvas.color.ignoresSafeArea(edges: .bottom))
+            // A page with no footer (the evening) gets no inset at all: an
+            // empty footer still laid its canvas over the whole page.
+            if Footer.self != EmptyView.self {
+                footer
+                    .padding(.horizontal, metrics.pagePadding)
+                    .padding(.top, metrics.cardSpacing)
+                    .padding(.bottom, metrics.cardSpacing)
+                    .frame(maxWidth: metrics.pageMaxWidth)
+                    .frame(maxWidth: .infinity)
+                    .background(colors.canvas.color.ignoresSafeArea(edges: .bottom))
+            }
         }
         .background(colors.canvas.color.ignoresSafeArea())
         .navigationTitle(title)

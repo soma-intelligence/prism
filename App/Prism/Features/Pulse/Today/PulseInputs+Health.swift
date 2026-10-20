@@ -19,6 +19,7 @@ extension PulseInputs {
         static let workout = "HKWorkoutTypeIdentifier"
         static let mindful = "HKCategoryTypeIdentifierMindfulSession"
         static let dateOfBirth = "HKCharacteristicTypeIdentifierDateOfBirth"
+        static let vo2Max = "HKQuantityTypeIdentifierVO2Max"
     }
 
     /// Everything the Today page needs, read from `source` at once.
@@ -64,6 +65,17 @@ extension PulseInputs {
             return found
         }
 
+        var vo2Max: Double?
+        if let metric = HealthMetricCatalog.metric(for: Metric.vo2Max),
+           let reading = try? await source.latest(metric),
+           reading.end >= (calendar.date(byAdding: .day, value: -BodyMetric.trendLookbackDays, to: now) ?? now) {
+            vo2Max = reading.value
+        }
+        let profile = SomaProfileStore.shared.profile
+        let sex = BodyFitnessAge.Sex(
+            CardiometabolicProfileStore.shared.profile.sex ?? profile.sex.flatMap(LabSex.init) ?? LabHealth.biologicalSex()
+        )
+
         var age: Int?
         if let birth = HealthMetricCatalog.metric(for: Metric.dateOfBirth),
            let reading = try? await source.latest(birth) {
@@ -89,7 +101,9 @@ extension PulseInputs {
             workouts: readWorkouts,
             workoutSteps: workoutSteps,
             mindful: await mindful,
-            age: age
+            age: age ?? profile.age(on: now, calendar: calendar),
+            vo2Max: vo2Max,
+            sex: sex
         )
     }
 }

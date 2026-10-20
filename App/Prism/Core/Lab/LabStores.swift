@@ -175,9 +175,11 @@ nonisolated struct BodyMeasurementEntry: Codable, Identifiable, Sendable, Equata
     var place: Place = .home
 
     enum Place: String, Codable, Sendable {
-        case home, studio
+        /// Stored as "studio" by earlier builds; the raw value stays so
+        /// those entries still read.
+        case home, elsewhere = "studio"
 
-        var title: String { self == .home ? "at home" : "studio" }
+        var title: String { self == .home ? "at home" : "elsewhere" }
     }
 }
 

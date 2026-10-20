@@ -17,7 +17,7 @@ public struct SomaPageHero: View {
     @Environment(\.somaTheme) private var theme
 
     /// - Parameters:
-    ///   - eyebrow: set in small capitals above: "Six visits since July".
+    ///   - eyebrow: set in small capitals above: "Lean mass · eight weeks".
     ///   - title: the headline: "Your legs carried the change."
     ///   - reason: one or more sentences explaining it.
     public init(eyebrow: String?, title: String, reason: String?) {
@@ -53,9 +53,9 @@ public struct SomaPageHero: View {
     ZStack {
         SomaPreviewBackdrop()
         SomaPageHero(
-            eyebrow: "Six visits since July",
-            title: "Your legs carried the change.",
-            reason: "Twelve weeks of training added 1.5 kg of lean mass. Thursday’s visit reads the trunk again."
+            eyebrow: "Lean mass · eight weeks",
+            title: "You’ve built lean mass.",
+            reason: "Lean mass rose 1.5 kg in eight weeks, read by your smart scale through Apple Health."
         )
         .padding()
     }

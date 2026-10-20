@@ -109,15 +109,6 @@ enum LinkOutcome: Sendable, Hashable {
         }
     }
 
-    var unit: String {
-        switch self {
-        case .sleepScore, .energy, .recovery: "pts"
-        case .hrv: "ms"
-        case .restingHeart: "bpm"
-        case .sleepOnset: "min"
-        }
-    }
-
     /// Which way is better. Nil for a reading with no better side: an earlier
     /// bedtime is neither good nor bad on its own.
     var better: EffectMath.Better? {
@@ -151,8 +142,6 @@ struct CauseLink: Identifiable, Sendable, Equatable {
     var result: LinkMath.Result
 
     var id: String { "\(driver.name)>\(outcome.name)" }
-    /// "Alcohol → Sleep".
-    var title: String { "\(driver.name) \u{2192} \(outcome.name)" }
 
     /// The effect in the shown unit, signed. Nil when a side is empty.
     var effect: Double? { result.delta.map { $0 * outcome.scale } }
@@ -203,10 +192,11 @@ enum CauseLinks {
         /// Links held back: too few days, or inside the noise.
         var pending: [CauseLink]
 
-        /// The held links' titles, once each, for the "Needs more days" row.
+        /// The held links' plain names, once each, for the "Still learning"
+        /// row: "Hard days and recovery".
         var pendingNames: [String] {
             var seen: Set<String> = []
-            return pending.map(\.title).filter { seen.insert($0).inserted }
+            return pending.map(\.plainTitle).filter { seen.insert($0).inserted }
         }
     }
 

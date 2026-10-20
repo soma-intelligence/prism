@@ -29,6 +29,7 @@ struct LongevityMindView: View {
     @State private var moods: [MindMoodEntry] = []
     @State private var isBreathing = false
     @State private var sheet: MindEntryCards.Sheet?
+    @State private var quickMood: SomaMood?
 
     /// What today's stress line is read from: Pulse's stress page reads the
     /// same parts, so the two share one cached read.
@@ -51,13 +52,19 @@ struct LongevityMindView: View {
         MindLensContent(
             model: model,
             status: health.status,
+            latestMood: MindQuickMood.latestToday(moods, now: Date(), calendar: calendar),
             onStat: open,
             onBreathe: { isBreathing = true },
-            onEntry: { sheet = $0 }
+            onEntry: { sheet = $0 },
+            onMood: { quickMood = $0 }
         )
         .refreshable { await load(force: true) }
         .task { await load(force: false) }
         .sheet(isPresented: $isBreathing) { MindBreatheSession() }
+        .sheet(item: $quickMood, onDismiss: { Task { await loadMoods() } }) { mood in
+            MindEntryGate { MindMoodLogSheet(start: mood) }
+                .presentationDetents([.large])
+        }
         .sheet(item: $sheet, onDismiss: { Task { await loadMoods() } }) { which in
             switch which {
             case .feeling: MindEntryGate { MindEmotionLogSheet() }
@@ -128,15 +135,18 @@ struct LongevityMindView: View {
 struct MindLensContent: View {
     let model: MindLensModel
     var status: HealthDashboard.Status = .ready
+    var latestMood: MindMoodEntry?
     var onStat: (SomaStat) -> Void = { _ in }
     var onBreathe: () -> Void = {}
     var onEntry: (MindEntryCards.Sheet) -> Void = { _ in }
+    var onMood: (SomaMood) -> Void = { _ in }
 
     @Environment(\.somaTheme) private var theme
 
     var body: some View {
         ScrollView {
-            MindLensStack(model: model, status: status, onStat: onStat, onBreathe: onBreathe, onEntry: onEntry)
+            MindLensStack(model: model, status: status, latestMood: latestMood, onStat: onStat, onBreathe: onBreathe,
+                          onEntry: onEntry, onMood: onMood)
         }
         .aspectWash(.mind)
     }
@@ -146,9 +156,11 @@ struct MindLensContent: View {
 struct MindLensStack: View {
     let model: MindLensModel
     var status: HealthDashboard.Status = .ready
+    var latestMood: MindMoodEntry?
     var onStat: (SomaStat) -> Void = { _ in }
     var onBreathe: () -> Void = {}
     var onEntry: (MindEntryCards.Sheet) -> Void = { _ in }
+    var onMood: (SomaMood) -> Void = { _ in }
 
     @Environment(\.somaTheme) private var theme
 
@@ -175,18 +187,7 @@ struct MindLensStack: View {
             }
 
             MindSection("Mood", route: MindRoute.innerMap) {
-                SomaCard {
-                    VStack(alignment: .leading, spacing: metrics.cardSpacing) {
-                        HStack {
-                            Text("14 days")
-                                .somaFont(theme.typography.captionValue)
-                                .foregroundStyle(theme.colors.inkSecondary.color)
-                            Spacer(minLength: 0)
-                            MindLogMenu(onEntry: onEntry)
-                        }
-                        MindMoodStrip(days: model.moods)
-                    }
-                }
+                MindMoodCard(model: model, latest: latestMood, onEntry: onEntry, onMood: onMood)
             }
 
             MindSection("Mindful minutes", route: mindfulRoute) {
@@ -215,8 +216,64 @@ struct MindLensStack: View {
     }
 }
 
-/// The plus on the mood card: log a feeling, check in, tell the day, see
-/// today's moments, or change what Mind keeps.
+/// The mood card: one question and five faces to answer it, a line that
+/// says what you logged today, then fourteen days of mood under it. A face
+/// opens the quick log already set to it; the other ways in (the full log,
+/// a check in, telling the day) wait behind the card's menu.
+struct MindMoodCard: View {
+    let model: MindLensModel
+    let latest: MindMoodEntry?
+    var onEntry: (MindEntryCards.Sheet) -> Void = { _ in }
+    var onMood: (SomaMood) -> Void = { _ in }
+
+    @Environment(\.somaTheme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        let metrics = theme.metrics
+        let type = theme.typography
+        let colors = theme.colors
+        let logged = latest.map { MindQuickMood.mood(valence: $0.valence) }
+
+        SomaCard {
+            VStack(alignment: .leading, spacing: metrics.cardSpacing) {
+                HStack(alignment: .center) {
+                    Text(logged == nil ? "How do you feel?" : "How do you feel now?")
+                        .somaFont(type.cardTitle)
+                        .foregroundStyle(colors.inkPrimary.color)
+                    Spacer(minLength: 0)
+                    MindLogMenu(onEntry: onEntry)
+                }
+
+                SomaMoodFaces(selection: .constant(logged)) { mood in onMood(mood) }
+
+                if let latest, let logged {
+                    HStack(spacing: metrics.identityDotSpacing) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(logged.tone.color)
+                        Text("Logged \(String(localized: logged.title)) at \(latest.date.formatted(date: .omitted, time: .shortened))")
+                            .foregroundStyle(colors.inkSecondary.color)
+                    }
+                    .somaFont(type.caption)
+                    .transition(.opacity)
+                }
+
+                Rectangle()
+                    .fill(colors.inkPrimary.color.opacity(metrics.hairlineOpacity))
+                    .frame(height: 0.5)
+
+                Text("14 days")
+                    .somaFont(type.captionValue)
+                    .foregroundStyle(colors.inkSecondary.color)
+                MindMoodStrip(days: model.moods)
+            }
+        }
+        .animation(reduceMotion ? nil : theme.motion.selection, value: latest?.id)
+    }
+}
+
+/// The menu on the mood card: the full log, a check in, telling the day,
+/// today's moments, or what Mind keeps.
 struct MindLogMenu: View {
     let onEntry: (MindEntryCards.Sheet) -> Void
 
@@ -224,7 +281,7 @@ struct MindLogMenu: View {
 
     var body: some View {
         Menu {
-            Button("Log a feeling", systemImage: "face.smiling") { onEntry(.feeling) }
+            Button("Log in detail", systemImage: "face.smiling") { onEntry(.feeling) }
             Button("Check in", systemImage: "checkmark.circle") { onEntry(.checkIn) }
             Button("Tell your day", systemImage: "text.bubble") { onEntry(.tellDay) }
             Button("Today’s moments", systemImage: "clock") { onEntry(.day) }
@@ -233,7 +290,7 @@ struct MindLogMenu: View {
                 onEntry(.choices)
             }
         } label: {
-            Image(systemName: "plus")
+            Image(systemName: "ellipsis")
                 .somaFont(theme.typography.callout)
                 .fontWeight(.semibold)
                 .foregroundStyle(theme.colors.inkPrimary.color)
@@ -243,7 +300,7 @@ struct MindLogMenu: View {
         }
         .menuStyle(.button)
         .buttonStyle(.plain)
-        .accessibilityLabel("Log")
+        .accessibilityLabel("More ways to log")
     }
 }
 
