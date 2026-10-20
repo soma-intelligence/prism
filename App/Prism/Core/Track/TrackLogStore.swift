@@ -299,6 +299,16 @@ final class TrackLogStore {
         return base.appending(path: "track-log.json")
     }
 
+    /// Forgets every entry and setting, file and all, for "Erase data on
+    /// this iPhone".
+    func erase() {
+        apply(Stored())
+        unread = false
+        if let readableObserver { NotificationCenter.default.removeObserver(readableObserver) }
+        readableObserver = nil
+        if let url { try? FileManager.default.removeItem(at: url) }
+    }
+
     // MARK: Days
 
     func isSameDay(_ lhs: Date, _ rhs: Date) -> Bool { calendar.isDate(lhs, inSameDayAs: rhs) }

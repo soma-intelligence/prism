@@ -62,14 +62,21 @@ private struct ZoomDestination: ViewModifier {
     @Environment(\.zoomNamespace) private var namespace
 
     func body(content: Content) -> some View {
+        // Every pushed page scrolls under the same bar as the tab pages, so it
+        // takes the same top edge.
+        zoomed(content.somaScrollEdgeFade())
+    }
+
+    @ViewBuilder
+    private func zoomed(_ page: some View) -> some View {
 #if os(iOS)
         if let namespace {
-            content.navigationTransition(.zoom(sourceID: id, in: namespace))
+            page.navigationTransition(.zoom(sourceID: id, in: namespace))
         } else {
-            content
+            page
         }
 #else
-        content
+        page
 #endif
     }
 }

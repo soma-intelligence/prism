@@ -239,7 +239,7 @@ struct BodyDotColumns: View {
 
 #if DEBUG
 #Preview("Body charts") {
-    ScrollView {
+    SomaPageScroll {
         VStack(spacing: 24) {
             BodySilhouette()
             BodyBarRow(title: "Zone 2", subtitle: "Aerobic", fraction: 0.2, value: "38 min", aspect: .heart, isHighlighted: true, usual: 0.4...0.7)

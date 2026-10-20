@@ -191,6 +191,7 @@ public struct SomaVesselInput: View {
             SomaVessel(fill: capacity > 0 ? value / capacity : 0, aspect: aspect, showsKnob: true)
                 .frame(width: proxy.size.width, height: proxy.size.height)
                 .contentShape(.rect)
+                .somaClaimsSwipe()
                 .gesture(
                     DragGesture(minimumDistance: 0)
                         .onChanged { drag in

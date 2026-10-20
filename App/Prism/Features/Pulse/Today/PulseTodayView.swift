@@ -34,7 +34,7 @@ struct PulseTodayView: View {
         let metrics = theme.metrics
         let canvas = theme.colors.canvas.color
 
-        ScrollView {
+        SomaPageScroll {
             Group {
                 if isRoomy {
                     HStack(alignment: .top, spacing: metrics.leadSpacing) {
@@ -93,13 +93,7 @@ private struct PulseLead: View {
 
     @Environment(\.somaTheme) private var theme
     @Environment(\.zoomNamespace) private var zoom
-    /// The score page the orb or a score opened.
-    @State private var openedScore: ScoreRoute?
-    /// The ring that opened it, which the page zooms out of. Nil when the orb
-    /// opened it: the orb is no tile, its page pushes.
-    @State private var openedRing: SomaAspect?
-    /// The category page the orb opened, for an aspect with no score page.
-    @State private var openedCategory: PulseRoute?
+    @Environment(AppRouter.self) private var router
     /// The quick add, lifted by a long press on the orb.
     @State private var quickAdd: HomeSheetRoute?
 
@@ -125,9 +119,10 @@ private struct PulseLead: View {
                 .homeSheets($quickAdd)
 
             // One tap on a score opens its page.
-            SomaScoreRings(scoreRow, zoom: zoom) { tapped in
-                openedRing = tapped
-                openedScore = ScoreRoute.aspect(tapped)
+            // A ring zooms its page out of itself: its zoom id is the route
+            // it pushes, the id the page's destination zooms to.
+            SomaScoreRings(scoreRow, zoom: zoom, zoomID: { AnyHashable(TodayRoutes.ring($0)) }) { tapped in
+                router.pulsePath.append(TodayRoutes.ring(tapped))
             }
                 .padding(.top, metrics.heroSpacing * 2)
 
@@ -141,25 +136,12 @@ private struct PulseLead: View {
             }
 
         }
-        .navigationDestination(item: $openedScore) { route in
-            if let ring = openedRing {
-                route.page.zoomDestination(ring)
-            } else {
-                route.page
-            }
-        }
-        .navigationDestination(item: $openedCategory) { $0.page }
     }
 
-    /// The orb always opens something: its aspect's score page, or for heart,
-    /// gut and body, which have none, the aspect's page of readings.
+    /// The orb opens its aspect's own page, pushed plainly: the orb is no
+    /// tile, and the ring that opens the same page keeps its own zoom.
     private func open(_ aspect: SomaAspect) {
-        switch PulseOrbTarget.make(aspect) {
-        case .score(let route):
-            openedRing = nil
-            openedScore = route
-        case .category(let route): openedCategory = route
-        }
+        router.pulsePath.append(TodayRoutes.orb(aspect))
     }
 
     private var scoreRow: [SomaRingScore] {
@@ -415,18 +397,16 @@ private struct PulseTodayCardView: View {
         case .today:
             TileLink(value: HomeRoute.timeline) { PulseDayCard(today: today) }
         case .sleep:
-            TileLink(value: ScoreRoute.sleep) { PulseSleepCard(scores: scores) }
+            TileLink(value: TodayRoutes.nightCard) { PulseSleepCard(scores: scores) }
         case .heart:
-            Button { open(.marker(.restingHeartRate)) } label: {
+            TileLink(value: TodayRoutes.aspectCard(.heart)) {
                 SomaAspectCard(aspect: .heart, value: today?.heartCard.value, unit: "bpm resting",
                                summary: today?.heartCard.value == nil ? nil : insights[.restingHeartRate]?.insight.label) {
                     SomaBandLine(aspect: .heart, values: today?.restingDays ?? [], band: today?.restingBand)
                 }
-                .contentShape(.rect)
             }
-            .buttonStyle(TilePressStyle())
         case .body:
-            TileLink(value: PulseRoute.aspect(.body)) {
+            TileLink(value: TodayRoutes.aspectCard(.body)) {
                 SomaAspectCard(aspect: .body, value: today?.bodyCard.value, unit: "fitness age",
                                summary: today?.bodyCard.summary) {
                     SomaRangeTrack(
@@ -485,14 +465,23 @@ struct PulseDoneMoves {
     }
 }
 
-/// Where a tap on the orb lands.
-enum PulseOrbTarget: Equatable {
-    case score(ScoreRoute)
-    case category(PulseRoute)
-
-    static func make(_ aspect: SomaAspect) -> PulseOrbTarget {
-        ScoreRoute.aspect(aspect).map(PulseOrbTarget.score) ?? .category(.aspect(aspect))
-    }
+/// Where each entry on Today opens: every aspect, wherever Today names it,
+/// opens that aspect's own page (owner, 2026-10-20). The night card is the
+/// one exception, by design: it opens last night, and the Sleep page
+/// (the score's) links to it and back.
+enum TodayRoutes {
+    /// A score ring under the orb.
+    static func ring(_ aspect: SomaAspect) -> ScoreRoute { .aspect(aspect) }
+    /// The orb, for the aspect it shows: the aspect's page, pushed plainly.
+    static func orb(_ aspect: SomaAspect) -> PulseRoute { .orb(aspect) }
+    /// An aspect card in Your aspects.
+    static func aspectCard(_ aspect: SomaAspect) -> ScoreRoute { .aspect(aspect) }
+    /// A tile in Today's Categories grid.
+    static func tile(_ aspect: SomaAspect) -> ScoreRoute { .aspect(aspect) }
+    /// A row of the six aspects in All categories.
+    static func allCategories(_ aspect: SomaAspect) -> ScoreRoute { .aspect(aspect) }
+    /// The last night card.
+    static let nightCard = ScoreRoute.lastNight
 }
 
 /// The orb's one action, set for this moment of the day.

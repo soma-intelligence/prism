@@ -52,4 +52,16 @@ public extension SomaMetrics {
     /// The span the map shows round the device's own position: close enough
     /// to read the street you are on.
     var environmentMapExactSpan: Double { 900 }
+    /// The sleep places heat map: how tall the tile is, the least ground it
+    /// frames (metres across), and each warm spot's glow: its reach in
+    /// metres, how many rings build it and how dense each ring is.
+    var heatMapHeight: CGFloat { 228 }
+    var heatMapMinimumSpan: Double { 640 }
+    var heatSpotRadius: Double { 80 }
+    var heatSpotLayers: Int { 14 }
+    var heatLayerOpacity: Double { 0.06 }
+
+    /// How far the chips over a map (the Sleep places name, its status)
+    /// sit in from the tile's corners.
+    var mapChipInset: CGFloat { 10 }
 }

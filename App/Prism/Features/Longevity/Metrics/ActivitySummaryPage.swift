@@ -7,8 +7,8 @@ import SwiftUI
 import SomaUI
 import HealthExportCore
 
-/// Thirty days of sessions: time by type, today's Move ring and the most
-/// recent sessions.
+/// Thirty days of sessions: the Move days on the metric stage, time by
+/// type and the most recent sessions.
 ///
 /// Sessions are the workouts in
 /// Health, from the watch or any app that writes them; the Move goal is the
@@ -20,6 +20,8 @@ struct ActivitySummaryPage: View {
     @State private var history: FitnessHistory?
     @State private var moveToday: Double?
     @State private var moveGoal: Double?
+    /// Active energy a day, the last thirty, today last.
+    @State private var moveDays: [Double?] = []
     @State private var isLogging = false
 
     private let reader = FitnessHealthKit()
@@ -42,6 +44,20 @@ struct ActivitySummaryPage: View {
             reason: lead?.reason ?? reason(workouts: workouts, byType: byType, total: total),
             stats: []
         ) {
+            AspectStage(
+                aspect: .activity,
+                lead: SomaMetricLead(
+                    caption: "Move, today",
+                    value: moveToday.map(words.whole),
+                    unit: moveGoal.map { "of \(words.whole($0)) kcal" } ?? "kcal",
+                    meaning: moveNote
+                ),
+                dial: moveGoal.map { SomaStageDial(aspect: .activity, scale: .fill(top: $0), value: moveToday, usual: nil) },
+                values: moveDays,
+                unit: "kcal",
+                scale: nil,
+                format: { MetricWords().whole($0) }
+            )
             SomaCard {
                 VStack(alignment: .leading, spacing: theme.metrics.bodyRowSpacing) {
                     Text("Time by type")
@@ -62,14 +78,6 @@ struct ActivitySummaryPage: View {
                         )
                     }
                 }
-            }
-            SomaChartCard(
-                eyebrow: "Move, today",
-                value: moveToday.map(words.whole),
-                unit: moveGoal.map { "of \(words.whole($0)) kcal" } ?? "kcal",
-                note: moveNote
-            ) {
-                MetricRing(fraction: moveGoal.flatMap { goal in moveToday.map { $0 / goal } }, aspect: .activity)
             }
             MetricRowsCard(eyebrow: "Recent sessions", rows: workouts.isEmpty
                 ? [MetricRowItem("No sessions in 30 days", detail: "A workout with Apple Watch, or any app that writes one to Health, lands here.")]
@@ -108,9 +116,9 @@ struct ActivitySummaryPage: View {
     }
 
     private var moveNote: String {
-        guard let moveToday else { return "Active energy from your watch fills the ring." }
-        guard let moveGoal else { return "Set a Move goal in the Fitness app and the ring shows how far along you are." }
-        return "\(Int((moveToday / moveGoal * 100).rounded()))% of today’s goal."
+        guard let moveToday else { return "No active energy yet" }
+        guard let moveGoal else { return "Set a Move goal in Fitness" }
+        return "\(Int((moveToday / moveGoal * 100).rounded()))% of today’s goal"
     }
 
     private func headline(byType: [(activity: Int, sessions: Int, seconds: Double)], total: Double) -> String {
@@ -137,6 +145,13 @@ struct ActivitySummaryPage: View {
         if let source = await health.prepare([FitnessHistory.Metric.activeEnergy]),
            let metric = HealthMetricCatalog.metric(for: FitnessHistory.Metric.activeEnergy) {
             moveToday = (try? await source.total(metric, from: Calendar.current.startOfDay(for: now), to: now))?.value
+            let calendar = Calendar.current
+            let totals = await FitnessHistory.dailyTotals(FitnessHistory.Metric.activeEnergy, days: Self.days, now: now,
+                                                          source: source, calendar: calendar)
+            let today = calendar.startOfDay(for: now)
+            moveDays = (0..<Self.days).map { index in
+                calendar.date(byAdding: .day, value: index - (Self.days - 1), to: today).flatMap { totals[$0] }
+            }
         }
         moveGoal = await reader.moveGoal(now: now, calendar: .current)
     }

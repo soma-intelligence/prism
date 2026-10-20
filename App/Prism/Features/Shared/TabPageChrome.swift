@@ -106,20 +106,15 @@ private struct TabPageChrome<Switcher: View>: ViewModifier {
 
                 ToolbarItem(placement: .primaryAction) {
                     Button { isShowingNotifications = true } label: {
-                        Image(systemName: "bell.and.waveform")
-                            .foregroundStyle(theme.colors.inkPrimary.color)
-                            .overlay(alignment: .topTrailing) {
-                                if SomaNotifications.shared.unreadCount > 0 {
-                                    Circle()
-                                        .fill(theme.colors.accent.color)
-                                        .frame(width: theme.metrics.chartDotDiameter, height: theme.metrics.chartDotDiameter)
-                                }
-                            }
+                        SomaNotificationGlyph(hasUnread: SomaNotifications.shared.unreadCount > 0)
                     }
                     .accessibilityLabel("Notifications")
                     .accessibilityValue(SomaNotifications.shared.unreadCount > 0 ? "Unread" : "")
                 }
             }
+            // The page's ground fades over what scrolls under the bar, rather
+            // than the bar drawing a block.
+            .somaScrollEdgeFade()
             .sheet(isPresented: $isShowingSettings) { SettingsSheet() }
             .sheet(isPresented: $isShowingNotifications) { NotificationCenterSheet() }
     }

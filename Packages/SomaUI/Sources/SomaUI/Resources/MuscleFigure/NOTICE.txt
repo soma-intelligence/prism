@@ -1,0 +1,9 @@
+Muscle illustrations rendered from Z-Anatomy, the libre 3D atlas of anatomy (CC BY-SA 4.0), based on BodyParts3D, The Database Center for Life Science (CC BY-SA 2.1 Japan). The illustrations are shared under CC BY-SA 4.0.
+
+Z-Anatomy: https://github.com/Z-Anatomy/Models-of-human-anatomy
+BodyParts3D: https://dbarchive.biosciencedbc.jp/en/bodyparts3d/
+CC BY-SA 4.0: https://creativecommons.org/licenses/by-sa/4.0/
+
+Every image in this folder is an adaptation of those works and is shared under
+CC BY-SA 4.0. Changes: the muscles chosen and lit for a front and a back view,
+rendered to grey shading with one mask per muscle group and side.

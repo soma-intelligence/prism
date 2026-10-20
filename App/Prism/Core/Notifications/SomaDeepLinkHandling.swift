@@ -77,7 +77,7 @@ private struct SomaDeepLinkHandling: ViewModifier {
             .sheet(item: $sheet) { sheet in
                 switch sheet {
                 case .sleep:
-                    NavigationStack { PulseRoute.aspect(.sleep).page.journeyDestinations() }
+                    NavigationStack { ScoreRoute.lastNight.page.journeyDestinations() }
                 case .vault(let metric):
                     NavigationStack { VaultRoute.dataType(BodyDataType(metric)).page.journeyDestinations() }
                 case .inbox:

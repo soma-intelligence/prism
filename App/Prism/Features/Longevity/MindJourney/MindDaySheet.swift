@@ -112,7 +112,7 @@ struct MindDaySheet: View {
         }
         .task {
             let start = Calendar.current.startOfDay(for: day)
-            events = MindCalendar.events(from: start, to: start.addingTimeInterval(24 * 60 * 60))
+            events = await MindCalendar.events(from: start, to: start.addingTimeInterval(24 * 60 * 60))
         }
     }
 

@@ -45,9 +45,9 @@ struct MindConsentSheet: View {
                             .foregroundStyle(colors.inkSecondary.color)
                     }
                     MindHairline()
-                    row("State of Mind") { Toggle("State of Mind", isOn: $consent.stateOfMind).labelsHidden() }
+                    row("State of Mind") { SomaSwitch("State of Mind", isOn: $consent.stateOfMind) }
                     MindHairline()
-                    row("Calendar busy times") { Toggle("Calendar busy times", isOn: $consent.calendar).labelsHidden() }
+                    row("Calendar busy times") { SomaSwitch("Calendar busy times", isOn: $consent.calendar) }
                     MindHairline()
                     row("Voice, for Tell your day") {
                         Text("Not yet")
@@ -56,9 +56,8 @@ struct MindConsentSheet: View {
                     }
                 }
             }
-            .tint(colors.accent.color)
 
-            MindReasonText(text: "Calendar gives Mind a meeting’s time and title, never its notes or who was invited. Everything is read on this device, and Mind’s own record stays on it.")
+            MindReasonText(text: "Calendar gives Mind a meeting’s time and title, never its notes or who was invited. It only reads, on this device, and keeps no title. Mind’s own record stays on this device too.")
 
             if MindStore.shared.consent.isGiven {
                 Button(role: .destructive) {

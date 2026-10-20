@@ -18,9 +18,9 @@ public extension SomaPreviewSamples {
     /// The usual range for that rate.
     static let breathingBand: ClosedRange<Double> = 17.0...18.2
 
-    /// A kept read and the fresh one after it, for a number rolling
-    /// between them: HRV in milliseconds.
-    static let rollingValues: [Double] = [58, 64]
+    /// A kept read and the fresh ones after it, for a number rolling
+    /// between them, the first roll losing a digit: HRV in milliseconds.
+    static let rollingValues: [Double] = [105, 98, 64]
     /// When a kept read was taken, old enough for the updated note.
     static var keptReadAt: Date { .now.addingTimeInterval(-3 * 3_600) }
 

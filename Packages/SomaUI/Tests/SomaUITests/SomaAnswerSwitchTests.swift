@@ -7,8 +7,9 @@ import Testing
 import SwiftUI
 @testable import SomaUI
 
-/// The journal's done or not done switch: how VoiceOver steps through it,
-/// what it says, and what a tap on a cell leaves.
+/// The journal's three state switch (not done, no entry, done): how
+/// VoiceOver steps through it, what it says, where its knob rests, and what
+/// a tap on a slot leaves.
 @Suite("Answer switch")
 struct SomaAnswerSwitchTests {
     @Test("VoiceOver steps from not done, through none, to done")
@@ -41,6 +42,27 @@ struct SomaAnswerSwitchTests {
         #expect(SomaAnswerSwitch.tapping(false, on: true) == false)
         #expect(SomaAnswerSwitch.tapping(true, on: true) == nil)
         #expect(SomaAnswerSwitch.tapping(false, on: false) == nil)
+    }
+
+    @Test("The dash in the middle always clears the answer")
+    func dash() {
+        #expect(SomaAnswerSwitch.tapping(nil, on: true) == nil)
+        #expect(SomaAnswerSwitch.tapping(nil, on: false) == nil)
+        #expect(SomaAnswerSwitch.tapping(nil, on: nil) == nil)
+    }
+
+    @Test("The knob rests on the cross, the dash in the middle, or the check")
+    func slots() {
+        #expect(SomaAnswerSwitch.slot(false) == 0)
+        #expect(SomaAnswerSwitch.slot(nil) == 1)
+        #expect(SomaAnswerSwitch.slot(true) == 2)
+    }
+
+    @Test("The dash is one level line in the grid's middle")
+    func dashMark() {
+        let bounds = SomaAnswerMarkShape(answer: nil).path(in: CGRect(x: 0, y: 0, width: 24, height: 24)).boundingRect
+        #expect(bounds.height == 0)
+        #expect(abs(bounds.midX - 12) < 0.001 && abs(bounds.midY - 12) < 0.001)
     }
 }
 

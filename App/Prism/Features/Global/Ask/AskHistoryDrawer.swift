@@ -53,7 +53,7 @@ struct AskHistoryDrawer: View {
                 .fill(colors.inkPrimary.color.opacity(metrics.hairlineOpacity))
                 .frame(height: 0.5)
 
-            ScrollView {
+            SomaPageScroll {
                 LazyVStack(alignment: .leading, spacing: metrics.scoreLabelSpacing) {
                     if sections.isEmpty {
                         Text(query.isEmpty ? "Your conversations with Soma are kept here, and in your account once you sign in." : "No conversation matches.")

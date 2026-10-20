@@ -153,7 +153,7 @@ struct MindBreatheSession: View {
         let minutes = Int((seconds / 60).rounded())
         let eased = (after.hrv ?? 0) > (before.hrv ?? .infinity)
 
-        return ScrollView {
+        return SomaPageScroll {
             VStack(spacing: metrics.leadSpacing) {
                 SomaOrb(aspect: .mind, scale: .hero)
                     .frame(maxHeight: metrics.orbDiameter)

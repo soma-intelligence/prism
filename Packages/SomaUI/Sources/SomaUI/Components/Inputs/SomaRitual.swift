@@ -10,26 +10,33 @@ import SwiftUI
 /// One step of a ritual: a square to tick, the step's line glyph and its
 /// name. The whole row is the button. Ticked, the square fills with the
 /// ritual's tone and its check draws itself, and the name softens; under
-/// Reduce Motion it simply changes.
+/// Reduce Motion it simply changes. A step Apple Health ticked carries a
+/// small heart after its name, so the person knows they did not have to.
 public struct SomaRitualStep<Trailing: View>: View {
     private let title: String
     private let glyph: SomaTrackGlyph.Kind
     private let tone: SomaTrackTone
     private let isDone: Bool
+    private let isFromHealth: Bool
     private let toggle: () -> Void
     private let trailing: Trailing
 
     @Environment(\.somaTheme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    /// - Parameter trailing: an optional control after the name, such as a
-    ///   button that starts the step.
+    /// - Parameters:
+    ///   - isFromHealth: whether Apple Health ticked it rather than the
+    ///     person.
+    ///   - trailing: an optional control after the name, such as a button
+    ///     that starts the step.
     public init(_ title: String, glyph: SomaTrackGlyph.Kind, tone: SomaTrackTone, isDone: Bool,
+                isFromHealth: Bool = false,
                 toggle: @escaping () -> Void, @ViewBuilder trailing: () -> Trailing) {
         self.title = title
         self.glyph = glyph
         self.tone = tone
         self.isDone = isDone
+        self.isFromHealth = isFromHealth
         self.toggle = toggle
         self.trailing = trailing()
     }
@@ -49,6 +56,12 @@ public struct SomaRitualStep<Trailing: View>: View {
                         .foregroundStyle(isDone ? colors.inkSecondary.color : colors.inkPrimary.color)
                         .lineLimit(1)
                         .minimumScaleFactor(0.85)
+                    if isFromHealth && isDone {
+                        Image(systemName: "heart.fill")
+                            .font(.system(size: metrics.ritualSourceGlyph, weight: .semibold))
+                            .foregroundStyle(tone.color)
+                            .transition(.opacity)
+                    }
                     Spacer(minLength: 0)
                 }
                 .frame(minHeight: metrics.ritualStepMinHeight)
@@ -58,7 +71,7 @@ public struct SomaRitualStep<Trailing: View>: View {
             .sensoryFeedback(.selection, trigger: isDone)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(Text(title))
-            .accessibilityValue(Text(isDone ? "Done" : "Not done"))
+            .accessibilityValue(Text(isDone ? (isFromHealth ? "Done, from Apple Health" : "Done") : "Not done"))
             .accessibilityAddTraits(isDone ? .isSelected : [])
             trailing
         }
@@ -97,14 +110,37 @@ public struct SomaRitualCheck: View {
             shape.fill(tone.color)
                 .scaleEffect(isDone || reduceMotion ? 1 : theme.motion.trackAnswerFrom)
                 .opacity(isDone ? 1 : 0)
-            SomaAnswerMarkShape(isYes: true)
-                .trim(from: 0, to: isDone ? 1 : 0)
-                .stroke(colors.surface.color, style: StrokeStyle(lineWidth: metrics.trackAnswerGlyphStroke, lineCap: .round, lineJoin: .round))
-                .frame(width: metrics.journalMarkGlyph, height: metrics.journalMarkGlyph)
-                .animation(reduceMotion ? nil : (isDone ? theme.motion.trackMarkDraw : theme.motion.trackPress), value: isDone)
+            // The check draws itself in once, then fades out whole when the
+            // tick is taken back: trimming it back leaves a stub of line on
+            // the way.
+            if isDone {
+                SomaDrawnCheck(ink: colors.surface.color)
+                    .frame(width: metrics.journalMarkGlyph, height: metrics.journalMarkGlyph)
+                    .transition(.opacity)
+            }
         }
         .frame(width: metrics.ritualCheckSide, height: metrics.ritualCheckSide)
         .accessibilityHidden(true)
+    }
+}
+
+/// A check that draws itself in when it appears, on the theme's
+/// ``SomaMotion/trackMarkDraw``; already drawn under Reduce Motion.
+struct SomaDrawnCheck: View {
+    let ink: Color
+
+    @Environment(\.somaTheme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var drawn = false
+
+    var body: some View {
+        SomaAnswerMarkShape(isYes: true)
+            .trim(from: 0, to: drawn || reduceMotion ? 1 : 0)
+            .stroke(ink, style: StrokeStyle(lineWidth: theme.metrics.trackAnswerGlyphStroke, lineCap: .round, lineJoin: .round))
+            .onAppear {
+                guard !reduceMotion else { return }
+                withAnimation(theme.motion.trackMarkDraw) { drawn = true }
+            }
     }
 }
 

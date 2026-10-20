@@ -48,6 +48,8 @@ struct PrismApp: App {
         // Before the Health observers start: a wake reuses this dashboard.
         WidgetRefresh.adopt(health: health)
         WidgetRefresh.register()
+        // Sleep places: a visit that wakes the app finds its delegate.
+        SleepVisitMonitor.shared.start()
         #endif
     }
 
@@ -84,6 +86,12 @@ struct PrismApp: App {
                 .environment(journal)
                 .somaCloud(health: health, journal: journal)
                 .somaWidgets(health: health)
+                // The Landscape theme's photographs decoded before the pages
+                // that open on them, so their first frame is whole.
+                .task(id: backdrop) {
+                    guard backdrop == SomaBackdropStyle.landscape.rawValue else { return }
+                    await SomaLandscapePhoto.prepare([.body, .mind, .sleep])
+                }
         }
         .modelContainer(sharedModelContainer)
         #if os(macOS)

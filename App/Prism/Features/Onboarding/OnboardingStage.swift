@@ -243,7 +243,7 @@ struct OnboardingPage<Content: View>: View {
     var body: some View {
         let metrics = theme.metrics
 
-        ScrollView {
+        SomaPageScroll {
             VStack(alignment: centred ? .center : .leading, spacing: metrics.onboardingTitleGap) {
                 Text(title)
                     .somaFont(theme.typography.headline)

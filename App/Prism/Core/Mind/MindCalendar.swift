@@ -28,6 +28,9 @@ enum MindCalendar {
 
     static var access: Access {
         guard MindStore.shared.consent.calendar else { return .off }
+        #if DEBUG && targetEnvironment(simulator)
+        if FixtureCalendar.isOn { return .granted }
+        #endif
         switch EKEventStore.authorizationStatus(for: .event) {
         case .fullAccess: return .granted
         case .notDetermined: return .notAsked
@@ -42,9 +45,20 @@ enum MindCalendar {
         return access
     }
 
-    /// Timed events between two moments. Empty without access.
-    static func events(from start: Date, to end: Date) -> [MindCalendarEvent] {
+    /// Timed events between two moments, read off the main actor: a month
+    /// of a busy calendar takes the event store a while. Empty without
+    /// access.
+    static func events(from start: Date, to end: Date) async -> [MindCalendarEvent] {
         guard access == .granted, end > start else { return [] }
+        #if DEBUG && targetEnvironment(simulator)
+        if FixtureCalendar.isOn { return FixtureCalendar.events(from: start, to: end) }
+        #endif
+        return await Task.detached(priority: .utility) {
+            Self.read(EKEventStore(), from: start, to: end)
+        }.value
+    }
+
+    nonisolated private static func read(_ store: EKEventStore, from start: Date, to end: Date) -> [MindCalendarEvent] {
         let predicate = store.predicateForEvents(withStart: start, end: end, calendars: nil)
         return store.events(matching: predicate)
             .filter { !$0.isAllDay }
@@ -62,6 +76,6 @@ enum MindCalendar {
 #else
     static var access: Access { .off }
     static func requestAccess() async -> Access { .off }
-    static func events(from start: Date, to end: Date) -> [MindCalendarEvent] { [] }
+    static func events(from start: Date, to end: Date) async -> [MindCalendarEvent] { [] }
 #endif
 }

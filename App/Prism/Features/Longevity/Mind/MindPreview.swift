@@ -100,6 +100,13 @@ extension MindLensModel {
             resting: 57, restingTrend: .up,
             mindfulToday: 7,
             stress: stress,
+            night: MindStressNight(
+                start: today.addingTimeInterval(-90 * 60),
+                end: today.addingTimeInterval(6.5 * 60 * 60),
+                samples: [24, 20, 17, 15, 14, 16, 13, 12, 14, 18, 15, 13, 16, 19, 22, 20].enumerated().map { index, value in
+                    MindStressSample(start: today.addingTimeInterval(Double(index - 3) * 30 * 60), value: value)
+                }
+            ),
             moods: moods,
             week: MindInnerSpace.preview.week.enumerated().map { index, bar in
                 var bar = bar

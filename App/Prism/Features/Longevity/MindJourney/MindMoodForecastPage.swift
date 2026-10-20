@@ -76,7 +76,7 @@ struct MindMoodForecastPage: View {
             inputs = await MindLoad.inputs(health)
             extras = await more
             moods = await MindJourneyLoad.moods(since: calendar.date(byAdding: .day, value: -14, to: today) ?? today, store: .shared)
-            calls = MindMeetingStress.meetings(in: MindCalendar.events(from: now, to: calendar.date(byAdding: .day, value: 1, to: today) ?? now))
+            calls = MindMeetingStress.meetings(in: await MindCalendar.events(from: now, to: calendar.date(byAdding: .day, value: 1, to: today) ?? now))
             if let reading = MindMoodForecast.forecast(self.forecastInputs(signals: MindSignals.make(
                 heartRateVariability: inputs?.heartRateVariability ?? [], restingHeartRate: inputs?.restingHeartRate ?? [],
                 respiratory: extras.respiratory, sleep: inputs?.sleep ?? [], peaks: [], now: now, calendar: calendar, words: words

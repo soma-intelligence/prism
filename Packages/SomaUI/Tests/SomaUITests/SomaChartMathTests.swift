@@ -76,4 +76,22 @@ struct SomaChartMathTests {
         #expect((SomaAnimatableVector([3, 3]) - SomaAnimatableVector([1, 2])).values == [2, 1])
         #expect(SomaAnimatableVector([3, 4]).magnitudeSquared == 25)
     }
+
+    @Test("The highest and lowest are found among the readings, the latest left out when asked")
+    func extremes() {
+        let values: [Double?] = [5, 9, nil, 2, 7, 12]
+        let all = SomaChartMath.extremes(values)
+        #expect(all?.high == 5)
+        #expect(all?.low == 3)
+        let before = SomaChartMath.extremes(values, excluding: 5)
+        #expect(before?.high == 1)
+        #expect(before?.low == 3)
+    }
+
+    @Test("No high or low to name under three readings, or when they are all the same")
+    func noExtremes() {
+        #expect(SomaChartMath.extremes([4, nil, 6]) == nil)
+        #expect(SomaChartMath.extremes([3, 3, 3, 3]) == nil)
+        #expect(SomaChartMath.extremes([]) == nil)
+    }
 }

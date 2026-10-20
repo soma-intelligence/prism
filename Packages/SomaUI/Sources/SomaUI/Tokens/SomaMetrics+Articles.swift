@@ -20,11 +20,6 @@ public extension SomaMetrics {
     var articleRowCoverSide: CGFloat { 76 }
     /// The narrowest a grid column may get before the grid drops a column.
     var articleTileMinWidth: CGFloat { 150 }
-    /// A card in the sideways rail of news.
-    var articleRailCardWidth: CGFloat { 236 }
-    /// A tile on a topic shelf: two and a bit show on a phone, so the shelf
-    /// says it scrolls.
-    var articleShelfCardWidth: CGFloat { 164 }
     /// The cover across the top of the reader page.
     var articleReaderCoverHeight: CGFloat { 300 }
     /// The featured card and the reader cover share this radius.

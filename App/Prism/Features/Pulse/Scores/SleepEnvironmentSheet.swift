@@ -59,7 +59,7 @@ struct SleepEnvironmentSheet: View {
                                 .somaFont(type.caption).foregroundStyle(colors.inkSecondary.color)
                         }
                     }
-                    .tint(colors.accent.color)
+                    .toggleStyle(.soma)
                     .padding(.vertical, theme.metrics.scoreRowSpacing)
                 }
             }
@@ -197,7 +197,9 @@ struct SleepPlaceLedgerSheet: View {
                         VStack(alignment: .trailing, spacing: 2) {
                             Text(night.score.map { "\(Int($0.rounded()))" } ?? "-")
                                 .somaFont(type.rowValue).foregroundStyle(colors.inkPrimary.color)
-                            Text(places.place(forNightEnding: night.day).map { "\($0.name) · set by you" } ?? "not set")
+                            Text(places.place(forNightEnding: night.day).map {
+                                places.isSetByHand(forNightEnding: night.day) ? "\($0.name) · set by you" : "\($0.name) · found"
+                            } ?? "not set")
                                 .somaFont(type.caption).foregroundStyle(colors.inkSecondary.color)
                         }
                     }

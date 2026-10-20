@@ -20,10 +20,15 @@ public struct SomaChartBucket: Identifiable, Equatable, Sendable {
     public var band: ClosedRange<Double>?
     /// The label under the plot, when this slot carries one.
     public var axisLabel: String?
-    /// When this slot was, as the readout says it while a finger rests on it.
+    /// When this slot was, as the head says it while a finger rests on it.
     public var readout: String
-    /// The value as the readout says it.
+    /// The value as the head says it.
     public var valueText: String?
+    /// What this slot's value means against the usual ("Above your usual"),
+    /// shown under the number while a finger rests on it.
+    public var note: String?
+    /// The tone of that line's dot.
+    public var tone: SomaCueTone
 
     public init(
         id: Int,
@@ -32,7 +37,9 @@ public struct SomaChartBucket: Identifiable, Equatable, Sendable {
         band: ClosedRange<Double>? = nil,
         axisLabel: String? = nil,
         readout: String,
-        valueText: String? = nil
+        valueText: String? = nil,
+        note: String? = nil,
+        tone: SomaCueTone = .neutral
     ) {
         self.id = id
         self.value = value
@@ -41,6 +48,8 @@ public struct SomaChartBucket: Identifiable, Equatable, Sendable {
         self.axisLabel = axisLabel
         self.readout = readout
         self.valueText = valueText
+        self.note = note
+        self.tone = tone
     }
 }
 
@@ -56,135 +65,184 @@ public enum SomaMetricChartStyle: Sendable, Equatable {
     case ranges
 }
 
-/// A metric's chart: the person's usual as a quiet band of ink behind, the
-/// values over it in the category's hue, the latest one full and the rest quieter,
-/// and a readout above that names the span until a finger reads one slot.
+/// The span's average, drawn as a quiet dotted line across the plot and
+/// named in the key above it.
+public struct SomaChartAverage: Equatable, Sendable {
+    public var value: Double
+    /// As the key says it: "Average 58 bpm".
+    public var text: String
+
+    public init(value: Double, text: String) {
+        self.value = value
+        self.text = text
+    }
+}
+
+/// A metric's chart, the one that carries a page: the person's usual as a
+/// calm band in the chart's hue, the span's average as a dotted line, the
+/// values over them with the latest marked, and the highest and lowest
+/// named where they sit. A small key above the plot says what the band and
+/// the line are, so no fact has to repeat them under the chart.
 ///
 /// It draws itself in when it arrives (bars rise one after another, a line
 /// traces left to right) and, when the span changes, every value glides to
 /// its new height and place rather than the chart blinking to the next one.
 /// Under Reduce Motion it arrives drawn and a new span fades in.
 ///
-/// Drag sideways across the plot, or tap it, to read one slot; the readout
-/// and a hairline rule follow the finger, and lifting it lets go. VoiceOver
-/// reads the summary and steps through slots with the adjustable action.
+/// Drag sideways across the plot, or tap it, to read one slot: a hairline
+/// rule and a ringed dot follow the finger, and the slot is handed to
+/// `selection`, so the page's head can show it (``SomaMetricStage`` does).
+/// Lifting the finger lets go. VoiceOver reads the summary and steps through
+/// slots with the adjustable action.
 public struct SomaMetricChart: View {
     private let buckets: [SomaChartBucket]
     private let style: SomaMetricChartStyle
     private let hue: SomaHealthHue
     private let domain: ClosedRange<Double>
-    private let bandLabels: (low: String, high: String)?
-    private let summaryLabel: String
-    private let summaryValue: String?
-    private let unit: String?
+    private let usualLabel: String?
+    private let average: SomaChartAverage?
+    private let summary: String
+    private let plotHeight: CGFloat?
+    private let showsExtremes: Bool
+    private let externalSelection: Binding<Int?>?
 
     @Environment(\.somaTheme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isDrawn = false
-    @State private var selected: Int?
+    @State private var ownSelection: Int?
     @State private var isScrubbing = false
 
     /// - Parameters:
     ///   - buckets: the span's slots, oldest first.
     ///   - domain: the values the plot's foot and top stand for.
-    ///   - bandLabels: the usual's edges as the gutter names them.
-    ///   - summaryLabel: what the readout says with no slot picked, such as
-    ///     "Average, Sep 20 to Oct 19".
-    ///   - summaryValue: the span's number for that line, nil for a dash.
-    ///   - unit: set small after any number the readout shows.
+    ///   - usualLabel: the band as the key names it: "Usual 56 to 58".
+    ///   - average: the span's average, for the dotted line and the key.
+    ///   - summary: what VoiceOver reads the chart as.
+    ///   - plotHeight: the plot's height; nil takes `metricChartHeight`.
+    ///   - showsExtremes: names the highest and lowest values on the plot.
+    ///   - selection: the slot a finger rests on; nil keeps it inside.
     public init(
         buckets: [SomaChartBucket],
         style: SomaMetricChartStyle,
         hue: SomaHealthHue,
         domain: ClosedRange<Double>,
-        bandLabels: (low: String, high: String)? = nil,
-        summaryLabel: String,
-        summaryValue: String?,
-        unit: String? = nil
+        usualLabel: String? = nil,
+        average: SomaChartAverage? = nil,
+        summary: String,
+        plotHeight: CGFloat? = nil,
+        showsExtremes: Bool = true,
+        selection: Binding<Int?>? = nil
     ) {
         self.buckets = buckets
         self.style = style
         self.hue = hue
         self.domain = domain
-        self.bandLabels = bandLabels
-        self.summaryLabel = summaryLabel
-        self.summaryValue = summaryValue
-        self.unit = unit
+        self.usualLabel = usualLabel
+        self.average = average
+        self.summary = summary
+        self.plotHeight = plotHeight
+        self.showsExtremes = showsExtremes
+        self.externalSelection = selection
     }
 
     private var values: [Double?] { buckets.map(\.value) }
     private var isEmpty: Bool { buckets.allSatisfy { $0.value == nil } }
     private var latest: Int? { buckets.lastIndex { $0.value != nil } }
+    private var selected: Int? { externalSelection.map(\.wrappedValue) ?? ownSelection }
     private var picked: SomaChartBucket? { selected.flatMap { buckets.indices.contains($0) ? buckets[$0] : nil } }
+    private var hasBand: Bool { buckets.contains { $0.band != nil } }
+
+    private func select(_ index: Int?) {
+        if let externalSelection {
+            externalSelection.wrappedValue = index
+        } else {
+            ownSelection = index
+        }
+    }
 
     /// What changes the drawn data, and so what a morph keys on.
-    private var shape: [Double?] { buckets.map(\.value) + buckets.map(\.low) + [domain.lowerBound, domain.upperBound] }
+    private var shape: [Double?] {
+        buckets.map(\.value) + buckets.map(\.low) + [domain.lowerBound, domain.upperBound, average?.value]
+    }
 
     public var body: some View {
         let metrics = theme.metrics
 
-        VStack(alignment: .leading, spacing: theme.metrics.cardSpacing) {
-            readout
-            HStack(alignment: .top, spacing: metrics.chartLabelGap) {
-                VStack(spacing: metrics.chartLabelGap) {
-                    plot
-                        .frame(height: metrics.metricChartHeight)
-                    axis
-                }
-                gutter
-                    .frame(width: metrics.metricChartGutter, height: metrics.metricChartHeight, alignment: .leading)
+        VStack(alignment: .leading, spacing: metrics.chartLabelGap) {
+            if usualLabel != nil || average != nil || plotHeight != nil {
+                // A stage's chart keeps the key's line even when a span has
+                // nothing to name (a day of a total), so the plot never jumps
+                // as the span changes.
+                key
+                    .padding(.bottom, metrics.chartLabelGap)
             }
+            plot
+                .frame(height: plotHeight ?? metrics.metricChartHeight)
+            axis
         }
         .onAppear { draw() }
         .sensoryFeedback(.selection, trigger: selected) { _, new in new != nil }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(summaryLabel))
+        .accessibilityLabel(Text(summary))
         .accessibilityValue(Text(accessibilityValue))
         .accessibilityAdjustableAction { direction in
             let known = buckets.indices.filter { buckets[$0].value != nil }
             guard !known.isEmpty else { return }
             let current = selected ?? latest ?? known[known.count - 1]
             switch direction {
-            case .increment: selected = known.first { $0 > current } ?? current
-            case .decrement: selected = known.last { $0 < current } ?? current
+            case .increment: select(known.first { $0 > current } ?? current)
+            case .decrement: select(known.last { $0 < current } ?? current)
             @unknown default: break
             }
         }
     }
 
     private var accessibilityValue: String {
-        if let picked { return [picked.readout, picked.valueText, unit].compactMap { $0 }.joined(separator: " ") }
-        return [summaryValue ?? "-", unit].compactMap { $0 }.joined(separator: " ")
+        if let picked { return [picked.readout, picked.valueText, picked.note].compactMap { $0 }.joined(separator: ", ") }
+        return [average?.text, usualLabel].compactMap { $0 }.joined(separator: ", ")
     }
 
-    // MARK: - Readout
+    // MARK: - Key
 
-    private var readout: some View {
+    /// What the dotted line and the band are, in a line above the plot.
+    private var key: some View {
+        let metrics = theme.metrics
         let colors = theme.colors
-        let label = picked?.readout ?? summaryLabel
-        let value = picked == nil ? summaryValue : picked?.valueText
+        let swatch = metrics.metricChartKeySwatch
 
-        return VStack(alignment: .leading, spacing: theme.metrics.metricFactSpacing) {
-            Text(label)
-                .somaFont(theme.typography.caption)
-                .foregroundStyle(colors.inkSecondary.color)
-                .lineLimit(1)
-                .contentTransition(.opacity)
-            HStack(alignment: .firstTextBaseline, spacing: theme.metrics.scoreLabelSpacing * 2) {
-                Text(value ?? "-")
-                    .somaFont(theme.typography.metricFact)
-                    .foregroundStyle(colors.inkPrimary.color)
-                    .contentTransition(reduceMotion ? .identity : .numericText())
-                if let unit, value != nil {
-                    Text(unit)
-                        .somaFont(theme.typography.caption)
-                        .foregroundStyle(colors.inkSecondary.color)
+        return ZStack(alignment: .leading) {
+            // Holds the line's height when there is nothing to name.
+            Text(verbatim: " ")
+                .hidden()
+            HStack(spacing: metrics.cardSpacing) {
+                if let average {
+                    HStack(spacing: metrics.metricHeroSpacing * 1.5) {
+                        SomaLevelShape(level: 0.5)
+                            .stroke(colors.inkSecondary.color, style: StrokeStyle(lineWidth: 1, lineCap: .round, dash: metrics.metricChartAverageDash))
+                            .frame(width: swatch, height: swatch / 2)
+                        Text(average.text)
+                            .somaRollingNumber(average.text)
+                    }
+                }
+                if let usualLabel, hasBand {
+                    HStack(spacing: metrics.metricHeroSpacing * 1.5) {
+                        RoundedRectangle(cornerRadius: 2, style: .continuous)
+                            .fill(bandTint.opacity(metrics.metricChartBandOpacity * 2))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 2, style: .continuous)
+                                    .strokeBorder(bandTint.opacity(metrics.metricChartBandEdgeOpacity), lineWidth: 0.5)
+                            }
+                            .frame(width: swatch, height: swatch * 0.6)
+                        Text(usualLabel)
+                    }
                 }
             }
         }
-        .animation(reduceMotion ? nil : theme.motion.chartScrub, value: label)
-        .animation(reduceMotion ? nil : theme.motion.numberRoll, value: value)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .somaFont(theme.typography.caption)
+        .foregroundStyle(colors.inkSecondary.color)
+        .lineLimit(1)
+        .minimumScaleFactor(0.8)
+        .animation(reduceMotion ? nil : theme.motion.numberRoll, value: average)
     }
 
     // MARK: - Plot
@@ -198,11 +256,13 @@ public struct SomaMetricChart: View {
                     .fill(theme.colors.inkPrimary.color.opacity(theme.metrics.chartGridOpacity))
                     .frame(width: size.width, height: 0.5)
                     .offset(y: size.height - 0.5)
+                averageLine
                 switch style {
                 case .bars, .ranges: bars(in: size)
                 case .line: line(in: size)
                 case .points: points(in: size)
                 }
+                extremes(in: size)
                 rule(in: size)
                 if isEmpty {
                     Text("Nothing recorded in this span")
@@ -217,12 +277,14 @@ public struct SomaMetricChart: View {
             .id(reduceMotion ? AnyHashable(shape) : AnyHashable(0))
             .transition(.opacity)
             .contentShape(.rect)
+            // A sideways drag here reads the chart, not the tab's parts.
+            .somaClaimsSwipe()
             .simultaneousGesture(scrub(width: size.width))
             .simultaneousGesture(
                 SpatialTapGesture().onEnded { tap in
                     let index = SomaChartMath.nearestKnown(SomaChartMath.slot(at: tap.location.x / max(1, size.width), count: buckets.count), in: values)
                     withAnimation(reduceMotion ? nil : theme.motion.chartScrub) {
-                        selected = selected == index ? nil : index
+                        select(selected == index ? nil : index)
                     }
                 }
             )
@@ -242,13 +304,19 @@ public struct SomaMetricChart: View {
                 let slot = SomaChartMath.slot(at: drag.location.x / max(1, width), count: buckets.count)
                 let index = SomaChartMath.nearestKnown(slot, in: values)
                 guard index != selected else { return }
-                withAnimation(reduceMotion ? nil : theme.motion.chartScrub) { selected = index }
+                withAnimation(reduceMotion ? nil : theme.motion.chartScrub) { select(index) }
             }
             .onEnded { _ in
                 guard isScrubbing else { return }
                 isScrubbing = false
-                withAnimation(reduceMotion ? nil : theme.motion.chartScrub) { selected = nil }
+                withAnimation(reduceMotion ? nil : theme.motion.chartScrub) { select(nil) }
             }
+    }
+
+    /// The band's tint: the chart's hue softened most of the way to the
+    /// secondary ink, calm in both appearances.
+    private var bandTint: Color {
+        hue.color.mix(with: theme.colors.inkSecondary.color, by: theme.metrics.metricChartBandMix)
     }
 
     @ViewBuilder
@@ -256,13 +324,35 @@ public struct SomaMetricChart: View {
         let lower = buckets.map { $0.band?.lowerBound }
         let upper = buckets.map { $0.band?.upperBound }
         if lower.contains(where: { $0 != nil }) {
-            SomaBandShape(
-                lower: SomaChartMath.curve(lower, domain: domain, count: theme.metrics.metricChartSamples),
-                upper: SomaChartMath.curve(upper, domain: domain, count: theme.metrics.metricChartSamples)
-            )
-            .fill(theme.colors.inkPrimary.color.opacity(theme.metrics.metricChartBandOpacity))
+            let metrics = theme.metrics
+            let low = SomaChartMath.curve(lower, domain: domain, count: metrics.metricChartSamples)
+            let high = SomaChartMath.curve(upper, domain: domain, count: metrics.metricChartSamples)
+            ZStack {
+                SomaBandShape(lower: low, upper: high)
+                    .fill(bandTint.opacity(metrics.metricChartBandOpacity))
+                SomaCurveShape(curve: high, closed: false, spansWidth: true)
+                    .stroke(bandTint.opacity(metrics.metricChartBandEdgeOpacity), lineWidth: 0.5)
+                SomaCurveShape(curve: low, closed: false, spansWidth: true)
+                    .stroke(bandTint.opacity(metrics.metricChartBandEdgeOpacity), lineWidth: 0.5)
+            }
             .opacity(isDrawn ? 1 : 0)
             .transition(.opacity)
+        }
+    }
+
+    /// The span's average as a dotted line across the plot.
+    @ViewBuilder
+    private var averageLine: some View {
+        if let average, !isEmpty {
+            let metrics = theme.metrics
+            SomaLevelShape(level: SomaChartMath.height(average.value, in: domain))
+                .stroke(
+                    theme.colors.inkSecondary.color.opacity(metrics.metricChartAverageOpacity),
+                    style: StrokeStyle(lineWidth: 1, lineCap: .round, dash: metrics.metricChartAverageDash)
+                )
+                .opacity(isDrawn ? 1 : 0)
+                .transition(.opacity)
+                .allowsHitTesting(false)
         }
     }
 
@@ -350,7 +440,7 @@ public struct SomaMetricChart: View {
     }
 
     /// Every reading on a sparse chart; on a line, the latest and the one a
-    /// finger rests on.
+    /// finger rests on. The one being read wears a soft halo.
     private func dots(in size: CGSize, all: Bool) -> some View {
         let metrics = theme.metrics
         let count = buckets.count
@@ -358,24 +448,83 @@ public struct SomaMetricChart: View {
             if let value = bucket.value, all || bucket.id == latest || bucket.id == selected {
                 let lead = bucket.id == (selected ?? latest)
                 let diameter = lead ? metrics.metricChartEndDot : metrics.metricChartPoint
-                Circle()
-                    .fill(all && !lead ? tint(at: bucket.id) : theme.colors.surface.color)
-                    .overlay {
-                        if !all || lead { Circle().strokeBorder(hue.color, lineWidth: metrics.metricChartLine) }
+                ZStack {
+                    if lead {
+                        Circle()
+                            .fill(hue.color.opacity(metrics.metricChartHaloOpacity))
+                            .frame(width: diameter * metrics.metricChartHaloScale, height: diameter * metrics.metricChartHaloScale)
                     }
-                    .frame(width: diameter, height: diameter)
-                    .position(
-                        x: SomaChartMath.center(of: bucket.id, count: count) * size.width,
-                        y: (1 - SomaChartMath.height(value, in: domain)) * size.height
-                    )
-                    .opacity(isDrawn ? 1 : 0)
-                    .animation(
-                        reduceMotion ? nil : theme.motion.chartDraw.delay(theme.motion.chartStagger * Double(bucket.id) / Double(max(1, count))),
-                        value: isDrawn
-                    )
-                    .transition(.opacity)
+                    Circle()
+                        .fill(all && !lead ? tint(at: bucket.id) : theme.colors.surface.color)
+                        .overlay {
+                            if !all || lead { Circle().strokeBorder(hue.color, lineWidth: metrics.metricChartLine) }
+                        }
+                        .frame(width: diameter, height: diameter)
+                }
+                .position(
+                    x: SomaChartMath.center(of: bucket.id, count: count) * size.width,
+                    y: (1 - SomaChartMath.height(value, in: domain)) * size.height
+                )
+                .opacity(isDrawn ? 1 : 0)
+                .animation(
+                    reduceMotion ? nil : theme.motion.chartDraw.delay(theme.motion.chartStagger * Double(bucket.id) / Double(max(1, count))),
+                    value: isDrawn
+                )
+                .transition(.opacity)
             }
         }
+    }
+
+    /// The highest and lowest values before the latest, named where they
+    /// sit; they step back
+    /// while a finger reads the chart, when the head says the value instead.
+    @ViewBuilder
+    private func extremes(in size: CGSize) -> some View {
+        if showsExtremes, style != .ranges, let marks = SomaChartMath.extremes(values, excluding: latest) {
+            let metrics = theme.metrics
+            let labelHeight = theme.typography.captionValue.size * 1.3
+            let gap = metrics.metricChartExtremeGap
+            let inset = metrics.metricChartLabelInset
+            // On bars only the high is named: the low sits among taller
+            // bars, where its label would lie across them.
+            ForEach(style == .bars ? [marks.high] : [marks.high, marks.low], id: \.self) { index in
+                if let value = buckets[index].value, let text = buckets[index].valueText {
+                    let isHigh = index == marks.high
+                    let markY = (1 - SomaChartMath.height(value, in: domain)) * size.height
+                    let dot = metrics.metricChartEndDot / 2
+                    // A bar's label sits on its top; a dot's above or under it.
+                    let below = !isHigh && style != .bars
+                    let y = below ? markY + dot + gap + labelHeight / 2 : markY - dot - gap - labelHeight / 2
+                    let x = min(max(SomaChartMath.center(of: index, count: buckets.count) * size.width, inset), size.width - inset)
+                    // A label that would sit on the latest mark gives way to it.
+                    // A label held in from the edge would sit off its mark, and
+                    // one beside the latest would sit on its line: both give way.
+                    let held = abs(x - SomaChartMath.center(of: index, count: buckets.count) * size.width) > 1
+                    let besideLatest = latest.map { abs($0 - index) <= 1 } ?? false
+                    if !collidesWithLatest(x: x, y: y, in: size, labelHeight: labelHeight), !(held && besideLatest) {
+                    Text(text)
+                        .somaFont(theme.typography.captionValue)
+                        .foregroundStyle(theme.colors.inkSecondary.color)
+                        .fixedSize()
+                        .position(x: x, y: min(max(y, labelHeight / 2), size.height - labelHeight / 2))
+                    }
+                }
+            }
+            .opacity(isDrawn && selected == nil ? 1 : 0)
+            .animation(reduceMotion ? nil : theme.motion.chartScrub, value: selected == nil)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+        }
+    }
+
+    /// Whether a label centred at `x`, `y` would cover the latest mark.
+    private func collidesWithLatest(x: CGFloat, y: CGFloat, in size: CGSize, labelHeight: CGFloat) -> Bool {
+        guard let latest, let value = buckets[latest].value else { return false }
+        let markX = SomaChartMath.center(of: latest, count: buckets.count) * size.width
+        let markY = (1 - SomaChartMath.height(value, in: domain)) * size.height
+        let reach = theme.metrics.metricChartEndDot * theme.metrics.metricChartHaloScale / 2
+        return abs(markX - x) < theme.metrics.metricChartLabelInset + reach
+            && abs(markY - y) < labelHeight / 2 + reach
     }
 
     @ViewBuilder
@@ -414,37 +563,6 @@ public struct SomaMetricChart: View {
         .animation(reduceMotion ? theme.motion.chartFade : theme.motion.chartMorph, value: buckets.map(\.axisLabel))
     }
 
-    /// The usual's two edges on the trailing side, or the plot's top and
-    /// foot when there is no usual yet.
-    private var gutter: some View {
-        GeometryReader { proxy in
-            let height = proxy.size.height
-            let latestBand = latest.flatMap { buckets[$0].band } ?? buckets.compactMap(\.band).last
-            let labelHeight = theme.typography.captionValue.size * 1.3
-            if let bandLabels, let latestBand {
-                let high = (1 - SomaChartMath.height(latestBand.upperBound, in: domain)) * height
-                let low = (1 - SomaChartMath.height(latestBand.lowerBound, in: domain)) * height
-                if low - high < labelHeight {
-                    label(bandLabels.high, y: (high + low) / 2, height: height)
-                } else {
-                    label(bandLabels.high, y: high, height: height)
-                    label(bandLabels.low, y: low, height: height)
-                }
-            }
-        }
-        .opacity(isDrawn ? 1 : 0)
-    }
-
-    private func label(_ text: String, y: CGFloat, height: CGFloat) -> some View {
-        Text(text)
-            .somaFont(theme.typography.captionValue)
-            .foregroundStyle(theme.colors.inkSecondary.color)
-            .lineLimit(1)
-            .minimumScaleFactor(0.7)
-            .frame(width: theme.metrics.metricChartGutter, alignment: .leading)
-            .position(x: theme.metrics.metricChartGutter / 2, y: min(max(y, 8), height - 8))
-    }
-
     private func draw() {
         guard !isDrawn else { return }
         if reduceMotion {
@@ -463,6 +581,9 @@ public struct SomaMetricChart: View {
 struct SomaCurveShape: Shape {
     var curve: SomaChartCurve
     var closed: Bool
+    /// Spread the samples across the whole width rather than between the
+    /// first and last slots' centres, as the band's edges are.
+    var spansWidth = false
 
     var animatableData: AnimatablePair<AnimatablePair<Double, Double>, SomaAnimatableVector> {
         get { AnimatablePair(AnimatablePair(curve.start, curve.end), SomaAnimatableVector(curve.samples)) }
@@ -477,9 +598,11 @@ struct SomaCurveShape: Shape {
         var path = Path()
         let samples = curve.samples
         guard samples.count >= 2 else { return path }
+        let start = spansWidth ? 0 : curve.start
+        let end = spansWidth ? 1 : curve.end
         let points = samples.enumerated().map { index, value in
             CGPoint(
-                x: rect.minX + (curve.start + (curve.end - curve.start) * Double(index) / Double(samples.count - 1)) * rect.width,
+                x: rect.minX + (start + (end - start) * Double(index) / Double(samples.count - 1)) * rect.width,
                 y: rect.minY + (1 - value) * rect.height
             )
         }
@@ -490,6 +613,24 @@ struct SomaCurveShape: Shape {
             path.addLine(to: CGPoint(x: first.x, y: rect.maxY))
             path.closeSubpath()
         }
+        return path
+    }
+}
+
+/// A level line across the plot, at a share of its height from the foot.
+struct SomaLevelShape: Shape {
+    var level: Double
+
+    var animatableData: Double {
+        get { level }
+        set { level = newValue }
+    }
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let y = rect.minY + (1 - level) * rect.height
+        path.move(to: CGPoint(x: rect.minX, y: y))
+        path.addLine(to: CGPoint(x: rect.maxX, y: y))
         return path
     }
 }
@@ -545,12 +686,12 @@ private let previewStepDays: [SomaChartBucket] = ["M", "T", "W", "T", "F", "S", 
         ScrollView {
             VStack(alignment: .leading, spacing: 32) {
                 SomaMetricChart(buckets: previewHeartDays, style: .line, hue: .heart, domain: 48...66,
-                                bandLabels: ("54", "60"), summaryLabel: "Average, last 30 days",
-                                summaryValue: "57", unit: "bpm")
+                                usualLabel: "Usual 54 to 60", average: SomaChartAverage(value: 57, text: "Average 57 bpm"),
+                                summary: "Resting heart rate, last 30 days", plotHeight: 248)
                 SomaMetricChart(buckets: previewStepDays, style: .bars, hue: .activity, domain: 0...13_000,
-                                summaryLabel: "Average, this week", summaryValue: "7,643", unit: "steps")
-                SomaMetricChart(buckets: [], style: .points, hue: .body, domain: 0...1,
-                                summaryLabel: "No readings yet", summaryValue: nil)
+                                usualLabel: "Usual 5,500 to 9,000", average: SomaChartAverage(value: 7_643, text: "Average 7,643"),
+                                summary: "Steps this week")
+                SomaMetricChart(buckets: [], style: .points, hue: .body, domain: 0...1, summary: "No readings yet")
             }
             .padding()
         }

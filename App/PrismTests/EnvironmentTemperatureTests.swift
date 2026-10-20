@@ -64,4 +64,11 @@ struct EnvironmentTemperatureTests {
         #expect(place.latitude == 37.44)
         #expect(place.longitude == -122.16)
     }
+
+    @Test("The quiet line under the outside chart: low, high and humidity, as many as are known")
+    func outsideNote() {
+        #expect(EnvironmentTemperature.note(low: 11.6, high: 19.8, humidity: 61.4) == "Low 12°, high 20°, humidity 61%")
+        #expect(EnvironmentTemperature.note(low: nil, high: 19.8, humidity: nil) == "High 20°")
+        #expect(EnvironmentTemperature.note(low: nil, high: nil, humidity: nil) == nil)
+    }
 }

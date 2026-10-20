@@ -7,11 +7,14 @@ import SwiftUI
 import SomaUI
 import HealthExportCore
 
-/// One Health category in the Vault, laid out as iOS 27 Apple Health lays a
-/// category out: the page washed in the category's hue under a large title,
-/// a card per data type that has readings this week (its name in the hue, the
-/// latest value large, seven small bars), then every type with nothing in a
-/// plain list under "No Data Available".
+/// One Health category, set in Soma's own language rather than Health's
+/// (owner, 2026-10-20: the category pages looked too much like Apple
+/// Health): the aspect's soft wash behind an inline title, a head with the
+/// aspect's glyph and how many measures read this week, then the measures
+/// with readings as quiet rows on one card (the name, when it was read, the
+/// week as a small line in the aspect's tone, the latest value), and the
+/// rest as plain names under "Nothing yet". The same rows a score page
+/// lists its readings with, so a category reads like the pages around it.
 struct BodyCategoryPage: View {
     let category: BodyCategory
 
@@ -31,38 +34,40 @@ struct BodyCategoryPage: View {
 
     var body: some View {
         let metrics = theme.metrics
+        let aspect = category.aspect
 
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: metrics.cardSpacing) {
+        SomaPageScroll {
+            VStack(alignment: .leading, spacing: metrics.leadSpacing) {
+                BodyCategoryHead(category: category, withData: hasRead ? withData.count : nil)
+
                 if !withData.isEmpty {
-                    heading("Past 7 Days")
-                    ForEach(withData) { type in
-                        if let summary = summaries[type] {
+                    section("This week") {
+                        SomaBrowseGroup(withData, hasGlyphs: false) { type in
                             NavigationLink(value: VaultRoute.dataType(type)) {
-                                SomaHealthSummaryCard(
-                                    symbol: category.symbol,
-                                    title: LocalizedStringResource(stringLiteral: type.title),
-                                    hue: category.hue,
-                                    date: summary.date,
-                                    value: summary.value,
-                                    unit: summary.unit,
-                                    bars: summary.bars
+                                let summary = summaries[type]
+                                SomaReadingRow(
+                                    title: MetricPageWords.title(identifier: type.metric.identifier, fallback: type.title),
+                                    caption: summary?.date,
+                                    value: summary?.value,
+                                    unit: summary?.unit,
+                                    week: summary?.bars ?? [],
+                                    aspect: aspect
                                 )
                             }
-                            .buttonStyle(.somaGlassPress)
+                            .buttonStyle(.plain)
                         }
                     }
                 }
 
                 if hasRead, !withoutData.isEmpty {
-                    heading("No Data Available")
-                        .padding(.top, metrics.cardSpacing)
-                    SomaBrowseGroup(withoutData, hasGlyphs: false) { type in
-                        NavigationLink(value: VaultRoute.dataType(type)) {
-                            SomaBrowseRow(title: type.title)
-                                .contentShape(.rect)
+                    section("Nothing yet") {
+                        SomaBrowseGroup(withoutData, hasGlyphs: false) { type in
+                            NavigationLink(value: VaultRoute.dataType(type)) {
+                                SomaBrowseRow(title: MetricPageWords.title(identifier: type.metric.identifier, fallback: type.title))
+                                    .contentShape(.rect)
+                            }
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
                     }
                 } else if !hasRead {
                     ProgressView()
@@ -75,34 +80,24 @@ struct BodyCategoryPage: View {
             .frame(maxWidth: metrics.pageMaxWidth, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
-        .background {
-            // The category's hue at the top, fading into the ground: pinned to
-            // the screen, so a pull never shows a band of bare ground above it.
-            ZStack(alignment: .top) {
-                theme.colors.canvas.color
-                LinearGradient(
-                    colors: [category.hue.start.color.opacity(0.55), category.hue.start.color.opacity(0)],
-                    startPoint: .top, endPoint: .bottom
-                )
-                .frame(height: 340)
-            }
-            .ignoresSafeArea()
-        }
+        .aspectWash(aspect)
         .navigationTitle(category.title)
 #if os(iOS)
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
 #endif
         .task { await load() }
         .refreshable { await load() }
     }
 
-    private func heading(_ text: LocalizedStringResource) -> some View {
-        Text(text)
-            .somaFont(theme.typography.title)
-            .fontWeight(.bold)
-            .foregroundStyle(theme.colors.inkPrimary.color)
-            .accessibilityAddTraits(.isHeader)
-            .padding(.horizontal, theme.metrics.browseRowPadding)
+    private func section<Content: View>(_ title: LocalizedStringResource, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: theme.metrics.cardSpacing) {
+            Text(title)
+                .somaFont(theme.typography.eyebrow)
+                .textCase(.uppercase)
+                .foregroundStyle(theme.colors.inkSecondary.color)
+                .accessibilityAddTraits(.isHeader)
+            content()
+        }
     }
 
     private func load() async {
@@ -110,24 +105,71 @@ struct BodyCategoryPage: View {
             hasRead = true
             return
         }
-        let reader = VaultReader(source: source)
-        let now = Date()
-        let read = await withTaskGroup(of: (BodyDataType, VaultWeekSummary).self) { group in
-            for type in category.types {
-                group.addTask {
-                    // The seven days end on the latest reading, as Health's do:
-                    // a watch left off for a week still shows its last week.
-                    let latest = await reader.latestRecord(type.metric)
-                    let points = await reader.series(type.metric, period: .week, now: latest?.end ?? now)
-                    return (type, VaultWeekSummary.make(type.metric, points: points, latest: latest))
-                }
-            }
-            var result: [BodyDataType: VaultWeekSummary] = [:]
-            for await (type, summary) in group { result[type] = summary }
-            return result
-        }
-        summaries = read
+        summaries = await VaultWeekSummary.read(category.types, from: source, now: Date())
         hasRead = true
+    }
+}
+
+/// The head of a category: the aspect's glyph on its tinted square (or the
+/// category's symbol on a recessed one, for the few that belong to no
+/// aspect), the category's name, and how many of its measures read this
+/// week.
+private struct BodyCategoryHead: View {
+    let category: BodyCategory
+    let withData: Int?
+
+    @Environment(\.somaTheme) private var theme
+
+    var body: some View {
+        let metrics = theme.metrics
+        let colors = theme.colors
+
+        HStack(spacing: metrics.moveRowGap) {
+            if let aspect = category.aspect {
+                SomaAspectGlyph(aspect, style: .badge)
+            } else {
+                Image(systemName: category.symbol)
+                    .foregroundStyle(colors.inkSecondary.color)
+                    .frame(width: metrics.aspectBadgeSide, height: metrics.aspectBadgeSide)
+                    .background(RoundedRectangle(cornerRadius: metrics.aspectBadgeCornerRadius, style: .continuous)
+                        .fill(colors.surfaceRecessed.color))
+            }
+            VStack(alignment: .leading, spacing: metrics.readingRowLineGap) {
+                Text(category.title)
+                    .somaFont(theme.typography.headline)
+                    .foregroundStyle(colors.inkPrimary.color)
+                Text(BodyCategoryPage.countLine(withData: withData, of: category.types.count))
+                    .somaFont(theme.typography.caption)
+                    .foregroundStyle(colors.inkSecondary.color)
+            }
+        }
+        .padding(.top, metrics.scoreHeroTopPadding)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+extension BodyCategoryPage {
+    /// "3 of 12 measures read this week", or the count alone before the read.
+    static func countLine(withData: Int?, of total: Int) -> String {
+        guard let withData else { return total == 1 ? "1 measure" : "\(total) measures" }
+        if withData == 0 { return "Nothing read this week" }
+        return "\(withData) of \(total) read this week"
+    }
+}
+
+extension BodyCategory {
+    /// The aspect a category belongs to, whose glyph and tone it wears; nil
+    /// for the few that belong to none (hearing, everything else).
+    var aspect: SomaAspect? {
+        switch title {
+        case "Activity", "Mobility": .activity
+        case "Body Measurements", "Cycle Tracking", "Medications", "Symptoms": .body
+        case "Heart", "Vitals", "Respiratory": .heart
+        case "Mental Wellbeing": .mind
+        case "Nutrition": .gut
+        case "Sleep": .sleep
+        default: nil
+        }
     }
 }
 
@@ -152,7 +194,7 @@ struct VaultWeekSummary: Sendable, Equatable {
             return VaultWeekSummary(
                 bars: bars,
                 value: VaultFormat.number(isCount ? value : VaultFormat.scaled(value, unit: metric.unit)),
-                unit: isCount ? String(localized: "records") : metric.unit.shortLabel,
+                unit: isCount ? (value == 1 ? String(localized: "record") : String(localized: "records")) : metric.unit.shortLabel,
                 date: last.interval.start.formatted(dateStyle)
             )
         }

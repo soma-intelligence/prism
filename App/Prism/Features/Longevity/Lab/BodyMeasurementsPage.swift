@@ -302,7 +302,7 @@ struct MeasurementReviewView: View {
     var body: some View {
         let measured = entry.values.count
         let skipped = BodyMeasurementKind.allCases.filter { entry.values[$0] == nil }
-        ScrollView {
+        SomaPageScroll {
             VStack(alignment: .leading, spacing: theme.metrics.leadSpacing) {
                 SomaPageHero(
                     eyebrow: "\(Calendar.current.isDateInToday(entry.date) ? "Today" : entry.date.labDay) · \(measured) of five places",

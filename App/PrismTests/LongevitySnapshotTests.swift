@@ -29,9 +29,7 @@ struct LongevitySnapshotTests {
         environment = EnvironmentLensSnapshot(
             report: report, outdoorNight: 11.2, noise: 34,
             place: EnvironmentSun.Place(latitude: 37.44, longitude: -122.14, name: "Palo Alto"),
-            isHere: true,
-            sleepPlaces: [EnvironmentSleepPlace(id: "home", name: "Home", latitude: 37.4, longitude: -122.1,
-                                                nights: 12, score: 81, isLastNight: true)]
+            isHere: true
         )
     }
 
@@ -250,10 +248,13 @@ struct LongevitySnapshotTests {
         let slots = MindStressSlots(samples, dayStart: dayStart)
         #expect(slots.heights.count == MindStressSlots.count)
         #expect(slots.present.filter { $0 }.count == 4)
-        #expect(slots.runs == [[0, 1, 2], [6]])
-        #expect(slots.heights[2] == 0.2)
-        #expect(slots.heights[3] == 0.2, "The nearest reading before the gap")
-        #expect(slots.heights[49] == 0.6)
+        // The grid starts six hours (twelve half hours) before midnight.
+        let b = MindStressSlots.before
+        #expect(slots.runs == [[b, b + 1, b + 2], [b + 6]])
+        #expect(slots.heights[b + 2] == 0.2)
+        #expect(slots.heights[b + 3] == 0.2, "The nearest reading before the gap")
+        #expect(slots.heights[MindStressSlots.count - 1] == 0.6)
+        #expect(slots.heights[0] == 0, "The evening before carries the first reading's height")
         #expect(MindStressSlots([], dayStart: dayStart).heights.allSatisfy { $0 == 0 })
     }
 }

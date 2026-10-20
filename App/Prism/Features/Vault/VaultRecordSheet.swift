@@ -7,8 +7,9 @@ import SwiftUI
 import SomaUI
 import HealthExportCore
 
-/// One record, field by field: the value, when it began and ended, how long it
-/// ran, what wrote it and on what, whether it was typed in, and its grade.
+/// One record, set like a metric page: when it was taken over the value
+/// itself, large and light, then its grade as marks with the word for it,
+/// when it began and ended, and what wrote it.
 struct VaultRecordSheet: View {
     let reading: HealthReading
     let metric: HealthMetric
@@ -16,55 +17,66 @@ struct VaultRecordSheet: View {
     @Environment(\.somaTheme) private var theme
     @Environment(\.dismiss) private var dismiss
 
-    private struct Field: Identifiable {
+    struct Field: Identifiable, Equatable {
         let title: String
         let value: String
         var id: String { title }
     }
 
-    private var fields: [Field] {
-        let formatted = VaultFormat.value(of: reading, metric: metric)
-        let seconds = reading.end.timeIntervalSince(reading.start)
-        return [
-            Field(title: "Value", value: formatted.value),
-            Field(title: "Unit", value: formatted.unit ?? "-"),
-            Field(title: "Start", value: reading.start.formatted(date: .abbreviated, time: .standard)),
-            Field(title: "End", value: reading.end.formatted(date: .abbreviated, time: .standard)),
-            Field(title: "Duration", value: seconds > 0 ? VaultFormat.duration(seconds) : "Instant"),
-            Field(title: "Source", value: reading.source ?? "-"),
-            Field(title: "Device", value: reading.device ?? "-"),
-            Field(title: "Model", value: reading.deviceModel ?? "-"),
-            Field(title: "Entered by hand", value: reading.wasUserEntered ? "Yes" : "No"),
-        ]
-    }
-
     var body: some View {
+        let metrics = theme.metrics
+        let formatted = VaultFormat.value(of: reading, metric: metric)
         let quality = ReadingQuality.grade(reading)
+        let title = MetricPageWords.title(identifier: metric.identifier, fallback: metric.displayName)
 
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: theme.metrics.browseSectionSpacing) {
-                    VStack(alignment: .leading, spacing: theme.metrics.browseHeadingSpacing) {
+            SomaPageScroll {
+                VStack(alignment: .leading, spacing: metrics.leadSpacing) {
+                    SomaMetricHero(
+                        caption: Self.caption(reading),
+                        value: formatted.value,
+                        unit: formatted.unit,
+                        meaning: nil
+                    )
+
+                    section("Quality") {
                         SomaBrowseGroup([quality.level], hasGlyphs: false) { level in
-                            SomaBrowseRow(title: "Quality", detail: level.title, opensSomething: false) {
+                            HStack(spacing: metrics.browseRowSpacing) {
+                                VStack(alignment: .leading, spacing: metrics.readingRowLineGap) {
+                                    Text(MetricPageWords.quality(level) ?? String(localized: "Not known"))
+                                        .somaFont(theme.typography.body)
+                                        .foregroundStyle(theme.colors.inkPrimary.color)
+                                    Text(quality.reason)
+                                        .somaFont(theme.typography.caption)
+                                        .foregroundStyle(theme.colors.inkSecondary.color)
+                                }
+                                Spacer(minLength: metrics.browseRowSpacing)
                                 SomaQualityMarks(filled: level.marks, of: ReadingQuality.scale)
                             }
+                            .padding(.horizontal, metrics.browseRowPadding)
+                            .padding(.vertical, metrics.browseRowVerticalPadding)
+                            .frame(minHeight: metrics.browseRowMinHeight)
+                            .accessibilityElement(children: .combine)
                         }
-
-                        Text(quality.reason)
-                            .somaFont(theme.typography.caption)
-                            .foregroundStyle(theme.colors.inkSecondary.color)
-                            .padding(.horizontal, theme.metrics.browseRowPadding)
                     }
 
-                    SomaBrowseGroup(fields, hasGlyphs: false) { field in
-                        SomaBrowseRow(title: field.title, detail: field.value, opensSomething: false)
+                    section("When") {
+                        SomaBrowseGroup(Self.when(reading), hasGlyphs: false) { field in
+                            SomaBrowseRow(title: field.title, detail: field.value, opensSomething: false)
+                        }
+                    }
+
+                    section("Source") {
+                        SomaBrowseGroup(Self.source(reading), hasGlyphs: false) { field in
+                            SomaBrowseRow(title: field.title, detail: field.value, opensSomething: false)
+                        }
                     }
                 }
-                .padding(theme.metrics.pagePadding)
+                .padding(.horizontal, metrics.pagePadding)
+                .padding(.bottom, metrics.pagePadding)
             }
-            .background(theme.colors.canvas.color.ignoresSafeArea())
-            .navigationTitle(metric.displayName)
+            .aspectWash(BodyCategory.containing(BodyDataType(metric))?.aspect)
+            .navigationTitle(title)
 #if !os(macOS)
             .navigationBarTitleDisplayMode(.inline)
 #endif
@@ -75,6 +87,56 @@ struct VaultRecordSheet: View {
             }
         }
         .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+    }
+
+    private func section<Content: View>(_ title: LocalizedStringResource, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: theme.metrics.cardSpacing) {
+            Text(title)
+                .somaFont(theme.typography.eyebrow)
+                .textCase(.uppercase)
+                .foregroundStyle(theme.colors.inkSecondary.color)
+                .accessibilityAddTraits(.isHeader)
+            content()
+        }
+    }
+
+    /// "Today at 10:00", "Yesterday at 23:12 to 06:48".
+    static func caption(_ reading: HealthReading, now: Date = .now, calendar: Calendar = .current) -> String {
+        let day = VaultWords.day(reading.start, now: now, calendar: calendar)
+        let time = VaultWords.time(start: reading.start, end: reading.end, calendar: calendar)
+        return String(localized: "\(day) at \(time)")
+    }
+
+    /// When it began, when it ended and how long it ran; an instant reading
+    /// gives one time and no length.
+    static func when(_ reading: HealthReading, calendar: Calendar = .current) -> [Field] {
+        let style = Date.FormatStyle(locale: calendar.locale ?? .current, calendar: calendar, timeZone: calendar.timeZone)
+            .month(.abbreviated).day().hour().minute().second()
+        let seconds = reading.end.timeIntervalSince(reading.start)
+        guard seconds > 0 else {
+            return [Field(title: String(localized: "Taken"), value: reading.start.formatted(style))]
+        }
+        return [
+            Field(title: String(localized: "Began"), value: reading.start.formatted(style)),
+            Field(title: String(localized: "Ended"), value: reading.end.formatted(style)),
+            Field(title: String(localized: "Lasted"), value: VaultFormat.duration(seconds)),
+        ]
+    }
+
+    /// What wrote it and on what; a field Health left empty is left out, and
+    /// a record typed in says so.
+    static func source(_ reading: HealthReading) -> [Field] {
+        var fields: [Field] = [Field(title: String(localized: "App"), value: reading.source ?? "-")]
+        if let device = reading.device, !device.isEmpty {
+            fields.append(Field(title: String(localized: "Device"), value: device))
+        }
+        if let model = reading.deviceModel, !model.isEmpty, model != reading.device {
+            fields.append(Field(title: String(localized: "Model"), value: model))
+        }
+        fields.append(Field(title: String(localized: "Entered by hand"),
+                            value: reading.wasUserEntered ? String(localized: "Yes") : String(localized: "No")))
+        return fields
     }
 }
 

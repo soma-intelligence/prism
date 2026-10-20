@@ -134,6 +134,7 @@ public struct SomaValenceSlider: View {
                     .animation(reduceMotion || dragShare != nil ? nil : theme.motion.selection, value: share)
             }
             .contentShape(.rect)
+            .somaClaimsSwipe()
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { drag in

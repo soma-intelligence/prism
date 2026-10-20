@@ -7,49 +7,202 @@ import SwiftUI
 import SomaUI
 import HealthScoring
 
-/// Sleep: the gauge against last week, what moved it against your usual,
-/// last night's stages, and the rows that open debt, the night dip,
-/// breathing, the room and how the score is built.
+/// Sleep, the score's page: the score with its ring, a month of nights
+/// against the usual, last night as a card that opens its own page, the
+/// averages of the last week against the month, how regular the nights
+/// were, what moved the score, and the readings behind it.
+///
+/// Everything about one night lives on ``LastNightPage``; this page reads
+/// sleep over time (owner, 2026-10-20: two sleep pages). The score and the
+/// night card each open one, and each links to the other.
 struct SleepPage: View {
     @Environment(HealthDashboard.self) private var health
     @State private var inputs: ScoreDetailInputs?
     @State private var sheet: Sheet?
 
     enum Sheet: String, Identifiable {
-        case debt, dip, breathing, environment, built, history
+        case debt, built
         var id: String { rawValue }
     }
 
     var body: some View {
-        let page = ScorePages.sleep(health.scores, inputs)
+        let scores = health.scores
+        let page = ScorePages.sleep(scores, inputs)
+        let detail = scores?.detail ?? SomaScores.Detail()
 
         ScorePageScaffold(aspect: .sleep, title: "Sleep") {
-            ScoreGauge(aspect: .sleep, lead: page.lead)
+            ScoreStage(aspect: .sleep, lead: page.lead, series: scores?.sleepSeries ?? [], caption: "Last night")
             ScoreHead(page.lead)
+            TileLink(value: ScoreRoute.lastNight) { PulseSleepCard(scores: scores) }
+                .accessibilityHint(Text("Opens last night"))
+            SleepAveragesCard(averages: SleepAverages.make(detail))
+            SleepRhythmCard(nights: SleepAverages.windows(detail, nights: 14, calendar: .current),
+                            note: SleepAverages.rhythmNote(detail))
             ScoreUsualCard(title: "What moved it", aspect: .sleep, lines: page.lines)
-            SleepLastNightSection(night: SleepNightSummary.make(scoring: page.stages, inBedStart: inputs?.inBedStart,
-                                                                parts: page.parts))
             ScoreLinks(links: [
                 ScoreLink(title: "Sleep debt", detail: page.debt ?? "-") { sheet = .debt },
-                ScoreLink(title: "Night dip", detail: page.dip ?? "-") { sheet = .dip },
-                ScoreLink(title: "Breathing", detail: page.breathing ?? "-") { sheet = .breathing },
-                ScoreLink(title: "Sleep environment", detail: page.sound ?? "-") { sheet = .environment },
                 ScoreLink(title: "How your score is built") { sheet = .built },
-                ScoreLink(title: "Sleep over time") { sheet = .history },
             ])
             if let move = page.move {
                 ScoreMoveCard(move: move, aspect: .sleep)
             }
+            AspectReadings(aspect: .sleep, identifiers: AspectReadingKind.sleepReadings, category: .aspect(.sleep))
         }
         .scoreInputs([.nights, .heart, .nightHeart, .breathing, .sound], into: $inputs)
         .sheet(item: $sheet) { sheet in
             switch sheet {
             case .debt: SleepDebtSheet(scores: health.scores)
-            case .dip: NightDipSheet(scores: health.scores, inputs: inputs)
-            case .breathing: BreathingSheet(inputs: inputs)
-            case .environment: SleepEnvironmentSheet(scores: health.scores, inputs: inputs)
             case .built: SleepBuiltSheet(score: health.scores?.sleep, parts: page.parts)
-            case .history: ScoreHistorySheet(kind: .sleep, scores: health.scores)
+            }
+        }
+    }
+}
+
+/// The nights in numbers: the last seven against the thirty, and the
+/// windows they were slept in.
+enum SleepAverages {
+    struct Row: Identifiable, Equatable {
+        var id: String { title }
+        var title: String
+        var week: String?
+        var month: String?
+    }
+
+    /// Asleep, deep and REM as durations; bedtime and waking as clock times.
+    static func make(_ detail: SomaScores.Detail) -> [Row] {
+        func hours(_ values: [Double?]) -> (String?, String?) {
+            (ScoreMath.mean(values.suffix(7)).map(ScoreMath.hoursMinutes),
+             ScoreMath.mean(values.suffix(30)).map(ScoreMath.hoursMinutes))
+        }
+        func clock(_ values: [Double?]) -> (String?, String?) {
+            (circularMean(values.suffix(7)).map(ScoreMath.clock), circularMean(values.suffix(30)).map(ScoreMath.clock))
+        }
+        let asleep = hours(detail.sleepHours)
+        let deep = hours(detail.deepHours)
+        let rem = hours(detail.remHours)
+        let bed = clock(detail.bedHour)
+        let wake = clock(detail.wakeHour)
+        return [
+            Row(title: "Asleep", week: asleep.0, month: asleep.1),
+            Row(title: "Deep", week: deep.0, month: deep.1),
+            Row(title: "REM", week: rem.0, month: rem.1),
+            Row(title: "Bedtime", week: bed.0, month: bed.1),
+            Row(title: "Woke up", week: wake.0, month: wake.1),
+        ]
+    }
+
+    /// The last `nights` windows, oldest first, labelled by weekday letter.
+    static func windows(_ detail: SomaScores.Detail, nights: Int, calendar: Calendar, now: Date = Date()) -> [SomaSleepWindow] {
+        let beds = Array(detail.bedHour.suffix(nights))
+        let wakes = Array(detail.wakeHour.suffix(nights))
+        let count = min(beds.count, wakes.count)
+        let today = calendar.startOfDay(for: now)
+        var style = Date.FormatStyle.dateTime.weekday(.narrow)
+        style.timeZone = calendar.timeZone
+        return (0..<count).map { index in
+            let day = calendar.date(byAdding: .day, value: index - count + 1, to: today) ?? today
+            return SomaSleepWindow(id: index, label: day.formatted(style), bed: beds[index], wake: wakes[index])
+        }
+    }
+
+    /// One plain line on how steady the bedtimes were over a fortnight:
+    /// how far a usual night strays from the middle bedtime.
+    static func rhythmNote(_ detail: SomaScores.Detail) -> String? {
+        let beds = detail.bedHour.suffix(14).compactMap { $0 }.map(SomaSleepWindowClock.pastNoon)
+        guard beds.count >= 5 else { return nil }
+        let sorted = beds.sorted()
+        let middle = sorted[sorted.count / 2]
+        let strays = beds.map { abs($0 - middle) }.sorted()
+        let typical = strays[strays.count / 2] * 60
+        let minutes = max(5, Int((typical / 5).rounded()) * 5)
+        return minutes <= 30
+            ? "Bedtime within \(minutes) min on most nights"
+            : "Bedtime moves about \(minutes) min from night to night"
+    }
+
+    /// The mean of clock hours across midnight: 23:30 and 00:30 average to
+    /// midnight, not to noon.
+    static func circularMean(_ hours: ArraySlice<Double?>) -> Double? {
+        let known = hours.compactMap { $0 }
+        guard !known.isEmpty else { return nil }
+        let past = known.map(SomaSleepWindowClock.pastNoon)
+        let mean = past.reduce(0, +) / Double(past.count)
+        return (mean + 12).truncatingRemainder(dividingBy: 24)
+    }
+}
+
+/// Clock hours as hours past noon, so a night reads in one run.
+enum SomaSleepWindowClock {
+    static func pastNoon(_ hour: Double) -> Double {
+        let h = hour.truncatingRemainder(dividingBy: 24)
+        let wrapped = h < 0 ? h + 24 : h
+        return wrapped >= 12 ? wrapped - 12 : wrapped + 12
+    }
+}
+
+/// The last week against the month: one row per average, the week's value
+/// in the ink and the month's beside it in the secondary.
+private struct SleepAveragesCard: View {
+    let averages: [SleepAverages.Row]
+
+    @Environment(\.somaTheme) private var theme
+
+    var body: some View {
+        let type = theme.typography
+        let colors = theme.colors
+
+        SomaCard {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack {
+                    SomaCardHeader("Averages", caption: "Last 7 nights")
+                    Spacer()
+                    Text("30 nights")
+                        .somaFont(type.caption)
+                        .foregroundStyle(colors.inkSecondary.color)
+                        .frame(width: theme.metrics.bodyRowValueWidth, alignment: .trailing)
+                }
+                ScoreRows(averages) { row in
+                    HStack {
+                        Text(row.title)
+                            .somaFont(type.body)
+                            .foregroundStyle(colors.inkPrimary.color)
+                        Spacer()
+                        Text(row.week ?? "-")
+                            .somaFont(type.rowValue)
+                            .foregroundStyle(colors.inkPrimary.color)
+                        Text(row.month ?? "-")
+                            .somaFont(type.rowValue)
+                            .foregroundStyle(colors.inkSecondary.color)
+                            .frame(width: theme.metrics.bodyRowValueWidth, alignment: .trailing)
+                    }
+                    .accessibilityElement(children: .combine)
+                }
+            }
+        }
+    }
+}
+
+/// How regular the nights were: a fortnight of windows and one line.
+private struct SleepRhythmCard: View {
+    let nights: [SomaSleepWindow]
+    let note: String?
+
+    @Environment(\.somaTheme) private var theme
+
+    var body: some View {
+        SomaCard {
+            VStack(alignment: .leading, spacing: theme.metrics.cardSpacing) {
+                SomaCardHeader("Rhythm", caption: "Last 14 nights")
+                if nights.contains(where: { $0.bed != nil }) {
+                    SomaSleepWindows(nights)
+                } else {
+                    ScoreEmptyPlot(message: "Your nights line up here after a few of them.")
+                }
+                if let note {
+                    Text(note)
+                        .somaFont(theme.typography.callout)
+                        .foregroundStyle(theme.colors.inkSecondary.color)
+                }
             }
         }
     }

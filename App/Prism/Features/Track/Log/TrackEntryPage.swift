@@ -33,7 +33,7 @@ struct TrackEntryPage<Content: View, Footer: View, Principal: View>: View {
         let metrics = theme.metrics
         let colors = theme.colors
 
-        ScrollView {
+        SomaPageScroll {
             VStack(spacing: metrics.leadSpacing * 0.75) {
                 content
             }

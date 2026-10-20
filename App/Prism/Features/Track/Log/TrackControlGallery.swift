@@ -105,5 +105,5 @@ struct TrackControlGallery: View {
 }
 
 #Preview("Track controls") {
-    ScrollView { TrackControlGallery() }
+    SomaPageScroll { TrackControlGallery() }
 }

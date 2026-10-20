@@ -38,22 +38,23 @@ enum BundledArticles {
     }
 
     /// The cover of each piece, from Unsplash (free to use under the Unsplash
-    /// licence, commercial use included), saved at 1200 px wide in
-    /// `Assets.xcassets/Articles/<slug>`. The licence asks for no credit, and
-    /// the reader gives one anyway.
+    /// licence, commercial use included), saved at 1200 by 800 in
+    /// `Assets.xcassets/Articles/<slug>` under one quiet, warm grade (muted
+    /// colour, soft contrast, lifted blacks). The licence asks for no credit,
+    /// and the reader gives one anyway.
     private static let photos: [String: (name: String, id: String)] = [
-        "sleep-regularity": ("Suhas Hanjar", "PgROW5b4Sw0"),
-        "deep-sleep": ("Quentin Schulz", "7_jpPTmV65E"),
-        "daylight-and-your-body-clock": ("Hoover Tung", "DjlNzHuv_Ck"),
-        "hrv-basics": ("Ryan Stone", "jV2cNlH4e6A"),
-        "alcohol-and-sleep": ("Denis Sousa", "PzZnixZv12U"),
-        "resting-heart-rate-trends": ("Giana Bleu", "fnQ_Zk9TQQg"),
-        "zone-2-training": ("Viktor Bystrov", "Gi0OMNguFaw"),
-        "vo2-max-and-longevity": ("Alban Rozes", "DhGC1dVw0Tg"),
-        "strength-and-lean-mass": ("Alora Griffiths", "hvFrA-iKQd0"),
-        "caffeine-timing": ("Dani", "ZLqxSzvVr7I"),
-        "protein-and-muscle": ("Shelley Pauls", "t4X660oKiYs"),
-        "breathing-and-stress": ("Ant Rozetsky", "q-DJ9XhKkhA"),
+        "sleep-regularity": ("Efe Kekikciler", "APy5TV9HrVo"),
+        "deep-sleep": ("Christopher Farrugia", "FqOMlLb5o7Y"),
+        "daylight-and-your-body-clock": ("Lawless Capture", "_-_OBX0mOJI"),
+        "hrv-basics": ("Kateryna Hliznitsova", "biHkVTrULUQ"),
+        "alcohol-and-sleep": ("Alexey Demidov", "HBOL4tVLmCU"),
+        "resting-heart-rate-trends": ("Alexander Grey", "8wcV6KTFdG8"),
+        "zone-2-training": ("Tiberiu Popa", "9qrMsQDaUXQ"),
+        "vo2-max-and-longevity": ("Gabriel Francesco", "3hD1VIDhIlw"),
+        "strength-and-lean-mass": ("Rafik Wahba", "IFSFaEGoBU8"),
+        "caffeine-timing": ("ibmoon Kim", "8uJjd2XjoFA"),
+        "protein-and-muscle": ("Siora Photography", "DCOiZhT-WkI"),
+        "breathing-and-stress": ("Tom Garritty", "xJN1Pi7Cy6U"),
     ]
 
     private static func photo(_ slug: String) -> ArticlePhoto? {

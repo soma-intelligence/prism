@@ -38,8 +38,23 @@ public enum SomaMuscleState: Sendable, Hashable, Codable {
         }
     }
 
-    func color(_ colors: SomaColors) -> Color? {
-        tone?.color
+    /// The figure's own tone under its light: a pale stone on the light
+    /// card, a lifted graphite on the dark one, so its forms read on both.
+    static let figure = SomaColorValue(light: 0xD9DADD, dark: 0x6B6E76)
+    /// A muscle with no data: a shade off the figure, so the muscles still
+    /// read as muscles before the first session.
+    static let idle = SomaColorValue(light: 0xCBCCD0, dark: 0x5E6169)
+
+    /// The chest's tone in this state: the state's own, a step deeper and
+    /// richer, so the chest stands out from the core and the shoulders
+    /// beside it while still reading as the same state.
+    public var chestTone: SomaColorValue? {
+        switch self {
+        case .recovered: SomaColorValue(light: 0x24745A, dark: 0x6ADDB0)
+        case .fatigued: SomaColorValue(light: 0xB97D22, dark: 0xF5C25E)
+        case .depleted: SomaColorValue(light: 0xA9472A, dark: 0xF5845C)
+        case .none: nil
+        }
     }
 }
 
@@ -78,22 +93,30 @@ public enum SomaMuscleGroup: String, CaseIterable, Sendable, Hashable, Identifia
     }
 }
 
-/// The body front and back, each muscle filled by how rested it is: a quiet
-/// figure, the muscles in sage, sand or clay with a hairline seam between
-/// them, and a muscle with no data left a shade lighter than the figure.
+/// The body front and back, each muscle tinted by how rested it is: a
+/// rendered anatomical figure in the card's quiet tone, the muscles in sage,
+/// sand or clay under the figure's own light and shade, the chest a step
+/// deeper so it stands out, and a muscle with no data a shade off the figure.
 ///
 /// Given a highlight, every other muscle steps back, so one group reads
 /// against the rest; given an action, a tap on a muscle names it.
 ///
-/// The figure is real anatomical art: the male front and back paths of the MIT
-/// licensed MuscleMap SDK by Melih Colpan, vendored in `MuscleArt/` with its
-/// licence. Every vendored muscle group belongs to one ``SomaMuscle`` (several
-/// can share one, the shins ride with the calves), and the parts that are not
-/// muscles (head, hands, knees, feet) are the figure itself.
+/// The figure is rendered from Z-Anatomy, the libre 3D atlas of anatomy
+/// (CC BY-SA 4.0), based on BodyParts3D, The Database Center for Life
+/// Science (CC BY-SA 2.1 Japan): a grey image of the body's light and shade
+/// and one mask per ``SomaMuscle`` and side, in `Resources/MuscleFigure`
+/// (see ``SomaMuscleFigureArt``). The view fills the silhouette and each mask
+/// with its tone, then multiplies the light and shade over them, so every
+/// state keeps the same forms.
 public struct SomaMuscleMap: View {
     private let states: [SomaMuscle: SomaMuscleState]
     private let highlight: Set<SomaMuscle>?
     private let onTap: ((SomaMuscle?) -> Void)?
+
+    @Environment(\.somaTheme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// Whether the figure's art is decoded; see ``SomaMuscleFigureArt/prepare()``.
+    @State private var isReady = SomaMuscleFigureArt.isReady
 
     /// - Parameters:
     ///   - highlight: the muscles to bring forward; nil draws all alike.
@@ -109,11 +132,20 @@ public struct SomaMuscleMap: View {
     }
 
     public var body: some View {
-        HStack(spacing: 0) {
-            Figure(art: .front, states: states, highlight: highlight, onTap: onTap)
-            Figure(art: .back, states: states, highlight: highlight, onTap: onTap)
+        HStack(spacing: theme.metrics.muscleMapFigureGap) {
+            ForEach(SomaMuscleFigureArt.Side.allCases, id: \.self) { side in
+                Figure(art: isReady ? .of(side) : nil, states: states, highlight: highlight, onTap: onTap)
+                    .aspectRatio(SomaMuscleFigureArt.aspect, contentMode: .fit)
+            }
         }
-        .aspectRatio(MuscleArtFigure.front.bounds.width * 2 / MuscleArtFigure.front.bounds.height, contentMode: .fit)
+        .frame(maxHeight: theme.metrics.muscleMapHeight)
+        // The art is a few megabytes once decoded: read off the main thread,
+        // then drawn, faded in unless Reduce Motion is on.
+        .task {
+            guard !isReady else { return }
+            await SomaMuscleFigureArt.prepare()
+            withAnimation(reduceMotion ? nil : .easeOut(duration: theme.motion.pressDuration * 2)) { isReady = true }
+        }
         .accessibilityElement()
         .accessibilityLabel(Text("Muscle map"))
         .accessibilityValue(Text(summary))
@@ -127,7 +159,7 @@ public struct SomaMuscleMap: View {
     }
 
     private struct Figure: View {
-        let art: MuscleArtFigure
+        let art: SomaMuscleFigureArt?
         let states: [SomaMuscle: SomaMuscleState]
         let highlight: Set<SomaMuscle>?
         let onTap: ((SomaMuscle?) -> Void)?
@@ -136,57 +168,40 @@ public struct SomaMuscleMap: View {
 
         var body: some View {
             let canvas = Canvas { context, size in
-                let fit = art.fit(in: size)
-                context.translateBy(x: fit.offset.x, y: fit.offset.y)
-                context.scaleBy(x: fit.scale, y: fit.scale)
-                let scale = fit.scale
+                guard let art else { return }
+                let rect = art.fit(in: size)
+                let pixel = rect.width / art.size.width
+                let figure = SomaMuscleState.figure.color
+                let idle = SomaMuscleState.idle.color
 
-                let colors = theme.colors
-                let surface = colors.surface.color
-                let ink = colors.inkSecondary.color
-                // Opaque tones, so a part that overlaps its neighbour never
-                // reads darker where they meet.
-                let figure = surface.mix(with: ink, by: 0.26)
-                let idle = surface.mix(with: ink, by: 0.36)
-                // The art leaves a wide gap round every part. Each part swells
-                // by this much on screen, which closes the gap down to a thin
-                // seam of the card's own surface between neighbours.
-                let swell = StrokeStyle(lineWidth: 0.7 / scale, lineJoin: .round)
+                context.drawLayer { layer in
+                    // The silhouette in the figure's own tone: the head,
+                    // hands, feet, the bones that show and the muscles the
+                    // map does not read.
+                    var silhouette = layer.resolve(Image(decorative: art.image, scale: 1).renderingMode(.template))
+                    silhouette.shading = .color(figure)
+                    layer.draw(silhouette, in: rect)
 
-                for part in art.parts {
-                    let shading: GraphicsContext.Shading
-                    let isBack = part.muscle.map { muscle in highlight.map { !$0.contains(muscle) } ?? false } ?? false
-                    if part.muscle == nil {
-                        shading = .color(figure)
-                    } else if isBack {
-                        // Not the group being read: it steps back toward
-                        // the figure, keeping a trace of its tone.
-                        let tone = state(part).color(colors) ?? idle
-                        shading = .color(idle.mix(with: tone, by: theme.metrics.muscleMapBackTone))
-                    } else if let color = state(part).color(colors) {
-                        // Top lit, so each muscle reads as a form.
-                        let rect = part.path.boundingRect
-                        shading = .linearGradient(
-                            Gradient(colors: [color, color.mix(with: surface, by: 0.16)]),
-                            startPoint: CGPoint(x: rect.midX, y: rect.minY),
-                            endPoint: CGPoint(x: rect.midX, y: rect.maxY)
-                        )
-                    } else {
-                        shading = .color(idle)
+                    // Each muscle in its state's tone.
+                    for mask in art.masks {
+                        var tinted = layer.resolve(Image(decorative: mask.image, scale: 1).renderingMode(.template))
+                        tinted.shading = .color(tone(of: mask.muscle, idle: idle))
+                        layer.draw(tinted, in: CGRect(
+                            x: rect.minX + mask.frame.minX * pixel,
+                            y: rect.minY + mask.frame.minY * pixel,
+                            width: mask.frame.width * pixel,
+                            height: mask.frame.height * pixel
+                        ))
                     }
-                    context.fill(part.path, with: shading)
-                    context.stroke(part.path, with: shading, style: swell)
-                }
-                // A hairline seam on every edge, so parts that meet still read
-                // as separate muscles.
-                for part in art.parts {
-                    context.stroke(part.path, with: .color(surface), lineWidth: 0.45 / scale)
+
+                    // The render's light and shade over every tone, so a
+                    // muscle keeps its form whatever its state.
+                    layer.blendMode = .multiply
+                    layer.draw(layer.resolve(Image(decorative: art.image, scale: 1)), in: rect)
                 }
             }
-            // The back sits a step behind the front.
-            .opacity(art.isBack ? 0.86 : 1)
 
-            if let onTap {
+            if let onTap, let art {
                 GeometryReader { proxy in
                     canvas
                         .contentShape(.rect)
@@ -199,91 +214,18 @@ public struct SomaMuscleMap: View {
             }
         }
 
-        private func state(_ part: MuscleArtFigure.Part) -> SomaMuscleState {
-            part.muscle.flatMap { states[$0] } ?? .none
-        }
-    }
-}
-
-// MARK: - The art
-
-/// One side of the vendored figure, parsed once: each part's path in the
-/// art's own coordinates, and the muscle it reads (nil for the figure itself).
-struct MuscleArtFigure: Sendable {
-    struct Part: Sendable {
-        let muscle: SomaMuscle?
-        let path: Path
-    }
-
-    let parts: [Part]
-    /// The drawn extent, so the two sides sit close together.
-    let bounds: CGRect
-    let isBack: Bool
-
-    static let front = MuscleArtFigure(MuscleArtMaleFront.paths, isBack: false)
-    static let back = MuscleArtFigure(MuscleArtMaleBack.paths, isBack: true)
-
-    private init(_ source: [MuscleArtPart], isBack: Bool) {
-        var parts: [Part] = []
-        for part in source {
-            // The art layers finer sub groups over their parents; the map reads
-            // whole groups, so it draws the parents and the sub groups the
-            // art always shows (adductors, neck, ankles).
-            if let group = part.slug.muscle, group.isSubGroup, !group.isAlwaysVisibleSubGroup { continue }
-            let muscle = Self.muscle(for: part.slug)
-            for string in part.allPaths {
-                let path = MuscleArtPathBuilder.buildPath(from: string, scale: 1, offsetX: 0, offsetY: 0)
-                parts.append(Part(muscle: muscle, path: path))
+        /// The tone a muscle is filled with: its state's, the chest a step
+        /// deeper and richer so it stands out from the core under it, and a
+        /// muscle outside the group being read stepping back toward the
+        /// figure with a trace of its tone.
+        private func tone(of muscle: SomaMuscle, idle: Color) -> Color {
+            let state = states[muscle] ?? .none
+            var tone = state.tone?.color ?? idle
+            if muscle == .chest, let lead = state.chestTone?.color {
+                tone = lead
             }
-        }
-        // The figure first, the muscles over it.
-        parts.sort { ($0.muscle == nil ? 0 : 1) < ($1.muscle == nil ? 0 : 1) }
-        self.parts = parts
-        let union = parts.reduce(CGRect.null) { $0.union($1.path.boundingRect) }
-        self.bounds = union.insetBy(dx: -4, dy: -4)
-        self.isBack = isBack
-    }
-
-    /// Where the art sits in a frame of `size`: scaled to fit and centred.
-    func fit(in size: CGSize) -> (scale: CGFloat, offset: CGPoint) {
-        let scale = min(size.width / bounds.width, size.height / bounds.height)
-        return (scale, CGPoint(
-            x: (size.width - bounds.width * scale) / 2 - bounds.minX * scale,
-            y: (size.height - bounds.height * scale) / 2 - bounds.minY * scale
-        ))
-    }
-
-    /// The muscle under a point of a frame of `size`, the topmost part
-    /// first; nil on the figure or off it.
-    func muscle(at point: CGPoint, in size: CGSize) -> SomaMuscle? {
-        let fit = fit(in: size)
-        guard fit.scale > 0 else { return nil }
-        let local = CGPoint(x: (point.x - fit.offset.x) / fit.scale, y: (point.y - fit.offset.y) / fit.scale)
-        for part in parts.reversed() where part.path.contains(local) {
-            return part.muscle
-        }
-        return nil
-    }
-
-    /// Which ``SomaMuscle`` a vendored group reads. Nil is the figure itself.
-    static func muscle(for slug: MuscleArtSlug) -> SomaMuscle? {
-        switch slug {
-        case .trapezius, .upperTrapezius, .lowerTrapezius: .traps
-        case .deltoids, .frontDeltoid, .rearDeltoid, .rotatorCuff: .shoulders
-        case .chest, .upperChest, .lowerChest: .chest
-        case .biceps: .biceps
-        case .triceps: .triceps
-        case .forearm: .forearms
-        case .abs, .upperAbs, .lowerAbs: .abs
-        case .obliques, .serratus: .obliques
-        case .upperBack, .rhomboids: .lats
-        case .lowerBack: .lowerBack
-        case .gluteal: .glutes
-        case .quadriceps, .innerQuad, .outerQuad, .hipFlexors: .quads
-        case .adductors: .adductors
-        case .hamstring: .hamstrings
-        case .calves, .tibialis: .calves
-        case .head, .hair, .neck, .hands, .knees, .feet, .ankles: nil
+            let isBack = highlight.map { !$0.contains(muscle) } ?? false
+            return isBack ? idle.mix(with: tone, by: theme.metrics.muscleMapBackTone) : tone
         }
     }
 }

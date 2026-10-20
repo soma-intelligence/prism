@@ -45,6 +45,8 @@ public struct SomaArticleCover: View {
     @Environment(\.somaTheme) private var theme
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.somaPartIsCurrent) private var partIsCurrent
+    @State private var fetchesPhoto = false
 
     /// - Parameters:
     ///   - tone: the topic's calm tone.
@@ -70,7 +72,7 @@ public struct SomaArticleCover: View {
             .overlay {
                 if let asset {
                     Image(asset).resizable().scaledToFill()
-                } else if let imageURL {
+                } else if let imageURL, fetchesPhoto {
                     AsyncImage(url: imageURL, transaction: Transaction(animation: reduceMotion ? nil : .easeOut(duration: theme.motion.pressDuration * 2))) { phase in
                         if let image = phase.image {
                             image.resizable().scaledToFill()
@@ -83,6 +85,11 @@ public struct SomaArticleCover: View {
                 shape.strokeBorder(theme.colors.inkPrimary.color.opacity(theme.metrics.hairlineOpacity), lineWidth: 0.5)
             }
             .accessibilityHidden(true)
+            // A cover in a tab's part kept aside fetches nothing until its
+            // part comes on screen once; then it keeps its photograph.
+            .onChange(of: partIsCurrent, initial: true) { _, current in
+                if current { fetchesPhoto = true }
+            }
     }
 
     @ViewBuilder

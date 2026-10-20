@@ -6,8 +6,8 @@
 import SwiftUI
 import SomaUI
 
-/// The latest ECG from Apple Watch: its rhythm, its heart rate, the trace
-/// itself, what the result means and cannot mean, and the recordings before
+/// The latest ECG from Apple Watch: its heart rate on the metric stage with
+/// the month's recordings, its rhythm, the trace itself, what the result means and cannot mean, and the recordings before
 /// it.
 ///
 /// ECG is read only here, and asked for when this page opens: never at launch.
@@ -33,15 +33,31 @@ struct ECGPage: View {
             reason: reason(latest),
             stats: []
         ) {
-            SomaChartCard(
-                eyebrow: "ECG, lead I",
-                value: latest?.averageHeartRate.map(words.whole),
-                unit: "bpm average",
-                note: latest.map { "\(words.day($0.date)), \(words.time($0.date)). \(Int($0.duration.rounded())) seconds." }
-                    ?? "Your next recording on Apple Watch draws its trace here."
-            ) {
-                ECGTrace(voltages: trace, samplingFrequency: latest?.samplingFrequency)
+            AspectStage(
+                aspect: .heart,
+                lead: SomaMetricLead(
+                    caption: latest.map { "\(words.day($0.date)), \(words.time($0.date))" } ?? "Latest recording",
+                    value: latest?.averageHeartRate.map(words.whole),
+                    unit: "bpm average",
+                    meaning: latest?.classification.rawValue ?? "No recording yet"
+                ),
+                values: Self.days(recordings, now: .now),
+                unit: "bpm",
+                scale: nil,
+                higherIsBetter: nil,
+                style: .points,
+                format: { MetricWords().whole($0) }
+            )
+            SomaCard {
+                VStack(alignment: .leading, spacing: theme.metrics.chartLabelGap * 2) {
+                    Text("Trace, lead I")
+                        .somaFont(theme.typography.eyebrow)
+                        .textCase(.uppercase)
+                        .foregroundStyle(theme.colors.inkSecondary.color)
+                    ECGTrace(voltages: trace, samplingFrequency: latest?.samplingFrequency)
+                }
             }
+            .accessibilityHint(Text(latest.map { "\(Int($0.duration.rounded())) seconds." } ?? "Your next recording on Apple Watch draws its trace here."))
             MetricTextCard(eyebrow: "What it means", lead: meaning(latest).lead, rest: meaning(latest).rest)
             if recordings.count > 0 {
                 MetricRowsCard(eyebrow: "Recent recordings", rows: recordings.map { recording in
@@ -64,6 +80,19 @@ struct ECGPage: View {
         .navigationTitle("ECG")
         .task { await load() }
         .refreshable { await load() }
+    }
+
+    /// The average heart rate of each day's last recording, the last thirty
+    /// days, today last.
+    static func days(_ recordings: [FitnessHealthKit.Recording], now: Date, calendar: Calendar = .current) -> [Double?] {
+        let today = calendar.startOfDay(for: now)
+        var byDay: [Date: Double] = [:]
+        for recording in recordings.sorted(by: { $0.date < $1.date }) {
+            if let rate = recording.averageHeartRate { byDay[calendar.startOfDay(for: recording.date)] = rate }
+        }
+        return (0..<30).map { index in
+            calendar.date(byAdding: .day, value: index - 29, to: today).flatMap { byDay[$0] }
+        }
     }
 
     private func load() async {

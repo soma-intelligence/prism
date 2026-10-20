@@ -13,6 +13,10 @@ import SomaUI
 /// plain value.
 enum PulseRoute: Hashable {
     case category(String)
+    /// An aspect's own page, opened by the orb: the same page as
+    /// ``ScoreRoute/aspect(_:)``, under its own value so the push is a plain
+    /// one rather than a zoom out of the ring that opens the same page.
+    case orb(SomaAspect)
 
     /// The Health category an aspect's card opens.
     static func aspect(_ aspect: SomaAspect) -> PulseRoute {
@@ -30,9 +34,17 @@ enum PulseRoute: Hashable {
         content.notesVisit(topic)
     }
 
+    /// The aspect page this route shows, when it shows one.
+    var aspectPage: ScoreRoute? {
+        if case .orb(let aspect) = self { return .aspect(aspect) }
+        return nil
+    }
+
     @ViewBuilder
     private var content: some View {
         switch self {
+        case .orb(let aspect):
+            ScoreRoute.aspect(aspect).page
         case .category(let title):
             if let category = BodyCatalog.categories.first(where: { $0.title == title }) {
                 BodyCategoryPage(category: category)
@@ -45,6 +57,7 @@ enum PulseRoute: Hashable {
     /// What Explore reads this page as interest in, if anything.
     private var topic: ArticleTopic? {
         switch self {
+        case .orb: nil
         case .category(let title):
             switch title {
             case "Activity", "Mobility": .movement

@@ -30,6 +30,9 @@ public extension SomaMetrics {
     var bodySessionDotDiameter: CGFloat { 12 }
     /// The thumbnail that leads an action card on the Body tab.
     var bodyActionThumbnail: CGFloat { 44 }
+    /// The narrowest a reading card gets before the grid gives it a row of
+    /// its own: one to a row on a phone, two side by side on a wide page.
+    var bodyReadingCardMinWidth: CGFloat { 320 }
 
     /// Muscle freshness: the legend's dot and the gap between its items,
     /// the group pills (height, inset, corner, gap, and how strongly the
@@ -43,4 +46,13 @@ public extension SomaMetrics {
     var musclePillSpacing: CGFloat { 8 }
     var musclePillSelectedTint: Double { 0.16 }
     var muscleMapBackTone: Double { 0.22 }
+}
+
+/// How the muscle map sets its figure.
+public extension SomaMetrics {
+    /// The gap between the front and the back.
+    var muscleMapFigureGap: CGFloat { 12 }
+    /// The tallest the two figures stand: past it they keep their
+    /// proportions and centre, so a wide card does not grow a tall figure.
+    var muscleMapHeight: CGFloat { 380 }
 }

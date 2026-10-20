@@ -35,7 +35,7 @@ struct MindDetailPage: View {
         let change = MindScoreWords.againstLastWeek(scores?.mindSeries ?? [])
         let metrics = theme.metrics
 
-        ScrollView {
+        SomaPageScroll {
             VStack(alignment: .leading, spacing: metrics.leadSpacing) {
                 MindGauge(score: score, word: MindScoreWords.word(score), change: change)
                     .padding(.top, metrics.heroTopPadding)

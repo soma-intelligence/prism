@@ -7,44 +7,39 @@ import SwiftUI
 import WebKit
 import SomaUI
 
-/// "Latest": the newest health news as a sideways rail of cards, each a
-/// picture, the publication and how long ago, and the title. Hidden when
-/// there is no news: the section has no bundled fallback.
+/// "Latest": the newest health news as a grid of cards, each a picture, the
+/// publication and how long ago, and the title: the first few, the rest in
+/// place behind "Show all". Hidden when there is no news: the section has no
+/// bundled fallback.
 struct ExploreNewsRail: View {
     let items: [NewsItem]
 
     @Environment(\.somaTheme) private var theme
+    @State private var isOpen = false
 
     var body: some View {
         let metrics = theme.metrics
+        let shown = isOpen ? items : Array(items.prefix(ExploreGrid.firstShown))
+        let opens = items.count > ExploreGrid.firstShown
 
         VStack(alignment: .leading, spacing: metrics.cardSpacing) {
-            Text("Latest")
-                .somaFont(theme.typography.eyebrow)
-                .textCase(.uppercase)
-                .foregroundStyle(theme.colors.inkSecondary.color)
-                .accessibilityAddTraits(.isHeader)
+            SomaShelfHeader(String(localized: "Latest"),
+                            action: opens ? (isOpen ? String(localized: "Show fewer") : String(localized: "Show all")) : nil,
+                            perform: opens ? { isOpen.toggle() } : nil)
 
-            ScrollView(.horizontal) {
-                HStack(alignment: .top, spacing: metrics.articleGridSpacing) {
-                    ForEach(items) { item in
-                        NavigationLink(value: item) {
-                            SomaArticleCard(title: item.title, topic: item.topic?.title ?? item.sourceName,
-                                            caption: "\(item.sourceName) · \(item.age)",
-                                            tone: item.topic?.tone ?? .stone, mark: .track(.read),
-                                            seed: item.id, imageURL: item.imageURL, style: .tile)
-                                .frame(width: metrics.articleRailCardWidth)
-                                .zoomSource(item.id)
-                                .somaScrollEdge(.horizontal)
-                        }
-                        .buttonStyle(TilePressStyle())
+            LazyVGrid(columns: ExploreGrid.columns(metrics), alignment: .leading, spacing: metrics.articleGridSpacing) {
+                ForEach(shown) { item in
+                    NavigationLink(value: item) {
+                        SomaArticleCard(title: item.title, topic: item.topic?.title ?? item.sourceName,
+                                        caption: "\(item.sourceName) · \(item.age)",
+                                        tone: item.topic?.tone ?? .stone, mark: .track(.read),
+                                        seed: item.id, imageURL: item.imageURL, style: .tile)
+                            .zoomSource(item.id)
+                            .somaScrollEdge()
                     }
+                    .buttonStyle(TilePressStyle())
                 }
-                .scrollTargetLayout()
             }
-            .scrollTargetBehavior(.viewAligned)
-            .scrollIndicators(.hidden)
-            .scrollClipDisabled()
         }
     }
 }

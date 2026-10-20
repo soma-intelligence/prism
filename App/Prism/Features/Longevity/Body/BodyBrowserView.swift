@@ -5,20 +5,19 @@
 
 import SwiftUI
 import SomaUI
+import HealthExportCore
 
-/// The Vault: every category Apple Health holds, and the field that finds one,
-/// laid out the way Apple Health lays out Browse: a search field that is
-/// always on screen, and the catalog as one long list of categories. Each data
-/// type opens onto its chart and every record behind it.
+/// The Vault: every category Apple Health holds and every score Soma works
+/// out of it, with the field that finds one.
 ///
-/// A list and not the card grid the parts use. The parts answer "how am I";
-/// this page answers "where is X", and for that the eye wants a single column
-/// it can run down, with every row starting at the same x.
-///
-/// The chrome is the system's own: the stack's bar and push, `.searchable` for
-/// the field. Anything hand built here would be a second-best copy of a control
-/// the person already knows, and on this screen the control is most of the
-/// design.
+/// Set in the language of the pages around it (owner, 2026-10-20: the Vault
+/// did not match the app): an inline title over a head with the Vault's
+/// glyph and how much it holds, the categories as tiles that wear their
+/// aspect's tone around their own line glyph, then Soma's scores and the
+/// night's parts as the quiet reading rows a score page lists, each with its
+/// latest value and its week. The search field stays the system's own,
+/// always on screen: on a page whose job is finding one of 192 things, a
+/// field that has to be found first is the wrong way round.
 struct BodyBrowserView: View {
     @Environment(HealthDashboard.self) private var health
     @Environment(\.somaTheme) private var theme
@@ -31,99 +30,178 @@ struct BodyBrowserView: View {
         !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
+    private static let scores = ScoreMetric.allCases.filter(\.isScore)
+    private static let night = ScoreMetric.allCases.filter { !$0.isScore }
+
     var body: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: theme.metrics.cardSpacing) {
+        let metrics = theme.metrics
+
+        SomaPageScroll {
+            VStack(alignment: .leading, spacing: metrics.leadSpacing) {
                 if isSearching {
                     results
                 } else {
-                    Text("Health Categories")
-                        .somaFont(theme.typography.title)
-                        .fontWeight(.bold)
-                        .foregroundStyle(theme.colors.inkPrimary.color)
-                        .accessibilityAddTraits(.isHeader)
-                        .padding(.horizontal, theme.metrics.browseRowPadding)
+                    VaultHead(
+                        line: VaultWords.holds(
+                            measures: BodyCatalog.measureCount,
+                            scores: ScoreMetric.allCases.count
+                        )
+                    )
 
-                    // iOS 27 Health's Browse: two columns of gradient tiles.
-                    LazyVGrid(
-                        columns: [GridItem(.flexible(), spacing: theme.metrics.cardSpacing), GridItem(.flexible(), spacing: theme.metrics.cardSpacing)],
-                        spacing: theme.metrics.cardSpacing
-                    ) {
-                        ForEach(BodyCatalog.categories) { category in
-                            NavigationLink(value: VaultRoute.category(category)) {
-                                SomaCategoryTile(
-                                    symbol: category.symbol,
-                                    title: LocalizedStringResource(stringLiteral: category.title),
-                                    hue: category.hue
-                                )
+                    section("Categories") {
+                        LazyVGrid(
+                            columns: [GridItem(.flexible(), spacing: metrics.cardSpacing),
+                                      GridItem(.flexible(), spacing: metrics.cardSpacing)],
+                            spacing: metrics.cardSpacing
+                        ) {
+                            ForEach(BodyCatalog.categories) { category in
+                                NavigationLink(value: VaultRoute.category(category)) {
+                                    SomaCategoryTile(
+                                        symbol: category.lineSymbol,
+                                        title: category.displayTitle,
+                                        caption: VaultWords.measures(category.types.count),
+                                        aspect: category.aspect
+                                    )
+                                }
+                                .buttonStyle(.somaGlassPress)
                             }
-                            .buttonStyle(.somaGlassPress)
                         }
                     }
 
-                    // What Soma works out of Health: the scores and the
-                    // night's parts, each on the same page as a Health type.
-                    SomaBrowseSection("Soma", items: ScoreMetric.allCases, hasGlyphs: false) { score in
-                        NavigationLink(value: VaultRoute.score(score)) {
-                            SomaBrowseRow(title: score.title).contentShape(.rect)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    .padding(.top, theme.metrics.browseSectionSpacing)
+                    // What Soma works out of Health, each on the same page as
+                    // a Health type.
+                    scoreSection("Scores", Self.scores)
+                    scoreSection("From the night", Self.night)
                 }
             }
-            .padding(theme.metrics.pagePadding)
-            .frame(maxWidth: theme.metrics.pageMaxWidth, alignment: .leading)
+            .padding(.horizontal, metrics.pagePadding)
+            .padding(.bottom, metrics.pagePadding)
+            .frame(maxWidth: metrics.pageMaxWidth, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
         .background(theme.colors.canvas.color.ignoresSafeArea())
         .navigationTitle("Vault")
 #if os(iOS)
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
 #endif
-        .refreshable { await health.load() }
+        .refreshable {
+            await health.load()
+            await health.loadScores()
+        }
         .searchableForBrowse(text: $query)
-        .task { await health.start() }
+        .task {
+            await health.start()
+            await health.loadScores()
+        }
+    }
+
+    private func section<Content: View>(_ title: LocalizedStringResource, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: theme.metrics.cardSpacing) {
+            Text(title)
+                .somaFont(theme.typography.eyebrow)
+                .textCase(.uppercase)
+                .foregroundStyle(theme.colors.inkSecondary.color)
+                .accessibilityAddTraits(.isHeader)
+            content()
+        }
+    }
+
+    private func scoreSection(_ title: LocalizedStringResource, _ scores: [ScoreMetric]) -> some View {
+        section(title) {
+            SomaBrowseGroup(scores, hasGlyphs: false) { score in
+                let summary = health.scores.map { VaultScoreSummary.make(score, days: score.days($0)) }
+                NavigationLink(value: VaultRoute.score(score)) {
+                    SomaReadingRow(
+                        title: score.title,
+                        caption: summary?.caption,
+                        value: summary?.value,
+                        week: summary?.week ?? [],
+                        aspect: score.aspect
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+        }
     }
 
     /// What the search field turns the page into: the categories whose name
-    /// matches, then the data types, which is the order a person scans them in.
+    /// matches, then the measures, which is the order a person scans them in.
     @ViewBuilder
     private var results: some View {
         if matchedCategories.isEmpty && matchedTypes.isEmpty {
-            VStack(spacing: 6) {
-                Text("No Results")
-                    .somaFont(theme.typography.title)
-                    .fontWeight(.bold)
+            VStack(spacing: theme.metrics.cardHeaderSpacing) {
+                Text("Nothing found")
+                    .somaFont(theme.typography.headline)
                     .foregroundStyle(theme.colors.inkPrimary.color)
-                Text("Nothing in Apple Health goes by that name.")
-                    .somaFont(theme.typography.body)
+                Text("No measure goes by that name")
+                    .somaFont(theme.typography.caption)
                     .foregroundStyle(theme.colors.inkSecondary.color)
                     .multilineTextAlignment(.center)
             }
             .frame(maxWidth: .infinity)
-            .padding(.top, theme.metrics.browseSectionSpacing)
+            .padding(.top, theme.metrics.leadSpacing)
         } else {
             if !matchedCategories.isEmpty {
-                SomaBrowseSection("Categories", items: matchedCategories) { category in
-                    NavigationLink(value: VaultRoute.category(category)) {
-                        SomaBrowseRow(symbol: category.symbol, title: category.title)
-                            .contentShape(.rect)
+                section("Categories") {
+                    SomaBrowseGroup(matchedCategories, hasGlyphs: false) { category in
+                        NavigationLink(value: VaultRoute.category(category)) {
+                            SomaBrowseRow(title: category.displayTitle,
+                                          detail: VaultWords.measures(category.types.count))
+                                .contentShape(.rect)
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
             }
 
             if !matchedTypes.isEmpty {
-                SomaBrowseSection("Data Types", items: matchedTypes, hasGlyphs: false) { type in
-                    NavigationLink(value: VaultRoute.dataType(type)) {
-                        SomaBrowseRow(title: type.title, detail: health.rowValue(for: type.metric))
+                section("Measures") {
+                    SomaBrowseGroup(matchedTypes, hasGlyphs: false) { type in
+                        NavigationLink(value: VaultRoute.dataType(type)) {
+                            SomaBrowseRow(
+                                title: MetricPageWords.title(identifier: type.metric.identifier, fallback: type.title),
+                                detail: health.rowValue(for: type.metric)
+                            )
                             .contentShape(.rect)
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
             }
         }
+    }
+}
+
+/// The Vault's head, set like a category's: the Vault's glyph on a recessed
+/// square, its name, and how much it holds.
+private struct VaultHead: View {
+    let line: String
+
+    @Environment(\.somaTheme) private var theme
+
+    var body: some View {
+        let metrics = theme.metrics
+        let colors = theme.colors
+
+        HStack(spacing: metrics.moveRowGap) {
+            Image(systemName: "archivebox")
+                .font(.system(size: metrics.aspectBadgeGlyph * 0.82, weight: .regular))
+                .foregroundStyle(colors.inkSecondary.color)
+                .frame(width: metrics.aspectBadgeSide, height: metrics.aspectBadgeSide)
+                .background(RoundedRectangle(cornerRadius: metrics.aspectBadgeCornerRadius, style: .continuous)
+                    .fill(colors.surfaceRecessed.color))
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: metrics.readingRowLineGap) {
+                Text("Vault")
+                    .somaFont(theme.typography.headline)
+                    .foregroundStyle(colors.inkPrimary.color)
+                Text(line)
+                    .somaFont(theme.typography.caption)
+                    .foregroundStyle(colors.inkSecondary.color)
+            }
+        }
+        .padding(.top, metrics.scoreHeroTopPadding)
+        .accessibilityElement(children: .combine)
     }
 }
 

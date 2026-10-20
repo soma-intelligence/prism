@@ -7,8 +7,8 @@ import SwiftUI
 import SomaUI
 import HealthExportCore
 
-/// The sound around you, or the sound in your headphones: fourteen days of
-/// levels against the 80 dB line, the last seven days in rows, and the change
+/// The sound around you, or the sound in your headphones: thirty days of
+/// levels on the metric stage, the last seven days in rows, and the change
 /// over seven, thirty and ninety days.
 ///
 /// One page for both, because both are a level held over time and read the
@@ -50,18 +50,17 @@ struct SoundExposurePage: View {
             reason: lead?.reason ?? report.reason,
             stats: []
         ) {
-            SomaChartCard(eyebrow: kind.title, value: report.value, unit: report.unit, note: report.note) {
-                MetricDailyBars(
-                    values: report.days,
-                    usual: report.usual,
-                    limit: SoundExposure.limit,
-                    floor: 40,
-                    aspect: .mind,
-                    leadingLabel: report.axis.0,
-                    middleLabel: report.axis.1,
-                    trailingLabel: report.axis.2
-                )
-            }
+            AspectStage(
+                aspect: .mind,
+                lead: report.lead,
+                values: report.stage,
+                unit: "dB",
+                scale: nil,
+                higherIsBetter: false,
+                style: .points,
+                format: { MetricWords().whole($0) },
+                hue: .mind
+            )
             MetricRowsCard(eyebrow: "Last 7 days", rows: report.week)
             MetricRowsCard(eyebrow: "By period", rows: report.periods)
             SomaActionCard(eyebrow: report.tipEyebrow, title: report.tipTitle, detail: report.tipDetail) {
@@ -101,6 +100,10 @@ struct SoundReport {
     var note: String
     var days: [Double?]
     var usual: ClosedRange<Double>?
+    /// The stage's days, the last thirty, today last.
+    var stage: [Double?]
+    /// What the stage's head says.
+    var lead: SomaMetricLead
     var axis: (String?, String?, String?)
     var week: [MetricRowItem]
     var periods: [MetricRowItem]
@@ -109,6 +112,7 @@ struct SoundReport {
     var tipDetail: String
 
     static let shownDays = 14
+    static let stageDays = 30
 
     static func make(
         kind: SoundExposurePage.Kind,
@@ -120,6 +124,7 @@ struct SoundReport {
         let words = MetricWords(calendar: calendar, locale: locale)
         let today = calendar.startOfDay(for: now)
         let days = SoundExposure.daily(readings, days: shownDays, now: now, calendar: calendar)
+        let stage = SoundExposure.daily(readings, days: stageDays, now: now, calendar: calendar)
         let usual = EnvironmentReport.usual(days.dropLast().compactMap { $0 }, roundedTo: 1)
         let weekStart = calendar.date(byAdding: .day, value: -6, to: today) ?? today
         let week = readings.filter { $0.start >= weekStart }
@@ -158,6 +163,9 @@ struct SoundReport {
                 note: "Daily averages, the last 14 days." + (usualText.map { " Usually \($0)." } ?? ""),
                 days: days,
                 usual: usual,
+                stage: stage,
+                lead: .days(stage, caption: "Today, average so far", value: todayLevel.map(words.whole), unit: "dB",
+                            higherIsBetter: false, format: words.whole),
                 axis: words.axis(days: shownDays, now: now),
                 week: [
                     MetricRowItem("Time above 80 dB", detail: peak.map { "Peak \(words.whole($0.value)) dB, \(words.day($0.start))" },
@@ -194,6 +202,14 @@ struct SoundReport {
                 note: "Daily levels, the last 14 days." + (usualText.map { " Usually \($0)." } ?? ""),
                 days: days,
                 usual: usual,
+                stage: stage,
+                lead: SomaMetricLead(
+                    caption: "7 day average",
+                    value: average.map(words.whole),
+                    unit: "dB",
+                    meaning: average.map { $0 < SoundExposure.limit ? "Under the 80 dB line" : "Over the 80 dB line" } ?? "No listening yet",
+                    tone: average.map { $0 < SoundExposure.limit ? .good : .watch } ?? .neutral
+                ),
                 axis: words.axis(days: shownDays, now: now),
                 week: [
                     MetricRowItem("Listening time", value: week.isEmpty ? nil : SoundExposure.duration(listening)),

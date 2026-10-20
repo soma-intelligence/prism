@@ -16,23 +16,59 @@ public extension View {
     /// the stat rows, tiles and rows here and the app's own cards, so they
     /// all move alike. Under Reduce Motion the number simply changes.
     ///
-    /// - Parameter text: what the number reads, as shown; nil for a dash.
-    func somaRollingNumber(_ text: String?) -> some View {
-        modifier(SomaRollingNumber(text: text))
+    /// A number with its unit or words after it holds its width through
+    /// the roll: a number losing a digit (105 to 98) keeps its room until
+    /// the digits have rolled, then gives it back on the same spring, so
+    /// the outgoing digits never run over the unit and the unit glides
+    /// rather than jumps.
+    ///
+    /// - Parameters:
+    ///   - text: what the number reads, as shown; nil for a dash.
+    ///   - holdsWidth: true when something sits after the number on its
+    ///     line. Leave it off for a number at the end of a line, where a
+    ///     held width would only nudge it.
+    func somaRollingNumber(_ text: String?, holdsWidth: Bool = false) -> some View {
+        modifier(SomaRollingNumber(text: text, holdsWidth: holdsWidth))
     }
 }
 
-/// The roll behind `somaRollingNumber(_:)`.
+/// The roll behind `somaRollingNumber(_:holdsWidth:)`.
 struct SomaRollingNumber: ViewModifier {
     let text: String?
+    let holdsWidth: Bool
+
+    /// The text the held width was measured on: the last one to finish
+    /// rolling.
+    @State private var settled: String?
+    /// The width of the settled text.
+    @State private var width: CGFloat?
 
     @Environment(\.somaTheme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    init(text: String?, holdsWidth: Bool) {
+        self.text = text
+        self.holdsWidth = holdsWidth
+        _settled = State(initialValue: text)
+    }
+
     func body(content: Content) -> some View {
+        let holding = holdsWidth && !reduceMotion && text != settled
         content
             .contentTransition(transition)
             .animation(reduceMotion ? nil : theme.motion.numberRoll, value: text)
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { measured in
+                if text == settled { width = measured }
+            }
+            .frame(minWidth: holding ? width : nil, alignment: .leading)
+            .task(id: text) {
+                guard holdsWidth, text != settled else { return }
+                if !reduceMotion {
+                    try? await Task.sleep(for: .seconds(theme.motion.numberRollHold))
+                    guard !Task.isCancelled else { return }
+                }
+                withAnimation(reduceMotion ? nil : theme.motion.numberRoll) { settled = text }
+            }
     }
 
     private var transition: ContentTransition {

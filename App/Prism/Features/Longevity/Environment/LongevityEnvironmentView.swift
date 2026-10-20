@@ -17,8 +17,9 @@ import HealthScoring
 /// the weather, air quality and last night's outdoor temperature there from
 /// Open-Meteo (``EnvironmentWeatherClient``), since the app has no WeatherKit
 /// capability. Sunrise and sunset are worked out on the device
-/// (``EnvironmentSun``). The bedroom and the sleep places are what the Sleep
-/// environment sheet keeps, read only.
+/// (``EnvironmentSun``). The bedroom is what the Sleep environment sheet
+/// keeps; the sleep places are what ``SleepPlaceFinder`` found and the
+/// person named, with nights set by hand.
 ///
 /// Each card opens ``EnvironmentDetailSheet``: the measure over 7 or 30 days,
 /// and for a Health reading the way into the Vault. Embedded by
@@ -40,6 +41,7 @@ struct LongevityEnvironmentView: View {
     @State private var outdoorNight: Double?
     @State private var nightLanded = false
     @State private var places = SleepPlaceStore.shared
+    @State private var finder = SleepPlaceFinder.shared
     @State private var sleepInputs: ScoreDetailInputs?
     @State private var detail: EnvironmentMeasure?
     @State private var sheet: BedroomSheet?
@@ -56,27 +58,25 @@ struct LongevityEnvironmentView: View {
         let report = lens.report
         let updated = LongevityShown(kept: kept, fresh: self.report.map { _ in lens }).updated(now: Date())
 
-        ScrollView {
+        SomaPageScroll {
             VStack(alignment: .leading, spacing: metrics.leadSpacing) {
-                if let updated {
-                    SomaUpdatedNote(updated)
-                        .padding(.top, metrics.heroTopPadding)
-                        .transition(.opacity)
-                }
-                TimelineView(.periodic(from: .now, by: 60)) { context in
-                    EnvironmentLensContent(
-                        report: report,
-                        sky: EnvironmentSky.make(now: context.date, place: lens.place),
-                        bedroom: bedroom(lens),
-                        here: EnvironmentHere(access: location.access, place: lens.place, isHere: lens.isHere,
-                                              exact: location.exact),
-                        sleepPlaces: lens.sleepPlaces,
-                        open: { detail = $0 },
-                        openBedroom: { sheet = .environment },
-                        openPlaces: { sheet = .places },
-                        requestLocation: { location.request() }
-                    )
-                    .padding(.top, updated == nil ? 0 : -metrics.heroTopPadding)
+                SomaUpdatedHeader(updated) {
+                    TimelineView(.periodic(from: .now, by: 60)) { context in
+                        EnvironmentLensContent(
+                            report: report,
+                            sky: EnvironmentSky.make(now: context.date, place: lens.place),
+                            bedroom: bedroom(lens),
+                            here: EnvironmentHere(access: location.access, place: lens.place, isHere: lens.isHere,
+                                                  exact: location.exact),
+                            sleepHeat: finder.heat(),
+                            sleepMain: finder.places.first,
+                            sleepPending: finder.pending,
+                            open: { detail = $0 },
+                            openBedroom: { sheet = .environment },
+                            openPlaces: { sheet = .places },
+                            requestLocation: { location.request() }
+                        )
+                    }
                 }
                 MindHealthStatus(status: health.status)
             }
@@ -90,6 +90,11 @@ struct LongevityEnvironmentView: View {
         .refreshable { await load() }
         .task { await load() }
         .task(id: location.place) { await loadOutside() }
+        .onChange(of: sleepInputs, initial: true) { _, inputs in
+            // Matches the phone's stays to the nights Health holds.
+            guard let inputs else { return }
+            finder.refresh(nights: inputs.recordedNights.map { DateInterval(start: $0.start, end: max($0.start, $0.end)) })
+        }
         .task(id: NightKey(night: (sleepInputs?.nights.last ?? nil)?.start, place: location.place)) { await loadNight() }
         .onChange(of: lens) { _, lens in
             // Kept for the next opening once Health's part has landed.
@@ -101,7 +106,7 @@ struct LongevityEnvironmentView: View {
         .sheet(item: $sheet) { sheet in
             switch sheet {
             case .environment: SleepEnvironmentSheet(scores: health.scores, inputs: sleepInputs)
-            case .places: SleepPlaceLedgerSheet(scores: health.scores, inputs: sleepInputs)
+            case .places: SleepPlacesSheet(scores: health.scores, inputs: sleepInputs)
             }
         }
     }
@@ -125,10 +130,7 @@ struct LongevityEnvironmentView: View {
             outdoorNight: nightLanded ? outdoorNight : kept?.outdoorNight,
             noise: sleepInputs.map { $0.nightSound.last ?? nil } ?? kept?.noise,
             place: place,
-            isHere: location.place != nil ? location.isHere : (place == nil ? false : kept?.isHere ?? false),
-            sleepPlaces: health.scores == nil && kept != nil
-                ? kept?.sleepPlaces ?? []
-                : EnvironmentSleepPlace.make(store: places, scores: health.scores?.detail.sleep ?? [], now: Date())
+            isHere: location.place != nil ? location.isHere : (place == nil ? false : kept?.isHere ?? false)
         )
     }
 

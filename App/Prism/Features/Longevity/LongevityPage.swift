@@ -38,7 +38,7 @@ struct LongevityPage: View {
         @Bindable var router = router
 
         NavigationStack(path: $router.longevityPath) {
-            SomaPartSwitcher(selection: router.longevitySection) { part in
+            SomaPartSwitcher(selection: $router.longevitySection) { part in
                 switch part {
                 case .body: LongevityBodyView()
                 case .mind: LongevityMindView()

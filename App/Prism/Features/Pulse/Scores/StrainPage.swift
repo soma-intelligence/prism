@@ -23,7 +23,7 @@ struct StrainPage: View {
         let page = ScorePages.strain(health.scores, inputs)
 
         ScorePageScaffold(aspect: .activity, title: "Strain") {
-            ScoreGauge(aspect: .activity, lead: page.lead)
+            ScoreStage(aspect: .activity, lead: page.lead, series: health.scores?.strainSeries ?? [], directional: false)
             ScoreHead(page.lead)
             ScoreStats(stats: [
                 SomaStat("Active kcal", value: page.activeEnergy),
@@ -49,8 +49,7 @@ struct StrainPage: View {
             ScoreUsualCard(title: "This week", aspect: .activity, lines: page.lines)
             ScoreLinks(links: [page.workout.map { workout in
                 ScoreLink(title: workout, detail: page.workoutDetail)
-            }, ScoreLink(title: "How your score is built") { showsBuilt = true },
-               ScoreLink(title: "Strain over time") { showsHistory = true }].compactMap { $0 })
+            }, ScoreLink(title: "How your score is built") { showsBuilt = true }].compactMap { $0 })
             if let move = page.move {
                 ScoreMoveCard(move: move, aspect: .activity)
             }

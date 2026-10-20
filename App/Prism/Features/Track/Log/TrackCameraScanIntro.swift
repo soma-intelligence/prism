@@ -83,7 +83,7 @@ struct TrackCameraScanIntro: View {
                             .somaFont(type.body)
                             .foregroundStyle(colors.inkPrimary.color)
                     }
-                    .tint(colors.accent.color)
+                    .toggleStyle(.soma)
                 }
             }
         } footer: {

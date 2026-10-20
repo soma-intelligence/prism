@@ -532,3 +532,32 @@ struct MetricWords {
         return (first.map(short), middle.map(short), "Today")
     }
 }
+
+// MARK: - The stage's head
+
+extension SomaMetricLead {
+    /// A metric page's head over its days (oldest first, today last): the
+    /// number given, and what the last day means against the usual drawn
+    /// from the same days, so the head and the chart under it agree.
+    static func days(
+        _ values: [Double?],
+        caption: String,
+        value: String?,
+        unit: String?,
+        higherIsBetter: Bool?,
+        format: (Double) -> String,
+        detail: String? = nil
+    ) -> SomaMetricLead {
+        let usual = AspectPageMath.usual(values)
+        let last = values.last ?? nil
+        let note = AspectPageMath.slotNote(last, usual: usual, higherIsBetter: higherIsBetter, format: format)
+        return SomaMetricLead(
+            caption: caption,
+            value: value,
+            unit: unit,
+            meaning: value == nil ? "No reading yet" : (note?.text ?? (usual == nil ? "Your usual needs a few more days" : nil)),
+            detail: detail,
+            tone: note?.tone ?? .neutral
+        )
+    }
+}

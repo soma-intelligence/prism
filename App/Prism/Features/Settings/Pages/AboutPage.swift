@@ -7,8 +7,8 @@ import SwiftUI
 import SomaUI
 
 /// Everything about the app in one place: the version (the seven taps that
-/// reveal the developer tools work here too), the legal pages, the code Soma
-/// ships that others wrote, and the photographs behind the Landscape theme.
+/// reveal the developer tools work here too), the legal pages, the work Soma
+/// ships that others made, and the photographs behind the Landscape theme.
 struct AboutPage: View {
     let reveal: DeveloperReveal
     /// Opens a route on the sheet: the website for Terms and Privacy, a push
@@ -54,9 +54,9 @@ struct AboutPage: View {
             }
 
             SettingsSection("Open source") {
-                SomaBrowseGroup([SettingsItem(id: "musclemap")]) { _ in
-                    SettingsTileRow("MuscleMap", symbol: "figure.strengthtraining.traditional",
-                                    detail: "MIT") { open(.openSource) }
+                SomaBrowseGroup([SettingsItem(id: "muscle-figure")]) { _ in
+                    SettingsTileRow("Muscle figure", symbol: "figure.strengthtraining.traditional",
+                                    detail: "CC BY-SA 4.0") { open(.openSource) }
                 }
             }
 
@@ -83,32 +83,33 @@ struct PhotoCredit: Identifiable, Hashable {
     var url: URL { URL(string: "https://unsplash.com/photos/\(photoID)") ?? URL(filePath: "/") }
 
     static let all: [PhotoCredit] = [
-        PhotoCredit(aspect: String(localized: "Sleep"), title: "Half Dome under moon in Yosemite", author: "Casey Horner", photoID: "mPnxwQBtUZE"),
-        PhotoCredit(aspect: String(localized: "Mind"), title: "Lake reflection", author: "Thomas Grams", photoID: "1Q578d01zas"),
-        PhotoCredit(aspect: String(localized: "Body"), title: "Sand dunes", author: "raouf bedrani", photoID: "oVWm9rQpbq0"),
-        PhotoCredit(aspect: String(localized: "Heart"), title: "Calm water at golden hour", author: "Linus Nylund", photoID: "JP23z_-dA74"),
-        PhotoCredit(aspect: String(localized: "Gut"), title: "Valley from a high point", author: "Nils Schirmer", photoID: "qWmUGrV8B54"),
-        PhotoCredit(aspect: String(localized: "Activity"), title: "Mountain at sunrise", author: "Mario von Rotz", photoID: "HHYpIR68Eds"),
+        PhotoCredit(aspect: String(localized: "Sleep"), title: "Moss in a pool of light, dark forest", author: "Matthieu Lemarchal", photoID: "rCgw95aGmVs"),
+        PhotoCredit(aspect: String(localized: "Mind"), title: "Light rays in a mossy redwood forest", author: "Landon Parenteau", photoID: "D0pMST46enU"),
+        PhotoCredit(aspect: String(localized: "Body"), title: "Warm moss on the forest floor", author: "Erik Mclean", photoID: "Qk28DEeEKc8"),
+        PhotoCredit(aspect: String(localized: "Heart"), title: "Sunrise through the trees", author: "Etienne Delorieux", photoID: "Nmd9UJLoCE4"),
+        PhotoCredit(aspect: String(localized: "Gut"), title: "Fronds against the dark", author: "Mohamed Elwaid", photoID: "vcrRGVsivK0"),
+        PhotoCredit(aspect: String(localized: "Activity"), title: "A ray of sunlight on a mossy path", author: "Sini Tiainen", photoID: "T2EvkDxqvMY"),
     ]
 }
 
-/// The licences of the code Soma ships that someone else wrote, in full, as
-/// their terms ask.
+/// The open work Soma ships, credited as its licence asks: the muscle
+/// figure on Body is rendered from Z-Anatomy, itself built on BodyParts3D,
+/// and is shared on under the same licence.
 struct OpenSourcePage: View {
     @Environment(\.somaTheme) private var theme
     @Environment(\.openURL) private var openURL
 
     var body: some View {
         ListScaffold(eyebrow: "About Soma", title: "Open source") {
-            SettingsSection("MuscleMap") {
-                SomaBrowseGroup([SettingsItem(id: "source")]) { _ in
-                    SettingsTileRow("Melih Colpan", symbol: "chevron.left.forwardslash.chevron.right", detail: "GitHub") {
-                        if let url = URL(string: "https://github.com/melihcolpan/MuscleMap") { openURL(url) }
+            SettingsSection("Muscle figure") {
+                SomaBrowseGroup(FigureCredit.all) { credit in
+                    SettingsTileRow(credit.title, symbol: credit.symbol, detail: credit.detail) {
+                        openURL(credit.url)
                     }
                 }
             }
             SomaCard {
-                Text(Self.muscleMapLicence)
+                Text(Self.muscleFigureCredit)
                     .somaFont(theme.typography.caption)
                     .foregroundStyle(theme.colors.inkSecondary.color)
                     .fixedSize(horizontal: false, vertical: true)
@@ -117,18 +118,28 @@ struct OpenSourcePage: View {
         }
     }
 
-    /// The MIT licence MuscleMap ships with, word for word.
-    static let muscleMapLicence = """
-    MIT License
+    /// The credit line the figure's licence asks for, word for word as in
+    /// `NOTICE.md` and beside the images in SomaUI.
+    static let muscleFigureCredit = "Muscle illustrations rendered from Z-Anatomy, the libre 3D atlas of anatomy (CC BY-SA 4.0), based on BodyParts3D, The Database Center for Life Science (CC BY-SA 2.1 Japan). The illustrations are shared under CC BY-SA 4.0."
+}
 
-    Copyright (c) 2026 Melih Colpan
+/// One link behind the muscle figure's credit.
+struct FigureCredit: Identifiable, Hashable {
+    let title: String
+    let detail: String
+    let symbol: String
+    let url: URL
 
-    Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+    var id: String { title }
 
-    The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-    """
+    static let all: [FigureCredit] = [
+        FigureCredit(title: "Z-Anatomy", detail: "CC BY-SA 4.0", symbol: "figure.stand",
+                     url: URL(string: "https://github.com/Z-Anatomy/Models-of-human-anatomy") ?? URL(filePath: "/")),
+        FigureCredit(title: "BodyParts3D", detail: "CC BY-SA 2.1 JP", symbol: "cube.transparent",
+                     url: URL(string: "https://dbarchive.biosciencedbc.jp/en/bodyparts3d/") ?? URL(filePath: "/")),
+        FigureCredit(title: String(localized: "Licence"), detail: "CC BY-SA 4.0", symbol: "doc.plaintext",
+                     url: URL(string: "https://creativecommons.org/licenses/by-sa/4.0/") ?? URL(filePath: "/")),
+    ]
 }
 
 #Preview("About") {

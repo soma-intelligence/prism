@@ -59,6 +59,11 @@ nonisolated struct TrackRitual: Codable, Hashable, Identifiable, Sendable {
 /// The person's two rituals, morning and evening, and which steps were done
 /// on which day.
 ///
+/// A step is done when the person ticked it, or when Apple Health shows it
+/// happened (``TrackRitualDetection``) and the person has not taken that
+/// tick back. What Health shows is read afresh each time and never written down;
+/// only the person's own ticks and untickings are.
+///
 /// Kept on the device as one JSON file in Application Support,
 /// `rituals.json`, beside the Journal's. A step removed later keeps its old
 /// ticks in the file but no longer counts.
@@ -68,8 +73,15 @@ final class TrackRitualStore {
     static let shared = TrackRitualStore()
 
     private(set) var rituals: [TrackRitual]
-    /// The ids of the steps done, keyed by the day's stamp, `yyyy-MM-dd`.
+    /// The ids of the steps the person ticked, keyed by the day's stamp,
+    /// `yyyy-MM-dd`.
     private(set) var done: [String: Set<String>]
+    /// The ids of the steps the person unticked after Health ticked them,
+    /// keyed the same way.
+    private(set) var undone: [String: Set<String>]
+    /// The ids of the steps Health shows were done, keyed the same way. Not
+    /// saved: read again on each opening.
+    private(set) var detected: [String: Set<String>] = [:]
 
     private let url: URL?
     private let calendar: Calendar
@@ -97,6 +109,8 @@ final class TrackRitualStore {
     private struct Stored: Codable {
         var rituals: [TrackRitual]
         var done: [String: Set<String>]
+        /// Absent from files written before Health ticked steps.
+        var undone: [String: Set<String>]?
     }
 
     /// - Parameter url: where the record lives. Nil keeps it in memory, for
@@ -108,9 +122,11 @@ final class TrackRitualStore {
            let stored = try? JSONDecoder().decode(Stored.self, from: data) {
             rituals = Self.complete(stored.rituals)
             done = stored.done
+            undone = stored.undone ?? [:]
         } else {
             rituals = Self.starter
             done = [:]
+            undone = [:]
         }
     }
 
@@ -133,7 +149,16 @@ final class TrackRitualStore {
     }
 
     func isDone(_ step: TrackRitualStep, on date: Date) -> Bool {
-        done[stamp(date)]?.contains(step.id) ?? false
+        let key = stamp(date)
+        if undone[key]?.contains(step.id) == true { return false }
+        return done[key]?.contains(step.id) == true || detected[key]?.contains(step.id) == true
+    }
+
+    /// Whether Health ticked the step that day, the person having left it.
+    func isFromHealth(_ step: TrackRitualStep, on date: Date) -> Bool {
+        let key = stamp(date)
+        return detected[key]?.contains(step.id) == true && undone[key]?.contains(step.id) != true
+            && done[key]?.contains(step.id) != true
     }
 
     /// The share of a ritual's steps done on a day, 0...1, or nil when the
@@ -141,18 +166,38 @@ final class TrackRitualStore {
     func share(_ moment: TrackRitualMoment, on date: Date) -> Double? {
         let steps = ritual(moment).steps
         guard !steps.isEmpty else { return nil }
-        let ticked = done[stamp(date)] ?? []
-        return Double(steps.filter { ticked.contains($0.id) }.count) / Double(steps.count)
+        return Double(steps.filter { isDone($0, on: date) }.count) / Double(steps.count)
     }
 
     // MARK: Writing
 
+    /// Ticks the step, or unticks it, whoever ticked it. Unticking a step
+    /// Health ticked is remembered, so the next read does not tick it again;
+    /// ticking it again forgets that.
     func toggle(_ step: TrackRitualStep, on date: Date) {
         let key = stamp(date)
         var ticked = done[key] ?? []
-        if ticked.contains(step.id) { ticked.remove(step.id) } else { ticked.insert(step.id) }
+        var unticked = undone[key] ?? []
+        if isDone(step, on: date) {
+            ticked.remove(step.id)
+            if detected[key]?.contains(step.id) == true { unticked.insert(step.id) }
+        } else {
+            unticked.remove(step.id)
+            // A tick by hand is kept as one even when Health shows the step
+            // too, so a later read of Health that drops it never undoes it.
+            ticked.insert(step.id)
+        }
         done[key] = ticked.isEmpty ? nil : ticked
+        undone[key] = unticked.isEmpty ? nil : unticked
         save()
+    }
+
+    /// What Health shows was done, by day, replacing the last read.
+    func setDetected(_ found: [Date: Set<String>]) {
+        var keyed: [String: Set<String>] = [:]
+        for (day, ids) in found where !ids.isEmpty { keyed[stamp(day), default: []].formUnion(ids) }
+        guard keyed != detected else { return }
+        detected = keyed
     }
 
     func addStep(_ title: String, glyph: SomaTrackGlyph.Kind, to moment: TrackRitualMoment) {
@@ -183,9 +228,19 @@ final class TrackRitualStore {
         return String(format: "%04d-%02d-%02d", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0)
     }
 
+    /// Back to the starter rituals with nothing ticked, file and all, for
+    /// "Delete my data".
+    func erase() {
+        rituals = Self.starter
+        done = [:]
+        undone = [:]
+        detected = [:]
+        if let url { try? FileManager.default.removeItem(at: url) }
+    }
+
     private func save() {
         guard let url else { return }
-        let stored = Stored(rituals: rituals, done: done)
+        let stored = Stored(rituals: rituals, done: done, undone: undone.isEmpty ? nil : undone)
         do {
             try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
             try JSONEncoder().encode(stored).write(to: url, options: SomaFileStorage.protectedAtomicOptions)

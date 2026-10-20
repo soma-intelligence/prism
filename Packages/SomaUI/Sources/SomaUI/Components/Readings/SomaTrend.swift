@@ -6,7 +6,7 @@
 import SwiftUI
 import Charts
 
-/// Where a reading sits against its normal range, as a status word.
+/// Where a reading sits against the person's usual range, as a status word.
 public enum SomaReadingStatus: Sendable {
     case normal
     case above
@@ -20,12 +20,13 @@ public enum SomaReadingStatus: Sendable {
     /// No range to read it against yet.
     case none
 
-    /// The status word: "Normal range", "Above normal".
+    /// The status word: "Within your usual", "Above your usual". Wellness
+    /// words, never a clinical "normal".
     public var word: LocalizedStringResource? {
         switch self {
-        case .normal: "Normal range"
-        case .above: "Above normal"
-        case .below: "Below normal"
+        case .normal: "Within your usual"
+        case .above: "Above your usual"
+        case .below: "Below your usual"
         case .alert(let word), .trend(let word), .worded(let word, _): word
         case .none: nil
         }
@@ -222,8 +223,10 @@ private struct SomaSparkPath: Shape {
         case .band:
             let top = y(shape.bandHigh)
             let bottom = y(shape.bandLow)
+            // A plain field across the plot, as the metric page draws it:
+            // rounded, a thin band read as a slider's track.
             let band = CGRect(x: rect.minX, y: min(top, bottom), width: rect.width, height: max(abs(bottom - top), 2))
-            path.addRoundedRect(in: band, cornerSize: CGSize(width: min(band.height / 2, 3), height: min(band.height / 2, 3)))
+            path.addRect(band)
         case .line:
             path.addLines(points)
         case .area:
@@ -330,9 +333,13 @@ public struct SomaTrendRow: View {
     }
 }
 
-/// A reading as a tile for a two column grid: a small title, the value large,
-/// its status and the cue that says what it means, and the trend under it,
-/// drawn over the usual band: the fitness tile.
+/// A reading as a card, set the way a metric's page sets its head: the
+/// name with where it sits on one line, then the value large with what it
+/// means under it, and beside them the last thirty days as a clean line
+/// over the usual band, the band's edges named on the trailing side.
+///
+/// Every part keeps its place whether it has something to say or not, so
+/// cards in a column share one height.
 public struct SomaTrendTile: View {
     private let title: LocalizedStringResource
     private let value: String?
@@ -346,7 +353,7 @@ public struct SomaTrendTile: View {
     @Environment(\.somaTheme) private var theme
 
     /// - Parameter cue: a few words on what the value means ("Highest in 30
-    ///   days"), set under the status. Never a sentence.
+    ///   days"), set under the value. Never a sentence.
     public init(
         _ title: LocalizedStringResource,
         value: String?,
@@ -370,49 +377,64 @@ public struct SomaTrendTile: View {
     public var body: some View {
         let colors = theme.colors
         let metrics = theme.metrics
+        let type = theme.typography
 
-        VStack(alignment: .leading, spacing: metrics.cardHeaderSpacing) {
-            Text(title)
-                .somaFont(theme.typography.caption)
-                .foregroundStyle(colors.inkSecondary.color)
-                .lineLimit(1)
-            HStack(alignment: .firstTextBaseline, spacing: 3) {
-                Text(value ?? "-")
-                    .somaFont(theme.typography.metricCompact)
-                    .foregroundStyle(colors.inkPrimary.color)
-                    .somaRollingNumber(value)
-                if let unit, value != nil {
-                    Text(unit)
-                        .somaFont(theme.typography.caption)
-                        .foregroundStyle(colors.inkSecondary.color)
+        VStack(alignment: .leading, spacing: metrics.trendTileSpacing) {
+            HStack(alignment: .firstTextBaseline, spacing: metrics.cardSpacing) {
+                Text(title)
+                    .somaFont(type.caption)
+                    .foregroundStyle(colors.inkSecondary.color)
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+                if let word = status.word {
+                    HStack(spacing: 5) {
+                        Circle()
+                            .fill(status.color(colors))
+                            .frame(width: metrics.chartPointDiameter, height: metrics.chartPointDiameter)
+                        Text(word)
+                            .somaFont(type.caption)
+                            .foregroundStyle(status.color(colors))
+                            .lineLimit(1)
+                    }
                 }
             }
-            if let word = status.word {
-                HStack(spacing: 5) {
-                    Circle()
-                        .fill(status.color(colors))
-                        .frame(width: metrics.chartPointDiameter, height: metrics.chartPointDiameter)
-                    Text(word)
-                        .somaFont(theme.typography.caption)
-                        .foregroundStyle(status.color(colors))
+
+            HStack(alignment: .center, spacing: metrics.cardSpacing) {
+                VStack(alignment: .leading, spacing: metrics.cardHeaderSpacing) {
+                    HStack(alignment: .firstTextBaseline, spacing: 3) {
+                        Text(value ?? "-")
+                            .somaFont(type.metricCompact)
+                            .foregroundStyle(value == nil ? colors.inkSecondary.color : colors.inkPrimary.color)
+                            .somaRollingNumber(value, holdsWidth: unit != nil)
+                        if let unit, value != nil {
+                            Text(unit)
+                                .somaFont(type.caption)
+                                .foregroundStyle(colors.inkSecondary.color)
+                        }
+                    }
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    // The line is held without a cue too, so every card
+                    // keeps one height.
+                    Group {
+                        if let cue {
+                            Text(cue)
+                        } else {
+                            Text(verbatim: " ").accessibilityHidden(true)
+                        }
+                    }
+                    .somaFont(type.caption)
+                    .foregroundStyle(colors.inkSecondary.color)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                SomaTrendTileChart(values: values, band: band, value: value,
+                                   tint: hue?.color ?? (status.isNone ? nil : status.color(colors)))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: metrics.trendTileChartHeight)
             }
-            // The line is held even without a cue, so tiles side by side
-            // keep one height.
-            Group {
-                if let cue {
-                    Text(cue)
-                } else {
-                    Text(verbatim: " ").accessibilityHidden(true)
-                }
-            }
-            .somaFont(theme.typography.caption)
-            .foregroundStyle(colors.inkSecondary.color)
-            .lineLimit(1)
-            .minimumScaleFactor(0.85)
-            SomaSparkline(values, tint: hue?.color ?? (status.isNone ? nil : status.color(colors)), band: band)
-                .frame(height: metrics.chartSparkHeight)
-                .padding(.top, 4)
         }
         .padding(metrics.cardPadding)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -421,6 +443,69 @@ public struct SomaTrendTile: View {
                 .fill(colors.surface.color)
         )
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// A trend tile's chart: the sparkline, and the usual band's edges named
+/// on its trailing side the way a metric page names them.
+struct SomaTrendTileChart: View {
+    let values: [Double?]
+    let band: ClosedRange<Double>?
+    let value: String?
+    let tint: Color?
+
+    @Environment(\.somaTheme) private var theme
+
+    var body: some View {
+        let metrics = theme.metrics
+        let shape = SomaSparkShape.make(values, band: band, samples: metrics.sparkSamples)
+        let labelled = shape.hasBand && shape.samples.count > 1
+
+        HStack(spacing: metrics.trendTileLabelGap) {
+            SomaSparkline(values, tint: tint, band: band)
+            if labelled, let band {
+                GeometryReader { proxy in
+                    let inset = metrics.sparkEndDot / 2 + 1
+                    let plot = proxy.size.height - inset * 2
+                    let high = inset + plot * (1 - shape.bandHigh)
+                    let low = inset + plot * (1 - shape.bandLow)
+                    // Two labels closer than a line apart would collide:
+                    // they part around the band's middle.
+                    let line = metrics.trendTileLabelLine
+                    let gap = max(0, line - (low - high)) / 2
+                    // Kept inside the chart's height, the pair moving
+                    // together so they never meet.
+                    let top = min(max(high - gap, line / 2), proxy.size.height - line * 1.5)
+                    let bottom = max(min(low + gap, proxy.size.height - line / 2), top + line)
+                    ZStack(alignment: .topLeading) {
+                        label(band.upperBound).position(x: proxy.size.width / 2, y: top)
+                        label(band.lowerBound).position(x: proxy.size.width / 2, y: bottom)
+                    }
+                }
+                .frame(width: metrics.trendTileLabelWidth)
+                .accessibilityHidden(true)
+            }
+        }
+    }
+
+    private func label(_ number: Double) -> some View {
+        Text(Self.format(number, like: value))
+            .somaFont(theme.typography.captionValue)
+            .foregroundStyle(theme.colors.inkSecondary.color)
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+    }
+
+    /// A band edge in the value's own precision: "4.8" beside "5.1", "62"
+    /// beside "66", grouped like the value ("7,168").
+    nonisolated static func format(_ number: Double, like value: String?) -> String {
+        let decimals = value.flatMap { text -> Int? in
+            guard let dot = text.lastIndex(where: { $0 == "." || $0 == "," }),
+                  text[text.index(after: dot)...].allSatisfy(\.isNumber),
+                  text.distance(from: dot, to: text.endIndex) <= 3 else { return nil }
+            return text.distance(from: dot, to: text.endIndex) - 1
+        } ?? 0
+        return number.formatted(.number.precision(.fractionLength(decimals)))
     }
 }
 

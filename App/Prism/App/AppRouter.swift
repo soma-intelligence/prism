@@ -37,6 +37,12 @@ final class AppRouter {
     /// Which part the Pulse tab shows. Held here so a tab switch can reset it.
     var pulseSection: PulseSection = .today
 
+    /// What is pushed on the Pulse stack. The score rings and the orb push
+    /// onto it rather than through a destination of their own, so a page
+    /// they open can push the next one on top (a Stress row on the Mind
+    /// page) instead of under itself.
+    var pulsePath = NavigationPath()
+
     /// Which part the Track tab shows. Held here so a tab switch can reset it.
     var trackSection: TrackSection = .journal
 

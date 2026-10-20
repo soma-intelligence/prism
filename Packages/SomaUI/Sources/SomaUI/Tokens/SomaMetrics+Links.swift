@@ -5,20 +5,23 @@
 
 import CoreGraphics
 
-/// The proportions of a cause and effect card: the two averages set on one
-/// track under the headline, their dots and the labels under them.
+/// The proportions of a cause and effect card: the two sides as a pair of
+/// columns under the headline, their averages and the labels under them.
 ///
 /// Computed so they add no stored field to the theme.
 public extension SomaMetrics {
-    /// The track the two averages sit on, and the segment that joins them.
+    /// The bar an average sits on, and twice the line that joins the two.
     var linkTrackHeight: CGFloat { 4 }
-    /// The usual side's dot and the side the card is about.
-    var linkDotSmall: CGFloat { 10 }
-    var linkDotLarge: CGFloat { 14 }
-    /// How strongly the segment between the two shows.
+    /// How strongly the line between the two averages shows.
     var linkSpanOpacity: Double { 0.35 }
-    /// The row the track and its dots take, labels left out.
-    var linkTrackRow: CGFloat { 18 }
     /// Gap between the headline, the line under it and the track.
     var linkCardSpacing: CGFloat { 8 }
+    /// The pair of columns, before and after: its height with the room
+    /// over the plot for the averages' numbers, each column's width (and its
+    /// average's bar), and a day's faint dot.
+    var linkPairHeight: CGFloat { 120 }
+    var linkPairLabelRoom: CGFloat { 26 }
+    var linkPairLaneWidth: CGFloat { 44 }
+    var linkPairDayDot: CGFloat { 5 }
+    var linkPairDayOpacity: Double { 0.28 }
 }

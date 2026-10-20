@@ -46,17 +46,20 @@ struct TrackRitualSummary: Equatable, Sendable {
         }
     }
 
-    /// One plain line on what keeping it does, or what it still needs.
-    var effectText: String {
-        let reading = moment == .morning ? "evening HRV" : "deep sleep"
-        let unit = moment == .morning ? "ms" : "min"
-        guard let delta = effect.delta else {
-            return "Keep it a few days and Soma shows what it does for your \(reading)."
-        }
+    /// The run of days kept, or the days kept this week, or nil when there
+    /// is neither: a row of empty days says it already.
+    var keptText: String? {
+        streakText ?? (keptThisWeek > 0 ? "\(keptThisWeek) of 7 this week" : nil)
+    }
+
+    /// What keeping it does, in a few words: "+12 min deep sleep", "+4 ms
+    /// HRV". Nil until there is a clear effect: no sentence asks the person
+    /// to wait for one.
+    var effectText: String? {
+        guard let delta = effect.delta else { return nil }
         let signed = MindMath.signed(delta)
-        if signed == "0" { return "Your \(reading) stays about the same on days you keep it." }
-        let days = moment == .morning ? "days" : "nights"
-        return "Your \(reading) runs \(signed) \(unit) on \(days) you keep it."
+        guard signed != "0" else { return nil }
+        return moment == .morning ? "\(signed) ms HRV" : "\(signed) min deep sleep"
     }
 
     @MainActor

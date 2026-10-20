@@ -31,8 +31,8 @@ struct PulsePage: View {
     var body: some View {
         @Bindable var router = router
 
-        NavigationStack {
-            SomaPartSwitcher(selection: router.pulseSection) { part in
+        NavigationStack(path: $router.pulsePath) {
+            SomaPartSwitcher(selection: $router.pulseSection) { part in
                 switch part {
                 case .today: PulseTodayView()
                 case .trends: PulseTrendsView()
@@ -53,6 +53,12 @@ struct PulsePage: View {
             if let name = UserDefaults.standard.string(forKey: "pulse.section"),
                let section = PulseSection.allCases.first(where: { "\($0)" == name }) {
                 router.pulseSection = section
+            }
+            // `-pulse.score sleep` (or heart, mind, recovery and the other
+            // score routes) opens that page over Today, for screenshots.
+            if let name = UserDefaults.standard.string(forKey: "pulse.score"), router.pulsePath.isEmpty,
+               let route = ScoreRoute.debugNamed(name) {
+                router.pulsePath.append(route)
             }
         }
 #endif

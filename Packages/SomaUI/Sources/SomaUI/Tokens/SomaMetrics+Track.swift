@@ -17,8 +17,11 @@ public extension SomaMetrics {
     /// How strongly a badge is tinted with its tone.
     var trackBadgeTint: Double { 0.15 }
 
-    /// The answer switch: one of its two cells, the inset between the track
-    /// and a chosen cell, the corners of each, and the glyph inside.
+    /// The answer switch: one of its three slots (cross, dash, check), the
+    /// height of each, the inset between the track and the knob, the
+    /// corners, and the glyph inside. A counted row's arrow square is one
+    /// cell wide.
+    var trackAnswerSlotWidth: CGFloat { 34 }
     var trackAnswerCellWidth: CGFloat { 40 }
     var trackAnswerCellHeight: CGFloat { 30 }
     var trackAnswerInset: CGFloat { 3 }
@@ -29,14 +32,16 @@ public extension SomaMetrics {
     var trackAnswerReach: CGFloat { 8 }
     /// The glyph of a cell that is not chosen.
     var trackAnswerIdleOpacity: Double { 0.42 }
-    /// A chosen "No": the ink at this strength, so a no reads as an answer
-    /// without the weight of a yes.
+    /// The knob in dark, where the surface is the card's own: the ink at
+    /// this strength over the track.
     var trackAnswerNoOpacity: Double { 0.16 }
 
     /// A ritual's step: the box it is ticked in, and the row's height.
     var ritualCheckSide: CGFloat { 26 }
     var ritualCheckCornerRadius: CGFloat { 8 }
     var ritualStepMinHeight: CGFloat { 52 }
+    /// The heart after a step Apple Health ticked.
+    var ritualSourceGlyph: CGFloat { 11 }
     /// The days of the consistency strip: one cell's height, its corners and
     /// the gap between cells.
     var ritualDayHeight: CGFloat { 22 }

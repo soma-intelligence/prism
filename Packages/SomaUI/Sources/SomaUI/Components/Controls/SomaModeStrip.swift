@@ -41,34 +41,32 @@ public struct SomaModeStrip<ID: Hashable>: View {
     }
 
     public var body: some View {
+        // One line when it fits, else lines that wrap: never a row that
+        // scrolls sideways.
         ViewThatFits(in: .horizontal) {
-            row
-            ScrollView(.horizontal) {
-                row.padding(.horizontal, theme.metrics.pagePadding)
-            }
-            .scrollIndicators(.hidden)
+            HStack(spacing: 0) { buttons }
+            SomaFlowLayout(spacing: 0) { buttons }
         }
     }
 
-    private var row: some View {
-        HStack(spacing: 0) {
-            ForEach(items) { item in
-                let on = selected.contains(item.id)
-                Button {
-                    onSelect(item.id)
-                } label: {
-                    label(item.title, color: on ? theme.colors.accent.color : theme.colors.inkPrimary.color)
-                }
-                .buttonStyle(.somaGlassPress)
-                .accessibilityAddTraits(on ? .isSelected : [])
+    @ViewBuilder
+    private var buttons: some View {
+        ForEach(items) { item in
+            let on = selected.contains(item.id)
+            Button {
+                onSelect(item.id)
+            } label: {
+                label(item.title, color: on ? theme.colors.accent.color : theme.colors.inkPrimary.color)
             }
+            .buttonStyle(.somaGlassPress)
+            .accessibilityAddTraits(on ? .isSelected : [])
+        }
 
-            if let trailing, let onTrailing {
-                Button(action: onTrailing) {
-                    label(trailing, color: theme.colors.inkSecondary.color)
-                }
-                .buttonStyle(.somaGlassPress)
+        if let trailing, let onTrailing {
+            Button(action: onTrailing) {
+                label(trailing, color: theme.colors.inkSecondary.color)
             }
+            .buttonStyle(.somaGlassPress)
         }
     }
 

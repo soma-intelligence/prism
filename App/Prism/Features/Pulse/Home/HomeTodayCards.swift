@@ -101,7 +101,7 @@ private struct HomeCycleCard: View {
 }
 
 /// Today's foot: the six aspects as a grid of tiles, each zooming into its
-/// page of readings, and under them two quiet pills, one to choose Today's
+/// own page, and under them two quiet pills, one to choose Today's
 /// cards and one to search every measure.
 struct HomeTodayFoot: View {
     let open: (HomeSheetRoute) -> Void
@@ -123,10 +123,10 @@ struct HomeTodayFoot: View {
 
             LazyVGrid(columns: columns, spacing: metrics.aspectTileSpacing) {
                 ForEach(Self.order) { aspect in
-                    TileLink(value: PulseRoute.aspect(aspect)) {
+                    TileLink(value: TodayRoutes.tile(aspect)) {
                         SomaAspectTile(aspect: aspect)
                     }
-                    .accessibilityHint(Text("Opens its readings"))
+                    .accessibilityHint(Text("Opens its page"))
                 }
             }
 

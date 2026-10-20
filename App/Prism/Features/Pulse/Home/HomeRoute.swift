@@ -79,7 +79,8 @@ enum HomeSheetRoute: Identifiable, Hashable {
         switch self {
         case .notifications: NotificationCenterSheet()
         case .quickAdd: HomeQuickAddSheet()
-        case .lastNight: HomeLastNightSheet()
+        // The same page the night card pushes, in a stack of its own.
+        case .lastNight: NavigationStack { LastNightPage().journeyDestinations() }
         case .marker(let marker): HomeMarkerSheet(initial: marker)
         case .mood: NavigationStack { TrackMoodView() }
         case .editToday: HomeEditTodaySheet()

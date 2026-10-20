@@ -166,6 +166,38 @@ enum MetricPageWords {
         )
     }
 
+    /// The band as the chart's key names it: "Usual 7.1K to 9.4K",
+    /// "Typical 95 to 100".
+    static func usualKey(_ band: ClosedRange<Double>, isReference: Bool, format: (Double) -> String) -> String {
+        (isReference ? "Typical " : "Usual ") + compact(band.lowerBound, format: format) + " to " + compact(band.upperBound, format: format)
+    }
+
+    /// The average as the chart's key names it: "Average 58 bpm", "Daily
+    /// average 8,288 steps", "Average night 7h 32m".
+    static func averageKey(_ value: Double, kind: Kind, format: (Double) -> String, unit: String?) -> String {
+        let what = switch kind {
+        case .total: "Daily average"
+        case .night: "Average night"
+        case .reading, .score: "Average"
+        }
+        return what + " " + format(value) + (unit.map { " " + $0 } ?? "")
+    }
+
+    /// The one quiet line under a metric's chart, folding what the facts
+    /// said: "Up 5% on the 30 days before · 18 of 30 days in your usual".
+    static func note(trend: SomaFact?, projection: SomaFact?, inBand: SomaFact?) -> String? {
+        var parts: [String] = []
+        if let trend, let value = trend.value {
+            parts.append(value == "Steady" ? "Steady over 30 days" : value + " on the 30 days before")
+        }
+        if let projection, let value = projection.value {
+            parts.append("About " + value + " in 30 days")
+        } else if let inBand, let value = inBand.value {
+            parts.append(value + (inBand.label == "Days in range" ? " days in the typical range" : " days in your usual"))
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
     /// A number shortened past a thousand, so two of them fit a third of the
     /// width: 7.1K.
     static func compact(_ value: Double, format: (Double) -> String) -> String {

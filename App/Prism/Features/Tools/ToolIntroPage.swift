@@ -52,7 +52,7 @@ struct ToolIntroPage: View {
                         .somaFont(type.body)
                         .foregroundStyle(colors.inkPrimary.color)
                 }
-                .tint(colors.accent.color)
+                .toggleStyle(.soma)
                 .padding(theme.metrics.explainerRowPadding)
             }
 

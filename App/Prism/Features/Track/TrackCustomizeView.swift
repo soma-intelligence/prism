@@ -230,7 +230,7 @@ struct TrackCustomizeView: View {
             ))
             .somaFont(theme.typography.body)
             .foregroundStyle(theme.colors.inkPrimary.color)
-            .tint(SomaTrackTone.sage.color)
+            .toggleStyle(.soma)
         }
         .listRowBackground(theme.colors.surface.color)
     }
@@ -246,7 +246,7 @@ struct TrackCustomizeView: View {
         return Toggle(title, isOn: Binding(get: { isOn }, set: { set(question, $0) }))
             .somaFont(theme.typography.body)
             .foregroundStyle(theme.colors.inkPrimary.color)
-            .tint(SomaTrackTone.sage.color)
+            .toggleStyle(.soma)
             .listRowBackground(theme.colors.surface.color)
     }
 
@@ -299,7 +299,7 @@ struct TrackRitualStepSheet: View {
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
 
         NavigationStack {
-            ScrollView {
+            SomaPageScroll {
                 VStack(alignment: .leading, spacing: metrics.leadSpacing * 0.75) {
                     HStack(spacing: metrics.browseRowSpacing) {
                         SomaTrackGlyph(glyph, tone: tone, style: .badge)

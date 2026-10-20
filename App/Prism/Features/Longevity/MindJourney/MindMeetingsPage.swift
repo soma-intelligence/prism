@@ -22,6 +22,8 @@ struct MindMeetingsPage: View {
     @State private var events: [MindCalendarEvent] = []
     @State private var tomorrow: [MindCalendarEvent] = []
     @State private var isBreathing = false
+    /// The calendar's lines against stress, worked out on the phone.
+    @State private var insights: [MindCalendarInsights.Insight]?
 
     static let historyDays = 30
 
@@ -53,6 +55,8 @@ struct MindMeetingsPage: View {
                 MindCalendarAccessCard(access: access) {
                     Task { await load(asking: true) }
                 }
+            } else {
+                MindCalendarCard(state: MindCalendarState(access: access, insights: insights))
             }
 
             SomaChartCard(
@@ -134,10 +138,12 @@ struct MindMeetingsPage: View {
         let now = Date()
         let start = calendar.date(byAdding: .day, value: -Self.historyDays, to: calendar.startOfDay(for: now)) ?? now
         let tomorrowStart = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: now)) ?? now
-        events = MindCalendar.events(from: start, to: tomorrowStart)
-        tomorrow = MindCalendar.events(from: tomorrowStart, to: tomorrowStart.addingTimeInterval(24 * 60 * 60))
+        events = await MindCalendar.events(from: start, to: tomorrowStart)
+        tomorrow = await MindCalendar.events(from: tomorrowStart, to: tomorrowStart.addingTimeInterval(24 * 60 * 60))
         let inputs = await MindLoad.inputs(health)
         curves = await MindJourneyLoad.curves(health, inputs: inputs, days: Self.historyDays)
+        insights = MindCalendarInsights.lines(curves: curves ?? [], events: events, hrv: inputs.heartRateVariability,
+                                              now: now, calendar: calendar)
     }
 }
 

@@ -26,6 +26,23 @@ extension CauseLink {
     }
 }
 
+extension LinkDriver {
+    /// The aspect the cause belongs to, whose glyph leads its Trends card.
+    var aspect: SomaAspect {
+        switch self {
+        case .sleepLength: .sleep
+        case .strain, .steps: .activity
+        case .daylight: .body
+        case .tag(let id):
+            switch id {
+            case "meditation", "screens-in-bed": .mind
+            case "sauna", "hard-training": .body
+            default: .gut
+            }
+        }
+    }
+}
+
 extension LinkOutcome {
     /// The aspect whose colour the outcome's line wears.
     var aspect: SomaAspect {
@@ -34,6 +51,15 @@ extension LinkOutcome {
         case .hrv, .restingHeart: .heart
         case .energy, .recovery: .body
         }
+    }
+
+    /// An average of the outcome as its Trends column writes it: a bedtime
+    /// as a clock, anything else as a number.
+    func columnText(_ values: [Double]) -> String? {
+        guard !values.isEmpty else { return nil }
+        let mean = values.reduce(0, +) / Double(values.count)
+        if self == .sleepOnset { return ScoreMath.clock(mean) }
+        return abs(mean) >= 10 ? ScoreMath.number(mean) : ScoreMath.number(mean, decimals: 1)
     }
 
     /// When the outcome is read, as the plural a takeaway opens with.

@@ -7,8 +7,9 @@ import SwiftUI
 import SomaUI
 import HealthExportCore
 
-/// The temperature page: outside now as the hero with one plain line, today
-/// hour by hour, the low, high and humidity, then the last thirty days. When
+/// The temperature page: outside now with one plain line over today hour by
+/// hour (or the last thirty days' highs), the low, high and humidity as one
+/// quiet line. When
 /// the watch reads it, your wrist overnight follows: last night against your
 /// own usual and the last two weeks of nights as dots.
 ///
@@ -19,6 +20,7 @@ struct EnvironmentTemperatureBody: View {
     @Environment(HealthDashboard.self) private var health
     @Environment(\.somaTheme) private var theme
     @State private var wrist: EnvironmentTemperature.Wrist?
+    @State private var span: EnvironmentTemperature.Span = .today
 
     var body: some View {
         let metrics = theme.metrics
@@ -29,69 +31,50 @@ struct EnvironmentTemperatureBody: View {
         let month = Array((outside?.highDays ?? []).suffix(30))
 
         VStack(alignment: .leading, spacing: metrics.leadSpacing) {
-            SomaMetricHero(
-                caption: String(localized: "Outside now"),
-                value: outside?.temperature.map(EnvironmentTemperature.degrees),
-                unit: "°C",
-                meaning: EnvironmentTemperature.meaning(now: outside?.temperature, low: outside?.low, high: outside?.high),
-                tone: .neutral
+            SomaMetricStage(
+                lead: SomaMetricLead(
+                    caption: String(localized: "Outside now"),
+                    value: outside?.temperature.map(EnvironmentTemperature.degrees),
+                    unit: "°C",
+                    meaning: EnvironmentTemperature.meaning(now: outside?.temperature, low: outside?.low, high: outside?.high)
+                ),
+                buckets: span == .today
+                    ? EnvironmentTemperature.hourBuckets(today, start: calendar.startOfDay(for: now))
+                    : EnvironmentTemperature.dayBuckets(month, today: now, calendar: calendar),
+                style: .line,
+                hue: EnvironmentTemperature.hue,
+                domain: EnvironmentTemperature.domain(span == .today ? today : month),
+                average: span == .today ? nil : PulseTrends.mean(month.compactMap { $0 }).map {
+                    SomaChartAverage(value: $0, text: String(localized: "Average high \(EnvironmentTemperature.degrees($0))°"))
+                },
+                summary: span == .today ? String(localized: "Today so far, hour by hour") : String(localized: "Each day’s high, last 30 days"),
+                note: EnvironmentTemperature.note(low: outside?.low, high: outside?.high, humidity: outside?.humidity),
+                periods: month.contains(where: { $0 != nil })
+                    ? EnvironmentTemperature.Span.allCases.map { SomaSegment(id: $0, title: $0.title) }
+                    : [],
+                period: $span
             )
-
-            SomaCard {
-                SomaMetricChart(
-                    buckets: EnvironmentTemperature.hourBuckets(today, start: calendar.startOfDay(for: now)),
-                    style: .line,
-                    hue: EnvironmentTemperature.hue,
-                    domain: EnvironmentTemperature.domain(today),
-                    summaryLabel: String(localized: "Today so far, hour by hour"),
-                    summaryValue: EnvironmentTemperature.range(low: today.compactMap { $0 }.min(), high: today.compactMap { $0 }.max())
-                )
-            }
-
-            SomaFactStrip([
-                SomaFact(String(localized: "Low"), value: outside?.low.map { EnvironmentTemperature.degrees($0) + "°" }),
-                SomaFact(String(localized: "High"), value: outside?.high.map { EnvironmentTemperature.degrees($0) + "°" }),
-                SomaFact(String(localized: "Humidity"), value: outside?.humidity.map { "\(Int($0.rounded()))%" }),
-            ])
-
-            if month.contains(where: { $0 != nil }) {
-                VStack(alignment: .leading, spacing: metrics.cardSpacing) {
-                    EnvironmentTemperatureHeading(title: "30 days")
-                    SomaCard {
-                        SomaMetricChart(
-                            buckets: EnvironmentTemperature.dayBuckets(month, today: now, calendar: calendar),
-                            style: .line,
-                            hue: EnvironmentTemperature.hue,
-                            domain: EnvironmentTemperature.domain(month),
-                            summaryLabel: String(localized: "Each day’s high, on average"),
-                            summaryValue: PulseTrends.mean(month.compactMap { $0 }).map { EnvironmentTemperature.degrees($0) + "°" }
-                        )
-                    }
-                }
-            }
 
             if let wrist, wrist.last != nil {
                 VStack(alignment: .leading, spacing: metrics.cardSpacing) {
                     EnvironmentTemperatureHeading(title: "Your wrist, overnight")
-                    SomaMetricHero(
-                        caption: String(localized: "Last night"),
-                        value: wrist.last.map(EnvironmentTemperature.signed),
-                        unit: "°C",
-                        meaning: wrist.meaning,
-                        tone: .neutral
+                    SomaMetricStage(
+                        lead: SomaMetricLead(
+                            caption: String(localized: "Last night"),
+                            value: wrist.last.map(EnvironmentTemperature.signed),
+                            unit: "°C",
+                            meaning: wrist.meaning
+                        ),
+                        buckets: EnvironmentTemperature.dayBuckets(wrist.nights, today: now, calendar: calendar,
+                                                                   band: wrist.band, format: EnvironmentTemperature.signed),
+                        style: .points,
+                        hue: .vitals,
+                        domain: EnvironmentTemperature.domain(wrist.nights + [wrist.band?.lowerBound, wrist.band?.upperBound]),
+                        usualLabel: wrist.band.map { String(localized: "Usual \(EnvironmentTemperature.signed($0.lowerBound)) to \(EnvironmentTemperature.signed($0.upperBound))") },
+                        summary: String(localized: "Two weeks, against your usual")
                     )
-                    SomaCard {
-                        SomaMetricChart(
-                            buckets: EnvironmentTemperature.dayBuckets(wrist.nights, today: now, calendar: calendar,
-                                                                       band: wrist.band, format: EnvironmentTemperature.signed),
-                            style: .points,
-                            hue: .vitals,
-                            domain: EnvironmentTemperature.domain(wrist.nights + [wrist.band?.lowerBound, wrist.band?.upperBound]),
-                            summaryLabel: String(localized: "Two weeks, against your usual"),
-                            summaryValue: wrist.last.map { EnvironmentTemperature.signed($0) + "°" }
-                        )
-                    }
                 }
+                .padding(.top, metrics.leadSpacing)
             }
 
             ScoreFootnote(text: "Outside is the forecast where you are. Your wrist is read by your watch as you sleep, against your own usual.")
@@ -128,6 +111,27 @@ private struct EnvironmentTemperatureHeading: View {
 nonisolated enum EnvironmentTemperature {
     /// The hue the outside lines draw in: warm, as weather apps draw it.
     static let hue: SomaHealthHue = .mobility
+
+    /// The two spans the outside chart offers.
+    enum Span: CaseIterable, Hashable {
+        case today, month
+
+        var title: LocalizedStringResource {
+            switch self {
+            case .today: "Today"
+            case .month: "30 days"
+            }
+        }
+    }
+
+    /// The quiet line under the outside chart: "Low 12°, high 20°, humidity 60%".
+    static func note(low: Double?, high: Double?, humidity: Double?) -> String? {
+        var parts: [String] = []
+        if let low { parts.append(String(localized: "Low \(degrees(low))°")) }
+        if let high { parts.append((parts.isEmpty ? String(localized: "High") : String(localized: "high")) + " \(degrees(high))°") }
+        if let humidity { parts.append((parts.isEmpty ? String(localized: "Humidity") : String(localized: "humidity")) + " \(Int(humidity.rounded()))%") }
+        return parts.isEmpty ? nil : parts.joined(separator: ", ")
+    }
 
     /// Your wrist overnight: each night against your usual, in degrees.
     struct Wrist: Equatable, Sendable {

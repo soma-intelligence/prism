@@ -91,7 +91,7 @@ struct AskPage: View {
     private var stack: some View {
         NavigationStack(path: $path) {
             ScrollViewReader { reader in
-                ScrollView {
+                SomaPageScroll {
                     Group {
                         if turns.isEmpty {
                             AskReadyView(name: profile.profile.firstName, suggestions: Ask.suggestions(facts), send: send)

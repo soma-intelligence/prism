@@ -38,6 +38,9 @@ struct LongevityMindView: View {
     @State private var isBreathing = false
     @State private var sheet: MindEntryCards.Sheet?
     @State private var quickMood: SomaMood?
+    /// The calendar against stress, worked out on the phone after the rest
+    /// has landed, and kept in memory only.
+    @State private var calendarState = MindCalendarState(access: MindCalendar.access)
 
     /// What today's stress line is read from: Pulse's stress page reads the
     /// same parts, so the two share one cached read.
@@ -58,7 +61,9 @@ struct LongevityMindView: View {
             onStat: open,
             onBreathe: { isBreathing = true },
             onEntry: { sheet = $0 },
-            onMood: { quickMood = $0 }
+            onMood: { quickMood = $0 },
+            calendar: calendarState,
+            onCalendar: connectCalendar
         )
         .refreshable { await load(force: true) }
         .task { await load(force: false) }
@@ -71,7 +76,7 @@ struct LongevityMindView: View {
             MindEntryGate { MindMoodLogSheet(start: mood) }
                 .presentationDetents([.large])
         }
-        .sheet(item: $sheet, onDismiss: { Task { await loadMoods() } }) { which in
+        .sheet(item: $sheet, onDismiss: { Task { await loadMoods(); await loadCalendar(asking: false) } }) { which in
             switch which {
             case .feeling: MindEntryGate { MindEmotionLogSheet() }
             case .checkIn: MindEntryGate { MindCheckInSheet() }
@@ -111,6 +116,7 @@ struct LongevityMindView: View {
             inner: inner,
             stress: today.map { ScorePages.stress(health.scores, $0, calendar: calendar) },
             heatmap: MindHeatmap.make(stress ?? [], calendar: calendar),
+            night: today.flatMap { MindNightStress.read($0, scores: health.scores, calendar: calendar) },
             moods: moods,
             feelings: feelings(calendar: calendar),
             now: base.now,
@@ -141,6 +147,51 @@ struct LongevityMindView: View {
             landed = true
         }
         LongevitySnapshotStore.shared.save(mind: liveModel(calendar: .current))
+        await loadCalendar(asking: false)
+    }
+
+    /// The card's button: asks for the calendar, or opens Mind's choices
+    /// when the calendar is off there.
+    private func connectCalendar() {
+        if calendarState.access == .off {
+            sheet = .choices
+        } else {
+            Task { await loadCalendar(asking: true) }
+        }
+    }
+
+    /// Thirty days of the calendar against thirty days of stress and the
+    /// next mornings' HRV, reduced to a few lines on the phone. Nothing is
+    /// kept: the events and the lines live in memory for this opening.
+    private func loadCalendar(asking: Bool) async {
+        let access = asking ? await MindCalendar.requestAccess() : MindCalendar.access
+        guard access == .granted else {
+            calendarState = MindCalendarState(access: access)
+            return
+        }
+        if calendarState.access != .granted { calendarState = MindCalendarState(access: access) }
+        let calendar = Calendar.current
+        let now = Date()
+        // The lines compare whole days, so one read a day is enough: a month
+        // of heart rate and of events is read again only the next day.
+        let insights: [MindCalendarInsights.Insight]
+        if let kept = MindCalendarDayCache.insights(on: now, calendar: calendar) {
+            insights = kept
+        } else {
+            let start = calendar.date(byAdding: .day, value: -MindMeetingsPage.historyDays, to: calendar.startOfDay(for: now)) ?? now
+            let events = await MindCalendar.events(from: start, to: now)
+            let base: MindInputs
+            if let inputs { base = inputs } else { base = await MindLoad.inputs(health) }
+            let curves = await MindJourneyLoad.curves(health, inputs: base, days: MindMeetingsPage.historyDays)
+            let hrv = base.heartRateVariability
+            insights = await Task.detached(priority: .utility) {
+                MindCalendarInsights.lines(curves: curves, events: events, hrv: hrv, now: now, calendar: calendar)
+            }.value
+            MindCalendarDayCache.store(insights, on: now, calendar: calendar)
+        }
+        withAnimation(reduceMotion ? nil : theme.motion.selection) {
+            calendarState = MindCalendarState(access: access, insights: insights)
+        }
     }
 
     /// Today's heart, sleep and steps for the stress line: the shared read
@@ -180,13 +231,17 @@ struct MindLensContent: View {
     var onBreathe: () -> Void = {}
     var onEntry: (MindEntryCards.Sheet) -> Void = { _ in }
     var onMood: (SomaMood) -> Void = { _ in }
+    /// Nil leaves the calendar out (a fixture render).
+    var calendar: MindCalendarState?
+    var onCalendar: () -> Void = {}
 
     @Environment(\.somaTheme) private var theme
 
     var body: some View {
-        ScrollView {
+        SomaPageScroll {
             MindLensStack(model: model, updated: updated, status: status, latestMood: latestMood, onStat: onStat,
-                          onBreathe: onBreathe, onEntry: onEntry, onMood: onMood)
+                          onBreathe: onBreathe, onEntry: onEntry, onMood: onMood,
+                          calendar: calendar, onCalendar: onCalendar)
         }
         .aspectWash(.mind)
     }
@@ -202,6 +257,8 @@ struct MindLensStack: View {
     var onBreathe: () -> Void = {}
     var onEntry: (MindEntryCards.Sheet) -> Void = { _ in }
     var onMood: (SomaMood) -> Void = { _ in }
+    var calendar: MindCalendarState?
+    var onCalendar: () -> Void = {}
 
     @Environment(\.somaTheme) private var theme
 
@@ -209,28 +266,30 @@ struct MindLensStack: View {
         let metrics = theme.metrics
 
         VStack(alignment: .leading, spacing: metrics.leadSpacing) {
-            if let updated {
-                SomaUpdatedNote(updated)
-                    .padding(.top, metrics.heroTopPadding)
-                    .transition(.opacity)
+            SomaUpdatedHeader(updated) {
+                SomaStatRow([
+                    SomaStat("HRV", value: model.hrv.map(MindLensFormat.whole), unit: "ms", trend: model.hrvTrend),
+                    SomaStat("Resting HR", value: model.resting.map(MindLensFormat.whole), unit: "bpm", trend: model.restingTrend),
+                    SomaStat("Mindful", value: model.mindfulToday.map(MindLensFormat.whole), unit: "min"),
+                ], onSelect: onStat)
+                .padding(.top, metrics.heroTopPadding)
             }
-
-            SomaStatRow([
-                SomaStat("HRV", value: model.hrv.map(MindLensFormat.whole), unit: "ms", trend: model.hrvTrend),
-                SomaStat("Resting HR", value: model.resting.map(MindLensFormat.whole), unit: "bpm", trend: model.restingTrend),
-                SomaStat("Mindful", value: model.mindfulToday.map(MindLensFormat.whole), unit: "min"),
-            ], onSelect: onStat)
-            .padding(.top, updated == nil ? metrics.heroTopPadding : 0)
 
             MindSection("Stress", route: ScoreRoute.stress) {
                 SomaCard {
-                    MindStressDayChart(samples: model.stress, dayStart: model.dayStart)
+                    MindStressDayChart(samples: model.stress, dayStart: model.dayStart, night: model.night)
                 }
                 NavigationLink(value: ScoreRoute.stress) {
                     MindStressZones(minutes: model.zoneMinutes)
                         .contentShape(.rect)
                 }
                 .buttonStyle(TilePressStyle())
+            }
+
+            if let calendar {
+                MindSection("Calendar", route: MindRoute.meetings) {
+                    MindCalendarCard(state: calendar, onConnect: onCalendar)
+                }
             }
 
             MindSection("Mood", route: MindRoute.innerMap) {
@@ -394,3 +453,27 @@ struct MindHealthStatus: View {
     .somaTheme(.standard)
 }
 #endif
+
+/// The calendar's lines for the day they were worked out on, for the life
+/// of the app.
+@MainActor
+enum MindCalendarDayCache {
+    private static var day: Date?
+    private static var kept: [MindCalendarInsights.Insight]?
+
+    static func insights(on date: Date, calendar: Calendar) -> [MindCalendarInsights.Insight]? {
+        guard let day, calendar.isDate(day, inSameDayAs: date) else { return nil }
+        return kept
+    }
+
+    static func store(_ insights: [MindCalendarInsights.Insight], on date: Date, calendar: Calendar) {
+        day = calendar.startOfDay(for: date)
+        kept = insights
+    }
+
+    /// Forgets the lines, for "Delete my data".
+    static func clear() {
+        day = nil
+        kept = nil
+    }
+}

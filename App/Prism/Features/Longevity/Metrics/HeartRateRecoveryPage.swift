@@ -7,8 +7,8 @@ import SwiftUI
 import SomaUI
 import HealthExportCore
 
-/// Heart rate recovery: the drop in the minute after the latest workout,
-/// thirty days of drops against their usual range, the recent workouts with
+/// Heart rate recovery: the drop in the minute after the latest workout on
+/// the metric stage, thirty days of drops against their usual range, the recent workouts with
 /// theirs, and why it matters.
 ///
 /// The drop is Apple Watch's own one minute recovery sample. The bands and the
@@ -42,20 +42,22 @@ struct HeartRateRecoveryPage: View {
             reason: lead?.reason ?? reason(latest: latest, usual: usual, slope: slope, first: all.first),
             stats: []
         ) {
-            SomaChartCard(
-                eyebrow: "Heart rate recovery",
-                value: latest.map { words.whole($0.value) },
-                unit: "bpm in a minute",
-                note: "\(Self.shownDays) days, after each workout." + (usual.map { " Usually \(words.whole($0.lowerBound)) to \(words.whole($0.upperBound))." } ?? "")
-            ) {
-                MetricBandChart(
-                    values: recent.map(\.value),
-                    lower: usual.map { band in recent.map { _ in band.lowerBound } },
-                    upper: usual.map { band in recent.map { _ in band.upperBound } },
-                    aspect: .heart,
-                    axis: [recent.first.map { words.short($0.start) }, recent.last.map { words.short($0.start) }].compactMap { $0 }
-                )
-            }
+            AspectStage(
+                aspect: .heart,
+                lead: SomaMetricLead(
+                    caption: latest.map { words.relativeDay($0.start, now: .now) } ?? "Latest",
+                    value: latest.map { words.whole($0.value) },
+                    unit: "bpm in a minute",
+                    meaning: latest.map { HeartRateRecovery.band($0.value).title } ?? "No recovery reading yet",
+                    tone: .neutral
+                ),
+                values: Self.days(recent, now: now),
+                unit: "bpm",
+                scale: nil,
+                higherIsBetter: true,
+                style: .points,
+                format: { MetricWords().whole($0) }
+            )
             MetricRowsCard(eyebrow: "Recent workouts", rows: workouts.isEmpty
                 ? [MetricRowItem("No recovery readings yet", detail: "Apple Watch writes one after most workouts, when you stay still for a minute at the end.")]
                 : workouts.prefix(4).map { workout, reading in
@@ -83,6 +85,17 @@ struct HeartRateRecoveryPage: View {
         .navigationTitle("Heart rate recovery")
         .task { history = await health.fitnessHistory(days: Self.readDays) }
         .refreshable { history = await health.fitnessHistory(days: Self.readDays) }
+    }
+
+    /// The last thirty days, today last, each the day's best drop: most
+    /// days have no workout and stay empty.
+    static func days(_ readings: [HealthReading], now: Date, calendar: Calendar = .current) -> [Double?] {
+        let today = calendar.startOfDay(for: now)
+        let byDay = Dictionary(grouping: readings) { calendar.startOfDay(for: $0.start) }
+            .mapValues { $0.map(\.value).max() }
+        return (0..<shownDays).map { index in
+            calendar.date(byAdding: .day, value: index - (shownDays - 1), to: today).flatMap { byDay[$0] ?? nil }
+        }
     }
 
     private func eyebrow(latest: HealthReading?, workouts: [(FitnessWorkout, HealthReading)]) -> String {

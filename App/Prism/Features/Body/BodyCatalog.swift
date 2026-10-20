@@ -56,6 +56,14 @@ struct BodyCategory: Identifiable, Hashable {
 /// An identifier that the catalog does not carry drops out silently, the same
 /// way the catalog itself lets an older OS skip a type it has never heard of.
 enum BodyCatalog {
+    /// How many measures the categories list: every count of measures the app
+    /// shows (the Vault's head, the search on Today's All categories) reads
+    /// this one. It is fewer than the Health catalog's entries, which also
+    /// hold the characteristics, correlations and kinds no category browses.
+    static var measureCount: Int {
+        categories.reduce(0) { $0 + $1.types.count }
+    }
+
     static let categories: [BodyCategory] = [
         BodyCategory("Activity", symbol: "flame.fill", [
             "HKQuantityTypeIdentifierStepCount",

@@ -152,6 +152,7 @@ public struct SomaDayClock<Center: View>: View {
         SomaKnob()
             .frame(width: theme.metrics.minimumTapTarget, height: theme.metrics.minimumTapTarget)
             .contentShape(.circle)
+            .somaClaimsSwipe()
             .gesture(
                 DragGesture(minimumDistance: 0, coordinateSpace: .named(Self.space))
                     .onChanged { drag in move(hour(of: drag.location, around: middle)) }

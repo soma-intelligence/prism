@@ -5,16 +5,19 @@
 
 import SwiftUI
 import SomaUI
+import HealthExportCore
 
 /// Track, Rituals: two short routines that bookend the day, a morning one and
 /// an evening one, each a few steps to tick.
 ///
-/// One line says what the page is for. Each ritual is a card: today's
-/// progress, the last two weeks as a strip of days, the run of days kept, its
-/// steps to tick, and one line on what keeping it does for the person, read
-/// from Apple Health with ``EffectMath`` (a morning ritual on that evening's
-/// HRV, an evening one on the next night's deep sleep). Steps are added,
-/// removed and reordered in Customize.
+/// No sentences: each ritual is a card with today's progress, the last two
+/// weeks as a strip of days, the run of days kept with what keeping it does
+/// for the person beside it (``EffectMath``: a morning ritual on that
+/// evening's HRV, an evening one on the next night's deep sleep, shown only
+/// once there is one), and its steps. Steps Apple Health can see tick
+/// themselves (``TrackRitualDetection``) and wear a small heart; the person
+/// can still untick them. Steps are added, removed and reordered in
+/// Customize.
 ///
 /// It draws no navigation chrome: the Track page embeds it under its own top
 /// bar. Needs `HealthDashboard`, `JournalStore` and `AppRouter` in the
@@ -27,6 +30,9 @@ struct TrackRitualsView: View {
     @State private var inputs: MindInputs?
     @State private var breathes = false
 
+    /// How many days back Health's ticks are read: the strip and the effect.
+    private static let detectionDays = TrackRitualSummary.effectDays
+
     private let store = TrackRitualStore.shared
     private let calendar = Calendar.current
 
@@ -34,19 +40,14 @@ struct TrackRitualsView: View {
         let metrics = theme.metrics
         let today = Date.now
 
-        ScrollView {
+        SomaPageScroll {
             VStack(alignment: .leading, spacing: metrics.leadSpacing * 0.75) {
-                TrackLeadText(
-                    lead: "Two small routines that bookend your day.",
-                    rest: "Tick each step as you go. Soma counts the days you keep and shows what they do for you."
-                )
-                .padding(.horizontal, metrics.scoreLabelSpacing)
-
                 ForEach(TrackRitualMoment.allCases) { moment in
                     TrackRitualCard(
                         summary: TrackRitualSummary.make(moment, store: store, inputs: inputs, today: today, calendar: calendar),
                         ritual: store.ritual(moment),
                         isDone: { store.isDone($0, on: today) },
+                        isFromHealth: { store.isFromHealth($0, on: today) },
                         toggle: { step in
                             store.toggle(step, on: today)
                         },
@@ -77,14 +78,39 @@ struct TrackRitualsView: View {
             .frame(maxWidth: .infinity)
         }
         .background(theme.colors.canvas.color.ignoresSafeArea())
-        .refreshable { inputs = await MindLoad.inputs(health) }
+        .refreshable { await load() }
         .task {
             guard inputs == nil else { return }
-            inputs = await MindLoad.inputs(health)
+            await load()
         }
         .sheet(isPresented: $breathes) {
             MindBreatheSheet()
         }
+    }
+}
+
+extension TrackRitualsView {
+    /// Reads Health once for the effects and for the steps it can tick.
+    private func load() async {
+        let read = await MindLoad.inputs(health)
+        inputs = read
+        guard let source = await health.prepare(TrackRitualSignals.Metric.all) else { return }
+        let now = Date.now
+        var signals = await TrackRitualSignals.read(from: source, inputs: read, stepDays: TrackRitualSummary.days,
+                                                    now: now, calendar: calendar)
+        // Water poured in the Journal counts even when Health was not
+        // allowed to keep it.
+        signals.water += TrackLogStore.shared.drinks
+            .filter { $0.drink == .water && $0.ml > 0 }
+            .compactMap { entry in
+                HealthMetricCatalog.metric(for: TrackRitualSignals.Metric.water).map {
+                    HealthReading(metric: $0.identifier, value: entry.ml, unit: $0.unit, start: entry.date, end: entry.date)
+                }
+            }
+        let start = calendar.startOfDay(for: now)
+        let days = (0..<Self.detectionDays).compactMap { calendar.date(byAdding: .day, value: -$0, to: start) }
+        store.setDetected(TrackRitualDetection.detected(store.rituals, days: days, signals: signals,
+                                                        now: now, calendar: calendar))
     }
 }
 
@@ -93,6 +119,7 @@ private struct TrackRitualCard: View {
     let summary: TrackRitualSummary
     let ritual: TrackRitual
     let isDone: (TrackRitualStep) -> Bool
+    let isFromHealth: (TrackRitualStep) -> Bool
     let toggle: (TrackRitualStep) -> Void
     let breathe: () -> Void
     let edit: () -> Void
@@ -123,7 +150,7 @@ private struct TrackRitualCard: View {
 
                 if ritual.steps.isEmpty {
                     Button(action: edit) {
-                        Text("No steps yet. Add a few in Customize.")
+                        Text("Add a step")
                             .somaFont(type.body)
                             .foregroundStyle(colors.inkSecondary.color)
                             .frame(maxWidth: .infinity, minHeight: metrics.ritualStepMinHeight, alignment: .leading)
@@ -131,21 +158,30 @@ private struct TrackRitualCard: View {
                     }
                     .buttonStyle(.somaGlassPressDim)
                 } else {
-                    VStack(alignment: .leading, spacing: metrics.scoreLabelSpacing * 2) {
+                    VStack(alignment: .leading, spacing: metrics.scoreLabelSpacing * 3) {
                         SomaRitualDays(shares: summary.shares, tone: tone)
-                        HStack {
-                            Text("Last \(TrackRitualSummary.days) days")
-                            Spacer()
-                            Text(summary.streakText ?? "\(summary.keptThisWeek) of 7 this week")
+                        if summary.keptText != nil || summary.effectText != nil {
+                            HStack {
+                                if let kept = summary.keptText {
+                                    Text(kept)
+                                        .foregroundStyle(colors.inkSecondary.color)
+                                }
+                                Spacer()
+                                if let effect = summary.effectText {
+                                    Text(effect)
+                                        .foregroundStyle(tone.color)
+                                }
+                            }
+                            .somaFont(type.tabLabel)
+                            .lineLimit(1)
                         }
-                        .somaFont(type.tabLabel)
-                        .foregroundStyle(colors.inkSecondary.color)
                     }
 
                     VStack(spacing: 0) {
                         ForEach(Array(ritual.steps.enumerated()), id: \.element.id) { index, step in
                             if index > 0 { TrackHairline() }
-                            SomaRitualStep(step.title, glyph: step.kind, tone: tone, isDone: isDone(step)) {
+                            SomaRitualStep(step.title, glyph: step.kind, tone: tone, isDone: isDone(step),
+                                           isFromHealth: isFromHealth(step)) {
                                 toggle(step)
                             } trailing: {
                                 if step.kind == .breathe && !isDone(step) {
@@ -163,12 +199,6 @@ private struct TrackRitualCard: View {
                             }
                         }
                     }
-
-                    TrackHairline()
-                    Text(summary.effectText)
-                        .somaFont(type.caption)
-                        .foregroundStyle(colors.inkSecondary.color)
-                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
         }

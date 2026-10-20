@@ -283,7 +283,7 @@ struct MindSheetFrame<Content: View, Footer: View>: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
+            SomaPageScroll {
                 VStack(alignment: .leading, spacing: theme.metrics.leadSpacing) {
                     content()
                 }
@@ -297,6 +297,17 @@ struct MindSheetFrame<Content: View, Footer: View>: View {
                     .padding(.horizontal, theme.metrics.pagePadding)
                     .padding(.bottom, theme.metrics.cardSpacing)
                     .frame(maxWidth: theme.metrics.pageMaxWidth)
+                    .frame(maxWidth: .infinity)
+                    // The page's ground under the buttons, fading in above
+                    // them, so what scrolls behind never shows through.
+                    .background {
+                        LinearGradient(stops: [
+                            .init(color: theme.colors.canvas.color.opacity(0), location: 0),
+                            .init(color: theme.colors.canvas.color, location: 0.3),
+                        ], startPoint: .top, endPoint: .bottom)
+                        .padding(.top, -theme.metrics.cardSpacing * 2)
+                        .ignoresSafeArea(edges: .bottom)
+                    }
             }
             .background(theme.colors.canvas.color.ignoresSafeArea())
             .navigationTitle(title)

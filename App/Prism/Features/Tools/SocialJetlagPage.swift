@@ -60,7 +60,7 @@ struct SocialJetlagPage: View {
                              actionTitle: "Set alarm", action: { showAlarm = true })
             }
         }
-        .navigationDestination(isPresented: $showAlarm) { SmartAlarmPage() }
+        .navigationDestination(isPresented: $showAlarm) { SmartAlarmPage().somaScrollEdgeFade() }
         .task {
             store.markOpened(.socialJetlag)
             await model.load(health)

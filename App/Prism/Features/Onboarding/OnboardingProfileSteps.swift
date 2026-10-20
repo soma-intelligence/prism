@@ -177,7 +177,7 @@ struct OnboardingChronotypeSheet: View {
         let type = theme.typography
 
         NavigationStack {
-            ScrollView {
+            SomaPageScroll {
                 VStack(alignment: .leading, spacing: metrics.leadSpacing) {
                     Text("Your chronotype")
                         .somaFont(type.headline)

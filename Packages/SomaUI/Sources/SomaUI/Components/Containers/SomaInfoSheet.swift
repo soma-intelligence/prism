@@ -40,7 +40,7 @@ public struct SomaInfoSheet<Footer: View>: View {
         let colors = theme.colors
         let metrics = theme.metrics
 
-        ScrollView {
+        SomaPageScroll {
             VStack(alignment: .leading, spacing: metrics.leadSpacing) {
                 Text(title)
                     .somaFont(theme.typography.headline)

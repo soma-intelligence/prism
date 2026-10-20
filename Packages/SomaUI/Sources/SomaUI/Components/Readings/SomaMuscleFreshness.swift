@@ -162,7 +162,8 @@ private struct SomaMuscleGroupPill: View {
     var body: some View {
         let metrics = theme.metrics
         let colors = theme.colors
-        let tone = reading.state.tone?.color
+        // The chest pill carries the chest's own deeper tone, as the figure does.
+        let tone = (reading.group == .chest ? reading.state.chestTone : reading.state.tone)?.color
         let shape = Capsule(style: .continuous)
 
         Button(action: action) {

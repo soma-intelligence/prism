@@ -25,7 +25,7 @@ struct StressPage: View {
         let calendar = Calendar.current
 
         ScorePageScaffold(aspect: .mind, title: "Stress") {
-            ScoreGauge(aspect: .mind, lead: page.lead)
+            ScoreStage(aspect: .mind, lead: page.lead, series: health.scores?.stressSeries ?? [], higherIsBetter: false)
             ScoreHead(page.lead)
             ScoreStats(stats: [
                 SomaStat("Highest", value: page.highest),
@@ -43,7 +43,6 @@ struct StressPage: View {
             StressBandsCard(minutes: page.bandMinutes, wake: page.wakeTime)
             ScoreUsualCard(title: "What stress leans on", aspect: .mind, lines: page.lines)
             ScoreLinks(links: [
-                ScoreLink(title: "Stress over time") { showsHistory = true },
                 ScoreLink(title: "Reading your stress score", detail: "4 min") { reader = .stressArticle },
                 ScoreLink(title: "How stress is measured") { reader = .stressMeasured },
             ])

@@ -27,7 +27,7 @@ struct ToolPage<Content: View>: View {
 
     var body: some View {
         let metrics = theme.metrics
-        ScrollView {
+        SomaPageScroll {
             VStack(alignment: .leading, spacing: metrics.cardSpacing) {
                 content
             }

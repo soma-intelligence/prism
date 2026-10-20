@@ -40,29 +40,26 @@ struct LongevityBodyView: View {
         let metrics = theme.metrics
         let updated = shown.updated(now: .now)
 
-        ScrollView {
+        SomaPageScroll {
             VStack(alignment: .leading, spacing: metrics.leadSpacing) {
-                if let updated {
-                    SomaUpdatedNote(updated)
-                        .padding(.top, metrics.heroTopPadding)
-                        .transition(.opacity)
-                }
-
                 // Three numbers, no line under them (owner, 2026-10-03), each a
-                // door to its page.
-                SomaStatRow([
-                    SomaStat(
-                        "Fitness age",
-                        value: page.fitnessAge.value,
-                        cue: page.fitnessAge.cue.map { LocalizedStringResource(stringLiteral: $0) },
-                        cueTone: page.fitnessAge.isGood ? .good : .neutral
-                    ),
-                    SomaStat("Lean mass", value: page.leanMass, unit: "kg", trend: page.leanTrend),
-                    SomaStat("VO2 max", value: page.vo2Max, trend: page.vo2Trend),
-                ]) { stat in
-                    openStat(stat)
+                // door to its page, under the quiet "Updated" line while they
+                // are kept ones.
+                SomaUpdatedHeader(updated) {
+                    SomaStatRow([
+                        SomaStat(
+                            "Fitness age",
+                            value: page.fitnessAge.value,
+                            cue: page.fitnessAge.cue.map { LocalizedStringResource(stringLiteral: $0) },
+                            cueTone: page.fitnessAge.isGood ? .good : .neutral
+                        ),
+                        SomaStat("Lean mass", value: page.leanMass, unit: "kg", trend: page.leanTrend),
+                        SomaStat("VO2 max", value: page.vo2Max, trend: page.vo2Trend),
+                    ]) { stat in
+                        openStat(stat)
                 }
-                .padding(.top, updated == nil ? metrics.heroTopPadding : 0)
+                .padding(.top, metrics.heroTopPadding)
+                }
 
                 BodySection("Heart and fitness") {
                     BodyTileGrid {
@@ -92,24 +89,7 @@ struct LongevityBodyView: View {
 
                 SomaMuscleFreshness(lens.muscles)
 
-                BodySection("Biomarkers") {
-                    VStack(spacing: metrics.cardSpacing) {
-                        ForEach(ranked(BodyBiomarkerSpec.rows), id: \.self) { spec in
-                            let marker = marker(spec)
-                            BodyMarkerLink(spec: spec) {
-                                SomaTrendRow(
-                                    LocalizedStringResource(stringLiteral: marker.title),
-                                    value: marker.value.map { marker.unit.isEmpty ? $0 : "\($0) \(marker.unit)" },
-                                    status: marker.status.reading,
-                                    cue: marker.cue.map { LocalizedStringResource(stringLiteral: $0) },
-                                    values: marker.days,
-                                    band: marker.band,
-                                    hue: spec.hue
-                                )
-                            }
-                        }
-                    }
-                }
+                BodyBiomarkersSection(specs: ranked(BodyBiomarkerSpec.rows), marker: marker)
 
                 BodyMoreRows(vo2Max: page.vo2Max)
             }
@@ -216,7 +196,9 @@ struct LongevityBodyView: View {
     }
 }
 
-/// Two tiles to a row.
+/// The reading cards, one to a row on a phone (each sets its value beside
+/// its line, which needs the width), two or more side by side where the
+/// page is wide enough.
 private struct BodyTileGrid<Content: View>: View {
     @ViewBuilder let content: Content
 
@@ -224,10 +206,113 @@ private struct BodyTileGrid<Content: View>: View {
 
     var body: some View {
         let spacing = theme.metrics.cardSpacing
-        LazyVGrid(columns: [GridItem(.flexible(), spacing: spacing), GridItem(.flexible(), spacing: spacing)], spacing: spacing) {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: theme.metrics.bodyReadingCardMinWidth), spacing: spacing)], spacing: spacing) {
             content
         }
     }
+}
+
+/// The biomarkers as quiet rows on one card, each the same height (its
+/// name, where it sits, its month as a small line, the value), and one way
+/// to add to them: a blood test read on the phone, or a reading written to
+/// Health where Health lets an app write it.
+private struct BodyBiomarkersSection: View {
+    let specs: [BodyBiomarkerSpec]
+    let marker: (BodyBiomarkerSpec) -> BodyBiomarker
+
+    @Environment(\.somaTheme) private var theme
+    @State private var adding: BodyAddition?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: theme.metrics.cardSpacing) {
+            HStack(alignment: .center) {
+                Text("Biomarkers")
+                    .somaFont(theme.typography.headline)
+                    .foregroundStyle(theme.colors.inkPrimary.color)
+                    .accessibilityAddTraits(.isHeader)
+                Spacer(minLength: theme.metrics.cardSpacing)
+                Menu {
+                    ForEach(BodyAddition.offered) { addition in
+                        Button(addition.title, systemImage: addition.symbol) { adding = addition }
+                    }
+                } label: {
+                    SomaQuietPill("Add", systemImage: "plus")
+                }
+                .menuStyle(.button)
+                .buttonStyle(.plain)
+                .accessibilityLabel("Add to biomarkers")
+            }
+
+            SomaBrowseGroup(specs, hasGlyphs: false) { spec in
+                let marker = marker(spec)
+                BodyMarkerLink(spec: spec) {
+                    SomaReadingRow(
+                        title: marker.title,
+                        caption: marker.cue,
+                        value: marker.value,
+                        unit: marker.unit.isEmpty ? nil : marker.unit,
+                        week: marker.days,
+                        aspect: .body,
+                        status: marker.status.reading
+                    )
+                }
+            }
+        }
+        .sheet(item: $adding) { addition in
+            switch addition {
+            case .bloodTest: AddBloodTestSheet()
+            case .log(let kind): LabLogSheet(kind: kind)
+            }
+        }
+    }
+}
+
+extension BodyBiomarkerSpec: Identifiable {
+    var id: String { rawValue }
+}
+
+/// What the Biomarkers section offers to add.
+enum BodyAddition: Identifiable, Hashable {
+    /// A lab's blood panel: photographed, imported or typed, read on the phone.
+    case bloodTest
+    /// One reading written to Apple Health.
+    case log(LabLogSheet.Kind)
+
+    var id: String {
+        switch self {
+        case .bloodTest: "blood"
+        case .log(let kind): "log.\(kind)"
+        }
+    }
+
+    var title: LocalizedStringResource {
+        switch self {
+        case .bloodTest: "Blood test"
+        case .log(.weight): "Weight"
+        case .log(.pressure): "Blood pressure"
+        case .log(.leanMass): "Lean mass"
+        case .log(.glucose): "Blood glucose"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .bloodTest: "drop"
+        case .log(.weight): "scalemass"
+        case .log(.pressure): "heart.text.square"
+        case .log(.leanMass): "figure.strengthtraining.traditional"
+        case .log(.glucose): "chart.line.uptrend.xyaxis"
+        }
+    }
+
+    /// A blood test always; a reading only where this build writes to
+    /// Health, since a reading kept nowhere else would be lost.
+    static func offered(canWrite: Bool) -> [BodyAddition] {
+        [.bloodTest] + (canWrite ? [.log(.weight), .log(.pressure), .log(.leanMass), .log(.glucose)] : [])
+    }
+
+    @MainActor
+    static var offered: [BodyAddition] { offered(canWrite: LabHealthWriter.canWrite) }
 }
 
 /// Fitness age as a tile: the age, how it sits against yours, and the age

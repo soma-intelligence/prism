@@ -25,7 +25,7 @@ struct PulseLinkDetailSheet: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
+            SomaPageScroll {
                 PulseLinkDetailContent(detail: detail)
                     .padding(theme.metrics.pagePadding)
             }

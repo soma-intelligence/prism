@@ -142,6 +142,27 @@ public enum SomaChartMath {
     }
 
     /// The width of one bar for `count` slots across `width` points.
+    /// The slots holding the highest and the lowest value, for the labels
+    /// that name them: nil under three readings, or when every reading is
+    /// the same (there is no high or low to name). A tie goes to the latest.
+    ///
+    /// `excluding` leaves one slot out: the latest, which the head already
+    /// says and a halo already marks (and which may be a day still filling).
+    public static func extremes(_ values: [Double?], excluding: Int? = nil) -> (high: Int, low: Int)? {
+        let known = values.enumerated().compactMap { index, value in
+            index == excluding ? nil : value.map { (index, $0) }
+        }
+        guard known.count >= 3 else { return nil }
+        var high = known[0]
+        var low = known[0]
+        for item in known.dropFirst() {
+            if item.1 >= high.1 { high = item }
+            if item.1 <= low.1 { low = item }
+        }
+        guard high.1 > low.1 else { return nil }
+        return (high.0, low.0)
+    }
+
     public static func barWidth(count: Int, width: CGFloat, share: CGFloat, minimum: CGFloat, maximum: CGFloat) -> CGFloat {
         guard count > 0 else { return minimum }
         return min(maximum, max(minimum, width / CGFloat(count) * share))

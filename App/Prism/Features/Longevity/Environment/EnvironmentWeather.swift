@@ -38,6 +38,22 @@ nonisolated struct EnvironmentConditions: Sendable, Equatable, Codable {
         return values.isEmpty ? nil : values.reduce(0, +) / Double(values.count)
     }
 
+    /// The sky in a word or two, from the WMO weather code.
+    var word: String? {
+        switch weatherCode ?? -1 {
+        case 0: return String(localized: "Clear")
+        case 1, 2: return String(localized: "Partly cloudy")
+        case 3: return String(localized: "Cloudy")
+        case 45, 48: return String(localized: "Fog")
+        case 51...57: return String(localized: "Drizzle")
+        case 61...67: return String(localized: "Rain")
+        case 71...77, 85, 86: return String(localized: "Snow")
+        case 80...82: return String(localized: "Showers")
+        case 95...99: return String(localized: "Storms")
+        default: return nil
+        }
+    }
+
     /// The sky as a symbol, from the WMO weather code.
     var symbol: String {
         let day = isDay ?? true

@@ -51,3 +51,18 @@ public extension SomaMetrics {
     var hypnogramLaneHeight: CGFloat { 26 }
     var hypnogramBlockShare: CGFloat { 0.62 }
 }
+
+/// The trend tile, set like a metric page's head: the gap between its name
+/// line and its value, the chart beside the value, and the band's edges
+/// named on the chart's trailing side (the gap to them, their column, and
+/// the least room two labels need before they part).
+public extension SomaMetrics {
+    var trendTileSpacing: CGFloat { 8 }
+    var trendTileChartHeight: CGFloat { 52 }
+    var trendTileLabelGap: CGFloat { 6 }
+    var trendTileLabelWidth: CGFloat { 34 }
+    var trendTileLabelLine: CGFloat { 16 }
+
+    /// The line that closes a night on a day's chart, in the sleep hue.
+    var chartNightEdgeOpacity: Double { 0.5 }
+}

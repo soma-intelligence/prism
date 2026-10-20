@@ -107,6 +107,7 @@ public struct SomaHeightRuler: View {
                     .position(x: rulerX, y: y(value))
             }
             .contentShape(.rect)
+            .somaClaimsSwipe()
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { drag in

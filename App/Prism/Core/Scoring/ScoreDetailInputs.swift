@@ -45,6 +45,8 @@ nonisolated struct ScoreDetailInputs: Sendable, Equatable {
     var resting: [Double?] = []
     var nightHeartRate: [Double?] = []
     var lastNightBeats: [ScoringTimedValue] = []
+    /// Last night's HRV readings, with `.heart`, when the night ended today.
+    var lastNightHRV: [ScoringTimedValue] = []
     var respiratory: [Double?] = []
     var wristTemperature: [Double?] = []
     var nightSound: [Double?] = []
@@ -134,6 +136,13 @@ nonisolated struct ScoreDetailInputs: Sendable, Equatable {
             async let resting = samples(Metric.restingHeartRate, from: first, to: now)
             inputs.hrv = SomaScoresReader.dailyMeans(await hrv, dayStarts: starts, calendar: calendar)
             inputs.resting = SomaScoresReader.dailyMeans(await resting, dayStarts: starts, calendar: calendar)
+            // The night's own readings, for the stress line's night.
+            if let last = nights.last ?? nil, calendar.isDate(last.end, inSameDayAs: now) {
+                inputs.lastNightHRV = await hrv
+                    .filter { $0.start >= last.start && $0.start <= last.end }
+                    .map { ScoringTimedValue(start: $0.start, end: $0.end, value: $0.value) }
+                    .sorted { $0.start < $1.start }
+            }
         }
 
         if parts.contains(.nightHeart) {
@@ -181,6 +190,13 @@ nonisolated struct ScoreDetailInputs: Sendable, Equatable {
             let hours = await stand
             inputs.standHours = hours.isEmpty ? nil : hours.filter { Int($0.value) == 0 }.count
             inputs.age = await birth
+            // Last night's beats too, for the stress line's night, when
+            // `.nightHeart` did not read them already.
+            if inputs.lastNightBeats.isEmpty, let last = nights.last ?? nil, calendar.isDate(last.end, inSameDayAs: now) {
+                inputs.lastNightBeats = await samples(Metric.heartRate, from: last.start, to: last.end)
+                    .map { ScoringTimedValue(start: $0.start, end: $0.end, value: $0.value) }
+                    .sorted { $0.start < $1.start }
+            }
         }
 
         if parts.contains(.heartRecovery) {

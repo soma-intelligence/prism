@@ -130,6 +130,7 @@ public struct SomaArcDial<Center: View>: View {
                 center.position(middle)
             }
             .contentShape(.rect)
+            .somaClaimsSwipe()
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { drag in set(from: drag.location, around: middle) }

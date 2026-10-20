@@ -74,3 +74,20 @@ struct MuscleFreshnessReadingsTests {
         #expect(legs?.freshAt == nil)
     }
 }
+
+@Suite("Muscle figure credit")
+struct MuscleFigureCreditTests {
+    @Test("NOTICE.md carries the figure's credit line and links, word for word as About shows them")
+    func noticeMatchesAbout() throws {
+        let notice = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appending(path: "open-source/overlay/NOTICE.md")
+        let text = try String(contentsOf: notice, encoding: .utf8)
+        #expect(text.contains(OpenSourcePage.muscleFigureCredit))
+        for credit in FigureCredit.all {
+            #expect(text.contains(credit.url.absoluteString), "\(credit.title)")
+        }
+        // The vector art it replaced is gone, credit and all.
+        #expect(!text.contains("MuscleMap"))
+    }
+}

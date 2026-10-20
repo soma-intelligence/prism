@@ -27,6 +27,9 @@ struct PulseExploreView: View {
     @Environment(\.somaTheme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(HealthDashboard.self) private var health
+    @Environment(\.somaPartIsCurrent) private var isCurrent
+    /// Whether the network read has run once since this view was built.
+    @State private var hasLoaded = false
     @State private var topic: ArticleTopic?
     @State private var query = ""
     @State private var plan = ExplorePlan.empty
@@ -83,12 +86,29 @@ struct PulseExploreView: View {
                 .zoomDestination(item.id)
         }
         .refreshable { await refresh() }
-        .task { await load() }
+        // Kept alive beside Today and Trends: what is cached plans the cards
+        // at once, and the network (the library, the news, the covers) waits
+        // until Explore is the part on screen.
+        .task { requestReplan() }
+        .onChange(of: isCurrent, initial: true) { _, current in
+            if current, !hasLoaded { Task { await load() } }
+        }
         .onChange(of: interest.log) { requestReplan() }
         .onChange(of: "\(library.origin) \(library.articles.count)") { requestReplan() }
+        // Covered by a reader pushed on the stack, or by another part: the
+        // part switcher keeps this view mounted, so appearing says nothing
+        // about being on screen.
         .onDisappear { hold.cover() }
-        .onAppear { showAgain() }
-        .searchableForExplore(text: $query)
+        .onAppear { if isCurrent { showAgain() } else { hold.cover() } }
+        .onChange(of: isCurrent) { _, current in
+            if current { showAgain() } else { hold.cover() }
+        }
+        // The search field belongs to the navigation bar every part shares,
+        // so it is declared only while Explore is the part on screen. Hung on
+        // a background, so the page itself keeps its identity and scroll.
+        .background {
+            if isCurrent { Color.clear.searchableForExplore(text: $query) }
+        }
     }
 
     private var isBrowsing: Bool {
@@ -169,6 +189,8 @@ struct PulseExploreView: View {
     // MARK: Reading
 
     private func load() async {
+        guard !hasLoaded else { return }
+        hasLoaded = true
         requestReplan()
         let reading = Task { await readReadings(force: false) }
         if !arrived {
@@ -211,7 +233,9 @@ struct PulseExploreView: View {
     /// Replans now, unless a reader covers the page or a zoom back is still
     /// landing: then once the page is settled again.
     private func requestReplan() {
-        if hold.allowsReplan() { replan() }
+        // The first plan always runs, so the part is never blank when it
+        // slides on; only a change to cards already shown waits.
+        if plan == .empty || hold.allowsReplan() { replan() }
     }
 
     /// The page shows again, after a reader or a part switch: anything held
@@ -394,8 +418,10 @@ private struct ExploreZoomCover: ViewModifier {
     }
 }
 
-/// A named row of tiles that scrolls sideways, with a way to see the whole
-/// topic.
+/// A named grid of tiles, as many columns as the width holds: the first
+/// few, then the whole topic behind "See all", or, for a shelf with no topic
+/// page (Saved), the rest in place behind "Show all". Never a row that
+/// scrolls sideways.
 private struct ExploreShelfView: View {
     let title: String
     let place: String
@@ -403,30 +429,47 @@ private struct ExploreShelfView: View {
     let seeAll: (() -> Void)?
 
     @Environment(\.somaTheme) private var theme
+    @State private var isOpen = false
 
     var body: some View {
         let metrics = theme.metrics
+        let shown = isOpen ? articles : Array(articles.prefix(ExploreGrid.firstShown))
 
         VStack(alignment: .leading, spacing: metrics.articleTextSpacing) {
-            SomaShelfHeader(title, action: seeAll == nil ? nil : "See all", perform: seeAll)
-            ScrollView(.horizontal) {
-                LazyHStack(alignment: .top, spacing: metrics.articleGridSpacing) {
-                    ForEach(articles) { article in
-                        ExploreArticleLink(article: article, place: "\(place)-\(title)", style: .tile)
-                            .frame(width: metrics.articleShelfCardWidth)
-                            .somaScrollEdge(.horizontal)
-                    }
+            SomaShelfHeader(title, action: action, perform: perform)
+            LazyVGrid(columns: ExploreGrid.columns(metrics), alignment: .leading, spacing: metrics.articleGridSpacing) {
+                ForEach(shown) { article in
+                    ExploreArticleLink(article: article, place: "\(place)-\(title)", style: .tile)
+                        .somaScrollEdge()
                 }
-                .scrollTargetLayout()
             }
-            .scrollTargetBehavior(.viewAligned)
-            .scrollIndicators(.hidden)
-            .scrollClipDisabled()
         }
+    }
+
+    private var action: String? {
+        if seeAll != nil { return String(localized: "See all") }
+        guard articles.count > ExploreGrid.firstShown else { return nil }
+        return isOpen ? String(localized: "Show fewer") : String(localized: "Show all")
+    }
+
+    private var perform: (() -> Void)? {
+        if let seeAll { return seeAll }
+        guard articles.count > ExploreGrid.firstShown else { return nil }
+        return { isOpen.toggle() }
     }
 }
 
-/// "All" and one chip a topic, in a row that scrolls sideways.
+/// How Explore lays tiles out: columns no narrower than a tile, as many as
+/// fit, and how many a shelf shows before it opens.
+enum ExploreGrid {
+    static let firstShown = 4
+
+    static func columns(_ metrics: SomaMetrics) -> [GridItem] {
+        [GridItem(.adaptive(minimum: metrics.articleTileMinWidth), spacing: metrics.articleGridSpacing, alignment: .top)]
+    }
+}
+
+/// "All" and one chip a topic, in lines that wrap.
 private struct ExploreTopicChips: View {
     @Binding var selection: ArticleTopic?
     let topics: [ArticleTopic]
@@ -434,18 +477,14 @@ private struct ExploreTopicChips: View {
     @Environment(\.somaTheme) private var theme
 
     var body: some View {
-        ScrollView(.horizontal) {
-            HStack(spacing: theme.metrics.articleChipDot) {
-                SomaTopicChip("All", tone: nil, isOn: selection == nil) { selection = nil }
-                ForEach(topics, id: \.self) { topic in
-                    SomaTopicChip(topic.title, tone: topic.tone, isOn: selection == topic) {
-                        selection = selection == topic ? nil : topic
-                    }
+        SomaFlowLayout(spacing: theme.metrics.articleChipDot) {
+            SomaTopicChip("All", tone: nil, isOn: selection == nil) { selection = nil }
+            ForEach(topics, id: \.self) { topic in
+                SomaTopicChip(topic.title, tone: topic.tone, isOn: selection == topic) {
+                    selection = selection == topic ? nil : topic
                 }
             }
         }
-        .scrollIndicators(.hidden)
-        .scrollClipDisabled()
     }
 }
 
@@ -478,7 +517,7 @@ struct ExploreScroll<Content: View>: View {
 
     var body: some View {
         if scrolls {
-            ScrollView { content }
+            SomaPageScroll { content }
         } else {
             content.frame(maxHeight: .infinity, alignment: .top)
         }

@@ -49,7 +49,7 @@ public struct SomaChartCard<Chart: View>: View {
                     Text(value ?? "-")
                         .somaFont(type.metric)
                         .foregroundStyle(colors.inkPrimary.color)
-                        .somaRollingNumber(value)
+                        .somaRollingNumber(value, holdsWidth: unit != nil)
                     if let unit, value != nil {
                         Text(unit)
                             .somaFont(type.callout)

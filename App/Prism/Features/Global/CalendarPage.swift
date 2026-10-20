@@ -32,7 +32,7 @@ struct CalendarPage: View {
             status: { statuses.status(on: $0) }, calendar: calendar
         )
 
-        ScrollView {
+        SomaPageScroll {
             VStack(alignment: .leading, spacing: theme.metrics.browseSectionSpacing) {
                 header
                 aspectPicker

@@ -11,14 +11,6 @@ import CoreGraphics
 /// Read from the design at one size for touch and pointer alike, and computed
 /// so they add no stored field to the theme.
 public extension SomaMetrics {
-    /// The gauge at the head of a score page, across.
-    var scoreGaugeWidth: CGFloat { 300 }
-    /// The gauge's arc.
-    var scoreGaugeStroke: CGFloat { 30 }
-    /// How much larger than the display role the gauge's number reads.
-    var scoreGaugeNumberScale: CGFloat { 1.9 }
-    /// The knob that marks today on the arc.
-    var scoreGaugeKnob: CGFloat { 18 }
     /// A plot inside a score card.
     var scorePlotHeight: CGFloat { 150 }
     /// A short plot: a sparkline row, the stress strip.

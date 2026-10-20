@@ -46,12 +46,11 @@ struct TrackJournalView: View {
 
     var body: some View {
         if scrolls {
-            ScrollView {
+            SomaPageScroll {
+                // SomaPageScroll holds the column to the scroll view's width:
+                // a card whose content ran a point wider made the whole page
+                // pan sideways under a finger.
                 column
-                    // Exactly the scroll view's width: a card whose content
-                    // ran a point wider made the whole page pan sideways
-                    // under a finger.
-                    .containerRelativeFrame(.horizontal)
                     .clipped()
             }
                 .background(theme.colors.canvas.color.ignoresSafeArea())
@@ -427,6 +426,7 @@ private struct TrackWeekStrip: View {
             }
         }
         .contentShape(.rect)
+        .somaClaimsSwipe()
         .gesture(
             DragGesture(minimumDistance: 24)
                 .onEnded { value in

@@ -49,7 +49,7 @@ struct ToolSettingsGroup: View {
         switch row {
         case .toggle(let title, let binding):
             Toggle(isOn: binding) { label(title) }
-                .tint(colors.accent.color)
+                .toggleStyle(.soma)
         case .time(let title, let binding):
             DatePicker(selection: Binding(get: { Self.date(minutes: binding.wrappedValue) },
                                           set: { binding.wrappedValue = Self.minutes(of: $0) }),

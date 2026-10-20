@@ -27,7 +27,7 @@ struct HomeQuickAddSheet: View {
         let columns = [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)]
 
         NavigationStack {
-            ScrollView {
+            SomaPageScroll {
                 VStack(alignment: .leading, spacing: theme.metrics.cardSpacing) {
                     Text("Add to today")
                         .somaFont(theme.typography.body)
@@ -158,12 +158,13 @@ struct HomeAllCategoriesSheet: View {
         var title: String
         var detail: String
         var score: Int?
-        var route: PulseRoute
+        var route: ScoreRoute
     }
 
     var body: some View {
         HomeSheet(eyebrow: "Pulse", title: "All categories") {
-            TextField("Search \(HealthMetricCatalog.all.count) measures", text: $query)
+            // The search runs over the Vault's categories, so it names their count.
+            TextField(VaultWords.searchPrompt(BodyCatalog.measureCount), text: $query)
                 .somaFont(theme.typography.body)
                 .padding(.horizontal, theme.metrics.cardPadding)
                 .frame(minHeight: theme.metrics.minimumTapTarget + 4)
@@ -245,12 +246,12 @@ struct HomeAllCategoriesSheet: View {
     private var aspects: [Aspect] {
         let scores = health.scores
         return [
-            Aspect(aspect: .sleep, title: "Sleep", detail: "Stages, timing, debt and the bedroom", score: scores?.sleep, route: .aspect(.sleep)),
-            Aspect(aspect: .mind, title: "Mind", detail: "Stress, energy and mindful minutes", score: scores?.mind, route: .aspect(.mind)),
-            Aspect(aspect: .heart, title: "Heart", detail: "Resting rate, HRV and blood pressure", score: scores?.recovery, route: .aspect(.heart)),
-            Aspect(aspect: .activity, title: "Activity", detail: "Steps, strain, zones and workouts", score: scores?.strain, route: .aspect(.activity)),
-            Aspect(aspect: .gut, title: "Gut", detail: "Meals, glucose, water and caffeine", score: nil, route: .aspect(.gut)),
-            Aspect(aspect: .body, title: "Body", detail: "Weight, composition and fitness age", score: nil, route: .aspect(.body)),
+            Aspect(aspect: .sleep, title: "Sleep", detail: "Stages, timing, debt and the bedroom", score: scores?.sleep, route: TodayRoutes.allCategories(.sleep)),
+            Aspect(aspect: .mind, title: "Mind", detail: "Stress, energy and mindful minutes", score: scores?.mind, route: TodayRoutes.allCategories(.mind)),
+            Aspect(aspect: .heart, title: "Heart", detail: "Resting rate, HRV and blood pressure", score: nil, route: TodayRoutes.allCategories(.heart)),
+            Aspect(aspect: .activity, title: "Activity", detail: "Steps, strain, zones and workouts", score: scores?.strain, route: TodayRoutes.allCategories(.activity)),
+            Aspect(aspect: .gut, title: "Gut", detail: "Meals, glucose, water and caffeine", score: nil, route: TodayRoutes.allCategories(.gut)),
+            Aspect(aspect: .body, title: "Body", detail: "Weight, composition and fitness age", score: nil, route: TodayRoutes.allCategories(.body)),
         ]
     }
 

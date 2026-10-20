@@ -99,6 +99,12 @@ final class ExploreInterest {
         }
     }
 
+    /// Forgets every visit, read and save, for "Erase data on this iPhone".
+    func erase() {
+        log = ExploreInterestLog()
+        defaults?.removeObject(forKey: key)
+    }
+
     func noteVisit(_ topic: ArticleTopic, at date: Date = .now) {
         var next = log
         next.visit(topic, at: date)

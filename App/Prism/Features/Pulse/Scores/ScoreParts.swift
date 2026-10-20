@@ -8,13 +8,13 @@ import SomaUI
 import UserNotifications
 
 // The pieces every score page is built from, so the pages read as one
-// family: the gauge and its sentence, the lines against your usual, the
-// trend table, the tank, the links, the move at the foot, and the sheet
+// family (the head, the chart and the readings are in AspectPageParts): the
+// sentence, the lines against your usual, the trend table, the tank, the links, the move at the foot, and the sheet
 // frame. Each reads the theme and draws from its inputs only.
 
 // MARK: - The page
 
-/// A score page: the aspect's weather behind the gauge, then the cards in one
+/// A score page: the aspect's weather behind the head, then the cards in one
 /// column. The first visit to any score page opens the page guide once; the
 /// toolbar's info button opens it again.
 struct ScorePageScaffold<Content: View>: View {
@@ -35,7 +35,7 @@ struct ScorePageScaffold<Content: View>: View {
     var body: some View {
         let metrics = theme.metrics
 
-        ScrollView {
+        SomaPageScroll {
             VStack(alignment: .leading, spacing: metrics.cardSpacing) {
                 content
             }
@@ -69,94 +69,7 @@ struct ScorePageScaffold<Content: View>: View {
     }
 }
 
-// MARK: - Gauge
-
-/// Today's score on a three quarter arc in the aspect's own colours, the
-/// number and its word in the middle, the change under them, and the ends of
-/// the scale at the feet of the arc.
-struct ScoreGauge: View {
-    let aspect: SomaAspect
-    let lead: ScorePages.Lead
-
-    @Environment(\.somaTheme) private var theme
-
-    /// The arc runs from 135 degrees to 405, a gap at the bottom.
-    private static let start = 135.0
-    private static let sweep = 270.0
-
-    var body: some View {
-        let metrics = theme.metrics
-        let type = theme.typography
-        let colors = theme.colors
-        let look = theme.aspects[aspect]
-        let share = lead.value.map { min(1, max(0, Double($0) / Double(lead.scale))) } ?? 0
-        let width = metrics.scoreGaugeWidth
-        let stroke = metrics.scoreGaugeStroke
-
-        VStack(spacing: 0) {
-            ZStack {
-                ScoreArc(start: Self.start, sweep: Self.sweep)
-                    .stroke(colors.inkPrimary.color.opacity(metrics.hairlineOpacity * 1.5),
-                            style: StrokeStyle(lineWidth: stroke, lineCap: .round))
-                if lead.value != nil {
-                    ScoreArc(start: Self.start, sweep: Self.sweep * share)
-                        .stroke(AngularGradient(colors: look.orb.stops.map(\.color) + [look.identity.color],
-                                                center: .center,
-                                                startAngle: .degrees(Self.start), endAngle: .degrees(Self.start + Self.sweep)),
-                                style: StrokeStyle(lineWidth: stroke, lineCap: .round))
-                    GeometryReader { proxy in
-                        let radius = (min(proxy.size.width, proxy.size.height) - stroke) / 2
-                        let angle = Angle.degrees(Self.start + Self.sweep * share).radians
-                        Circle()
-                            .fill(colors.onOrb.color)
-                            .overlay(Circle().strokeBorder(colors.canvas.color, lineWidth: 3))
-                            .frame(width: metrics.scoreGaugeKnob, height: metrics.scoreGaugeKnob)
-                            .position(x: proxy.size.width / 2 + radius * cos(angle),
-                                      y: proxy.size.height / 2 + radius * sin(angle))
-                    }
-                }
-                VStack(spacing: 4) {
-                    Text(lead.value.map { "\($0)" } ?? "-")
-                        .somaFont(type.display)
-                        .foregroundStyle(colors.inkPrimary.color)
-                        .scaleEffect(metrics.scoreGaugeNumberScale)
-                        .padding(.bottom, metrics.scoreGaugeNumberScale * 8)
-                    if let word = lead.word {
-                        Text(word)
-                            .somaFont(type.callout)
-                            .foregroundStyle(colors.inkSecondary.color)
-                    }
-                    if let change = lead.change {
-                        HStack(spacing: metrics.trendMarkSpacing) {
-                            if let trend = lead.changeTrend {
-                                SomaTrendMark(trend: trend == .up ? .up : .down)
-                            }
-                            Text(change)
-                                .somaFont(type.caption)
-                                .foregroundStyle(colors.inkSecondary.color)
-                        }
-                    }
-                }
-            }
-            .frame(width: width, height: width)
-            .padding(.bottom, -width * 0.12)
-
-            HStack {
-                Text(verbatim: "0")
-                Spacer()
-                Text(verbatim: "\(lead.scale)")
-            }
-            .somaFont(type.caption)
-            .foregroundStyle(colors.inkSecondary.color)
-            .frame(width: width * 0.86)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.top, metrics.heroTopPadding)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(lead.word ?? "No score yet"))
-        .accessibilityValue(Text(lead.value.map { "\($0) of \(lead.scale)" } ?? "Not measured"))
-    }
-}
+// MARK: - Arc
 
 /// An arc of a circle inset by nothing, from `start` degrees clockwise.
 struct ScoreArc: Shape {
@@ -746,7 +659,7 @@ struct ScoreSheet<Content: View>: View {
         let colors = theme.colors
 
         NavigationStack {
-            ScrollView {
+            SomaPageScroll {
                 VStack(alignment: .leading, spacing: metrics.cardSpacing) {
                     VStack(alignment: .leading, spacing: metrics.cardHeaderSpacing) {
                         Text(eyebrow)

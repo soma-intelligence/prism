@@ -34,6 +34,7 @@ public struct SomaOrbPager: View {
         VStack(spacing: theme.metrics.heroSpacing) {
             SomaOrb(aspect: selection, label: labels[selection] ?? selection.title)
                 .contentShape(.circle)
+                .somaClaimsSwipe()
                 .simultaneousGesture(swipe)
 
             SomaAspectDots(selection: selection)

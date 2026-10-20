@@ -12,6 +12,10 @@
 		<string>Soma.Prism.cloud-refresh</string>
 		<string>Soma.Prism.widgets.refresh</string>
 	</array>
+	<key>CADisableMinimumFrameDurationOnPhone</key>
+	<true/>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>With Always, your phone notes where it stays overnight so Soma can show where you sleep. Those places stay on this phone.</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

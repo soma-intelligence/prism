@@ -25,4 +25,9 @@ public extension SomaMotion {
     var chartFade: Animation { .easeOut(duration: 0.2) }
     /// A number rolling to its new value.
     var numberRoll: Animation { .snappy(duration: 0.35) }
+    /// How long a rolling number with a unit after it keeps its old width,
+    /// in seconds: until its digits have rolled.
+    var numberRollHold: Double { 0.4 }
+    /// The quiet "Updated" line fading out once a fresh read lands.
+    var updatedNoteFade: Animation { .easeOut(duration: 0.3) }
 }

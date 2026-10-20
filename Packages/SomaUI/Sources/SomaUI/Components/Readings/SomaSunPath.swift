@@ -43,7 +43,7 @@ public struct SomaSunPath: View {
                     Text(verbatim: day.map { SomaSunGeometry.duration($0.length) } ?? "-")
                         .somaFont(type.metricCompact)
                         .foregroundStyle(day == nil ? colors.inkSecondary.color : colors.inkPrimary.color)
-                        .somaRollingNumber(day.map { SomaSunGeometry.duration($0.length) })
+                        .somaRollingNumber(day.map { SomaSunGeometry.duration($0.length) }, holdsWidth: true)
                     Text("of daylight")
                         .somaFont(type.caption)
                         .foregroundStyle(colors.inkSecondary.color)

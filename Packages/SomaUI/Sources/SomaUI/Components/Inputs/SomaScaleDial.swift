@@ -108,6 +108,7 @@ public struct SomaScaleDial: View {
                     .position(x: width / 2, y: top - rise)
             }
             .contentShape(.rect)
+            .somaClaimsSwipe()
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { drag in

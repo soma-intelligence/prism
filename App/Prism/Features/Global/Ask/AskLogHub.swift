@@ -24,7 +24,7 @@ struct AskLogHub: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
+            SomaPageScroll {
                 VStack(alignment: .leading, spacing: theme.metrics.browseSectionSpacing) {
                     VStack(alignment: .leading, spacing: theme.metrics.cardHeaderSpacing) {
                         Text("Tell Soma")

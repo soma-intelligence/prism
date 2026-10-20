@@ -6,7 +6,8 @@
 import SwiftUI
 import SomaUI
 
-/// Seven day cardio load against the productive band, thirty days by status,
+/// Seven day cardio load against the productive band on the metric stage,
+/// thirty days by status,
 /// and the explainer that says how the band is drawn.
 ///
 /// The model is ``TrainingLoad``: Edwards' TRIMP per day from
@@ -41,17 +42,25 @@ struct CardioLoadPage: View {
             reason: lead?.reason ?? reason(model),
             stats: []
         ) {
-            SomaChartCard(
-                eyebrow: "Cardio load",
-                value: model.map { words.whole($0.today) },
-                unit: "7 day load",
-                note: model.map { "\($0.todayStatus.title), band \(words.whole($0.todayBand.lowerBound)) to \(words.whole($0.todayBand.upperBound))." }
-                    ?? "Workouts with heart rate draw this, and six weeks draw the band."
-            ) {
-                let axis = words.axis(days: Self.chartDays, now: .now)
-                MetricBandChart(values: model?.acute ?? [], lower: model?.bandLower, upper: model?.bandUpper, aspect: .heart,
-                                axis: [axis.0, axis.1, axis.2].compactMap { $0 })
-            }
+            AspectStage(
+                aspect: .heart,
+                lead: SomaMetricLead(
+                    caption: "7 day load, today",
+                    value: model.map { words.whole($0.today) },
+                    unit: nil,
+                    meaning: model?.todayStatus.title ?? "Workouts with heart rate draw this",
+                    detail: model.map { "Band \(words.whole($0.todayBand.lowerBound)) to \(words.whole($0.todayBand.upperBound))" },
+                    tone: model.map { $0.todayBand.contains($0.today) ? .good : .watch } ?? .neutral
+                ),
+                values: (model?.acute ?? []).map { Optional($0) },
+                scale: nil,
+                higherIsBetter: nil,
+                style: .line,
+                format: { MetricWords().whole($0) },
+                bands: model.map { model in
+                    zip(model.bandLower, model.bandUpper).map { low, high in Optional(min(low, high)...max(low, high)) }
+                }
+            )
             statusCard(model)
             MetricRowsCard(rows: [
                 MetricRowItem("How cardio load works", action: { isExplaining = true }),

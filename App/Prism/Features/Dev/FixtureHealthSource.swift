@@ -104,6 +104,14 @@ struct FixtureHealthSource: HealthSampleSource {
             add(q + "BloodPressureSystolic", day: day, hour: 8, value: value(121, wave: 3, noise: 3, day: day, seed: 13), every: 2, source: "Omron")
             add(q + "BloodPressureDiastolic", day: day, hour: 8, value: value(79, wave: 2, noise: 2, day: day, seed: 14), every: 2, source: "Omron")
             add(q + "BloodGlucose", day: day, hour: 7.5, value: value(92, wave: 4, noise: 4, day: day, seed: 15), every: 2, source: "Dexcom")
+            // Time in daylight: a walk out most mornings, lunch outside, and a
+            // mindful session every other evening, so the Rituals steps Health
+            // ticks have something to find.
+            if day % 4 != 3 {
+                add(q + "TimeInDaylight", day: day, hour: 7.4, value: max(4, value(14, wave: 3, noise: 4, day: day, seed: 29)), length: 15 * 60)
+            }
+            add(q + "TimeInDaylight", day: day, hour: 12.5, value: max(0, value(24, wave: 6, noise: 8, day: day, seed: 30)), length: 30 * 60)
+            add("HKCategoryTypeIdentifierMindfulSession", day: day, hour: 21.5, value: 0, every: 2, length: 6 * 60)
             for hour in stride(from: 8.0, to: 21, by: 1) {
                 add(q + "StepCount", day: day, hour: hour, value: max(0, value(640, wave: 120, noise: 180, day: day * 13 + Int(hour), seed: 16)), length: 3000, source: "iPhone")
                 add(q + "HeartRate", day: day, hour: hour, value: value(74, wave: 6, noise: 8, day: day * 13 + Int(hour), seed: 17))
@@ -115,6 +123,21 @@ struct FixtureHealthSource: HealthSampleSource {
             add("HKCategoryTypeIdentifierSleepAnalysis", day: day, hour: bed, value: 4, length: 1.2 * 3600)
             add("HKCategoryTypeIdentifierSleepAnalysis", day: day, hour: bed + 1.2, value: 3, length: (asleep - 2.8) * 3600)
             add("HKCategoryTypeIdentifierSleepAnalysis", day: day, hour: bed + asleep - 1.6, value: 5, length: 1.6 * 3600)
+            // The watch through the night: a heart that settles after the
+            // first hours and stirs before waking, and HRV every two hours
+            // round the day's own value, so the stress line has a night.
+            for hour in stride(from: bed + 0.25, to: bed + asleep, by: 0.5) {
+                let into = hour - bed
+                let settle = 6 * exp(-into / 1.5) + (into > asleep - 1 ? 4 : 0)
+                add(q + "HeartRate", day: day, hour: hour, value: value(51, wave: 1.5, noise: 2, day: day * 31 + Int(hour * 2), seed: 31) + settle)
+            }
+            for hour in stride(from: bed + 1, to: bed + asleep, by: 2) {
+                add(q + "HeartRateVariabilitySDNN", day: day, hour: hour,
+                    value: value(52, wave: 4, noise: 4, day: day, seed: 2, recent: -16, recentDays: 5) + sin(hour) * 6)
+            }
+            FixtureCalendar.heartRate(day: day, calendar: calendar).forEach { reading in
+                add(q + "HeartRate", day: day, hour: reading.hour, value: reading.value)
+            }
         }
         // A date of birth, read as the age today, as the real store reads it:
         // the line fitness age and the heart rate zones are read against.

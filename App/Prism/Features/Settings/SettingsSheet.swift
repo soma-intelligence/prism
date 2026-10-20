@@ -26,7 +26,7 @@ struct SettingsSheet: View {
 
     var body: some View {
         NavigationStack(path: $path) {
-            ScrollView {
+            SomaPageScroll {
                 VStack(alignment: .leading, spacing: theme.metrics.leadSpacing) {
                     VStack(spacing: theme.metrics.cardSpacing) {
                         accountRow
@@ -53,7 +53,9 @@ struct SettingsSheet: View {
             // and a line of copy that push the first row halfway down.
             .navigationTitle("Settings")
             .toolbarTitleDisplayMode(.inline)
-            .navigationDestination(for: VaultRoute.self) { $0.page }
+            // The Vault's pages fade into the sheet's ground under the bar, as a
+            // pushed page on a tab does.
+            .navigationDestination(for: VaultRoute.self) { $0.page.somaScrollEdgeFade() }
             .navigationDestination(for: GlobalRoute.self) { $0.page }
             .navigationDestination(for: SettingsRoute.self) { route in
                 switch route {
@@ -160,7 +162,7 @@ struct SettingsSheet: View {
 
     private var healthCaption: String? {
         guard health.status == .ready, !health.readings.isEmpty else { return nil }
-        return String(localized: "\(health.readings.count) types")
+        return VaultWords.withData(health.readings.count)
     }
 
     private var notificationsValue: String {
@@ -305,7 +307,10 @@ struct SettingsSheet: View {
                 SettingsRow(.healthAccess, String(localized: "Health access"), "heart.text.square"),
                 SettingsRow(.dataDiagnostics, String(localized: "Data and diagnostics"), "arrow.triangle.2.circlepath"),
                 SettingsRow(.exportData, String(localized: "Export my data"), "square.and.arrow.up"),
-                SettingsRow(.deleteData, String(localized: "Delete my data"), "trash"),
+                // With no account there is nothing online: the row erases
+                // what is on the phone, and says so.
+                SettingsRow(.deleteData, account.isSignedIn ? String(localized: "Delete my data")
+                                                            : String(localized: "Erase data on this iPhone"), "trash"),
             ]) { row in
                 SettingsTileRow(
                     row.title, symbol: row.symbol, detail: detail(row.route),

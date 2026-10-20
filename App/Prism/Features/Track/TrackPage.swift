@@ -31,7 +31,7 @@ struct TrackPage: View {
         @Bindable var router = router
 
         NavigationStack {
-            SomaPartSwitcher(selection: router.trackSection) { part in
+            SomaPartSwitcher(selection: $router.trackSection) { part in
                 switch part {
                 case .journal: TrackJournalView()
                 case .rituals: TrackRitualsView()

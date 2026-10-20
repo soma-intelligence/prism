@@ -69,6 +69,18 @@ public enum SomaPreviewSamples {
         SomaSegment(id: "explore", title: "Explore"),
     ]
 
+    /// The same parts as a type, for a part switcher under the control.
+    public enum Part: String, CaseIterable, Hashable, Sendable {
+        case today, trends, explore
+    }
+
+    /// The segments for ``Part``, titled like ``segments``.
+    public static let partSegments: [SomaSegment<Part>] = [
+        SomaSegment(id: .today, title: "Today"),
+        SomaSegment(id: .trends, title: "Trends"),
+        SomaSegment(id: .explore, title: "Explore"),
+    ]
+
     /// A camera's modes, for a mode strip that selects one.
     public static let modes: [SomaModeStrip<String>.Item] = [
         .init(id: "knock", title: "Knock"),
@@ -192,4 +204,26 @@ public enum SomaPreviewSamples {
             ("record", theme.colors.record.color),
         ]
     }
+}
+
+// MARK: - Vault
+
+public extension SomaPreviewSamples {
+    /// A category in the Vault's grid: its line glyph, its name, the line
+    /// under it and the aspect whose tone it takes.
+    struct VaultCategory: Identifiable, Sendable {
+        public let title: String
+        public let symbol: String
+        public let caption: String
+        public let aspect: SomaAspect?
+        public var id: String { title }
+    }
+
+    /// Four categories, one of them outside every aspect.
+    static let vaultCategories: [VaultCategory] = [
+        VaultCategory(title: "Heart", symbol: "heart", caption: "12 measures", aspect: .heart),
+        VaultCategory(title: "Respiratory", symbol: "lungs", caption: "6 measures", aspect: .heart),
+        VaultCategory(title: "Sleep", symbol: "bed.double", caption: "4 measures", aspect: .sleep),
+        VaultCategory(title: "Hearing", symbol: "ear", caption: "5 measures", aspect: nil),
+    ]
 }

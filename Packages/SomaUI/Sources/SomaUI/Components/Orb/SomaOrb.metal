@@ -41,15 +41,19 @@ inline float valueNoise(float2 s) {
 /// coordinates.
 ///
 /// `shape` is proportion, softness, distortion and swirl; `shapeScale` sizes
-/// the checks.
-inline float3 warp(float2 coordinates, float time, float4 shape, float shapeScale,
+/// the checks. `calm`, 0 to 1, smooths the weather: the shapes grow, the
+/// distortion eases, and each finer swirl harmonic is damped harder than the
+/// site's, so the large flow stays and the small eddies that read as boiling
+/// fade. At 0 it is the site's shader unchanged.
+inline float3 warp(float2 coordinates, float time, float4 shape, float shapeScale, float calm,
                    float3 c0, float3 c1, float3 c2, float3 c3) {
     float proportion = clamp(shape.x, 0.0, 1.0);
     float softness = shape.y;
-    float distortion = shape.z;
-    float swirl = shape.w;
+    float distortion = shape.z * (1.0 - 0.45 * calm);
+    float swirl = shape.w * (1.0 - 0.2 * calm);
+    float falloff = 1.0 + 0.7 * calm;
 
-    float2 uv = coordinates * 0.5;
+    float2 uv = coordinates * 0.5 * (1.0 - 0.3 * calm);
     float t = 0.0625 * (time + 118.0);
     float n1 = valueNoise(uv + t);
     float n2 = valueNoise(uv * 2.0 - t);
@@ -58,8 +62,9 @@ inline float3 warp(float2 coordinates, float time, float4 shape, float shapeScal
 
     for (int i = 1; i < 10; i++) {
         float fi = float(i);
-        uv.x += swirl / fi * cos(t + fi * 1.5 * uv.y);
-        uv.y += swirl / fi * cos(t + fi * 1.0 * uv.x);
+        float reach = swirl / pow(fi, falloff);
+        uv.x += reach * cos(t + fi * 1.5 * uv.y);
+        uv.y += reach * cos(t + fi * 1.0 * uv.x);
     }
 
     float k = 0.5 + 3.5 * shapeScale;
@@ -86,7 +91,8 @@ inline float3 warp(float2 coordinates, float time, float4 shape, float shapeScal
 ///
 /// - `size`: the view's size in points.
 /// - `radius`: the sphere's radius in points; what lies outside it is halo.
-/// - `clock`: the weather's time, the sphere's turn, then two unused lanes.
+/// - `clock`: the weather's time, the sphere's turn, how calm the weather is
+///   (0 to 1, see `warp`), and the breath (-1 to 1), which lifts the halo.
 /// - `shape`: proportion, softness, distortion, swirl.
 /// - `camera`: shape scale, rotation in radians, zoom, detail.
 /// - `shading`: light, rim, depth, the halo's strength.
@@ -100,6 +106,8 @@ inline float3 warp(float2 coordinates, float time, float4 shape, float shapeScal
                                float3 c0, float3 c1, float3 c2, float3 c3, float3 accent) {
     float time = clock.x;
     float spin = clock.y;
+    float calm = clamp(clock.z, 0.0, 1.0);
+    float breath = clock.w;
     float shapeScale = camera.x;
     float rotation = camera.y;
     float zoom = camera.z;
@@ -107,7 +115,7 @@ inline float3 warp(float2 coordinates, float time, float4 shape, float shapeScal
     float light = shading.x;
     float rim = shading.y;
     float depth = shading.z;
-    float glow = shading.w;
+    float glow = shading.w * (1.0 + breath);
 
     float2 q = (position - size * 0.5) / radius;
     float r = length(q);
@@ -125,7 +133,7 @@ inline float3 warp(float2 coordinates, float time, float4 shape, float shapeScal
     float sr = sin(rotation);
     float2 turned = float2(u.x * cr - u.y * sr, u.x * sr + u.y * cr);
 
-    float3 surface = soma::warp(turned, time, shape, shapeScale, c0, c1, c2, c3);
+    float3 surface = soma::warp(turned, time, shape, shapeScale, calm, c0, c1, c2, c3);
     surface = pow(max(surface, 0.0), depth);
 
     // Light from the top left, a little in front: the lit side keeps the

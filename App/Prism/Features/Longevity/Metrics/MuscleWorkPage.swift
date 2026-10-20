@@ -6,7 +6,8 @@
 import SwiftUI
 import SomaUI
 
-/// Which muscle groups thirty days of sessions loaded: a figure with each
+/// Which muscle groups thirty days of sessions loaded: the session days on
+/// the metric stage, a figure with each
 /// region's share, the six groups in a table, and the routine for the group
 /// that got the least.
 ///
@@ -50,13 +51,38 @@ struct MuscleWorkPage: View {
             reason: lead?.reason ?? reason(work),
             stats: []
         ) {
+            AspectStage(
+                aspect: .body,
+                lead: SomaMetricLead(
+                    caption: "Last \(Self.days) days",
+                    value: history == nil ? nil : "\(work.totalSessions)",
+                    unit: work.totalSessions == 1 ? "session" : "sessions",
+                    meaning: hasWork ? nil : "No sessions yet"
+                ),
+                values: Self.minutes(workouts, now: history?.now ?? .now),
+                unit: "min",
+                scale: nil,
+                higherIsBetter: nil,
+                format: { MetricWords().whole($0) }
+            )
             SomaSegmentedControl(
                 segments: Measure.allCases.map { SomaSegment(id: $0, title: $0.title) },
                 selection: $measure
             )
-            SomaChartCard(eyebrow: figureTitle, value: figureValue(work), unit: hasWork ? "in the legs" : nil, note: figureNote(hasWork)) {
-                BodySilhouette(changes: regionLabels(work))
+            SomaCard {
+                VStack(alignment: .leading, spacing: theme.metrics.chartLabelGap * 2) {
+                    Text(figureTitle)
+                        .somaFont(theme.typography.cardTitle)
+                        .foregroundStyle(theme.colors.inkPrimary.color)
+                    if let value = figureValue(work) {
+                        Text(hasWork ? "\(value) in the legs" : value)
+                            .somaFont(theme.typography.callout)
+                            .foregroundStyle(theme.colors.inkSecondary.color)
+                    }
+                    BodySilhouette(changes: regionLabels(work))
+                }
             }
+            .accessibilityHint(Text(figureNote(hasWork)))
             groupTable(work)
             if let least, hasWork {
                 TileLink(value: MetricRoute.sessionPreview(least.routine.id)) {
@@ -81,6 +107,17 @@ struct MuscleWorkPage: View {
         case .share: "Share of the work"
         case .work: "Work points"
         case .sessions: "Sessions that loaded it"
+        }
+    }
+
+    /// Minutes of sessions a day, the last thirty, today last; a day with
+    /// none is empty rather than zero.
+    static func minutes(_ workouts: [FitnessWorkout], now: Date, calendar: Calendar = .current) -> [Double?] {
+        let today = calendar.startOfDay(for: now)
+        let byDay = Dictionary(grouping: workouts) { calendar.startOfDay(for: $0.start) }
+            .mapValues { $0.reduce(0) { $0 + $1.end.timeIntervalSince($1.start) } / 60 }
+        return (0..<days).map { index in
+            calendar.date(byAdding: .day, value: index - (days - 1), to: today).flatMap { byDay[$0] }
         }
     }
 

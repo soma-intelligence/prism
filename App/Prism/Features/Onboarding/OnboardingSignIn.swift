@@ -253,7 +253,7 @@ struct OnboardingRecoveryView: View {
             .padding(.horizontal, metrics.pagePadding * 0.66)
             .padding(.top, 8)
 
-            ScrollView {
+            SomaPageScroll {
                 VStack(alignment: .leading, spacing: 0) {
                     Text("Reset your password.")
                         .somaFont(theme.typography.headline)

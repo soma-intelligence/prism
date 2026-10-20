@@ -6,27 +6,43 @@
 import SwiftUI
 import SomaUI
 
-/// The score pages: recovery, strain, stress, sleep, energy, weather and the peak window.
+/// The score pages, and the page each of the six aspects opens on.
 ///
 /// Registered on every tab's stack by `journeyDestinations()`, so a link
 /// anywhere in the app can push one of these with `NavigationLink(value:)`
 /// or a `TileLink`. Each case maps to its page in `page`.
+///
+/// Every aspect has a page of its own, built from the same parts so they
+/// read alike (owner, 2026-10-20: Mind opened Recovery and Activity opened
+/// Strain). Sleep, Mind and Activity lead with their score; Heart, Gut and
+/// Body with the reading they turn on. Recovery, Strain and Stress stay as
+/// the deeper pages those open.
 enum ScoreRoute: Hashable {
+    case sleep
+    /// Everything about the last night, which the night card opens.
+    case lastNight
+    case mind
+    case activity
+    case heart
+    case gut
+    case body
     case recovery
     case strain
     case stress
-    case sleep
     case energy
     case weather
     case peakWindow
 
-    /// The score page an aspect of the Today page stands for.
-    static func aspect(_ aspect: SomaAspect) -> ScoreRoute? {
+    /// The page an aspect opens on, wherever Today names it: the rings, the
+    /// orb, the aspect cards, the category tiles and All categories.
+    static func aspect(_ aspect: SomaAspect) -> ScoreRoute {
         switch aspect {
         case .sleep: .sleep
-        case .mind: .recovery
-        case .activity: .strain
-        case .heart, .gut, .body: nil
+        case .mind: .mind
+        case .activity: .activity
+        case .heart: .heart
+        case .gut: .gut
+        case .body: .body
         }
     }
 
@@ -38,9 +54,12 @@ enum ScoreRoute: Hashable {
     private var topic: ArticleTopic? {
         switch self {
         case .recovery, .energy: .recovery
-        case .strain: .movement
-        case .stress: .mind
-        case .sleep: .sleep
+        case .strain, .activity: .movement
+        case .stress, .mind: .mind
+        case .sleep, .lastNight: .sleep
+        case .heart: .heart
+        case .gut: .nutrition
+        case .body: .longevity
         case .weather, .peakWindow: nil
         }
     }
@@ -48,10 +67,16 @@ enum ScoreRoute: Hashable {
     @ViewBuilder
     private var content: some View {
         switch self {
+        case .sleep: SleepPage()
+        case .lastNight: LastNightPage()
+        case .mind: MindAspectPage()
+        case .activity: ActivityPage()
+        case .heart: AspectReadingPage(kind: .heart)
+        case .gut: AspectReadingPage(kind: .gut)
+        case .body: AspectReadingPage(kind: .body)
         case .recovery: RecoveryPage()
         case .strain: StrainPage()
         case .stress: StressPage()
-        case .sleep: SleepPage()
         case .energy: EnergyPage()
         case .weather: WeatherPage()
         case .peakWindow: PeakWindowPage()
@@ -127,3 +152,14 @@ extension View {
         modifier(ScoreInputsLoader(parts: parts, inputs: inputs))
     }
 }
+
+#if DEBUG
+extension ScoreRoute {
+    /// The route a `-pulse.score` launch argument names, for screenshots.
+    static func debugNamed(_ name: String) -> ScoreRoute? {
+        let all: [ScoreRoute] = [.sleep, .lastNight, .mind, .activity, .heart, .gut, .body,
+                                 .recovery, .strain, .stress, .energy, .weather, .peakWindow]
+        return all.first { "\($0)" == name }
+    }
+}
+#endif

@@ -18,6 +18,7 @@ public struct SomaAspectBackdrop: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.somaBackdropStyle) private var style
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.somaPartIsShown) private var partIsShown
 
     public init(aspect: SomaAspect) {
         self.aspect = aspect
@@ -38,10 +39,17 @@ public struct SomaAspectBackdrop: View {
             .resizable()
             .aspectRatio(contentMode: .fill)
             .overlay {
+                // Clear under the bar, where the photograph shows whole,
+                // then the page's ground thickening over it so the numbers
+                // the head sets on it keep their contrast on an intense
+                // photograph (deep moss, a low sun), and nothing of it is
+                // left by the first card.
+                let veil = theme.metrics.backdropVeilOpacities
                 LinearGradient(
                     stops: [
-                        .init(color: theme.colors.canvas.color.opacity(0.15), location: 0),
-                        .init(color: theme.colors.canvas.color.opacity(0.55), location: 0.6),
+                        .init(color: theme.colors.canvas.color.opacity(veil.top), location: 0),
+                        .init(color: theme.colors.canvas.color.opacity(veil.third), location: 0.3),
+                        .init(color: theme.colors.canvas.color.opacity(veil.lower), location: 0.62),
                         .init(color: theme.colors.canvas.color, location: 1),
                     ],
                     startPoint: .top, endPoint: .bottom
@@ -63,7 +71,7 @@ public struct SomaAspectBackdrop: View {
             isLight ? stop.color.mix(with: canvas, by: 0.62) : stop.color
         }
 
-        TimelineView(.animation(minimumInterval: 1.0 / 15.0, paused: reduceMotion)) { context in
+        TimelineView(.animation(minimumInterval: 1.0 / 15.0, paused: reduceMotion || !partIsShown)) { context in
             let t = reduceMotion ? 0 : context.date.timeIntervalSinceReferenceDate / 9
             MeshGradient(
                 width: 3,
@@ -72,13 +80,13 @@ public struct SomaAspectBackdrop: View {
                 colors: Self.colors(stops, canvas: canvas)
             )
         }
-        .blur(radius: 30)
-        .opacity(colorScheme == .light ? 0.55 : 0.7)
+        .blur(radius: theme.metrics.backdropFieldBlur)
+        .opacity(colorScheme == .light ? theme.metrics.backdropFieldOpacityLight : theme.metrics.backdropFieldOpacityDark)
         .mask(
             LinearGradient(
                 stops: [
                     .init(color: .black, location: 0),
-                    .init(color: .black.opacity(0.8), location: 0.45),
+                    .init(color: .black.opacity(theme.metrics.backdropFadeMiddleOpacity), location: 0.45),
                     .init(color: .clear, location: 1),
                 ],
                 startPoint: .top,

@@ -33,13 +33,10 @@ struct PulseTodayLayoutTests {
         #expect(PulseSleepCard.line(nil) == nil)
     }
 
-    @Test("The foot's grid holds the six aspects once each, and each opens its page of readings")
+    @Test("The foot's grid holds the six aspects once each, and each opens its own page")
     func footOpensEveryAspect() {
         #expect(Set(HomeTodayFoot.order) == Set(SomaAspect.allCases))
         #expect(HomeTodayFoot.order.count == SomaAspect.allCases.count)
-        for aspect in HomeTodayFoot.order {
-            guard case .category(let title) = PulseRoute.aspect(aspect) else { continue }
-            #expect(BodyCatalog.categories.contains { $0.title == title }, "\(aspect) opens no page")
-        }
+        #expect(Set(HomeTodayFoot.order.map(TodayRoutes.tile)).count == SomaAspect.allCases.count)
     }
 }

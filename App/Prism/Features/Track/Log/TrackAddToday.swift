@@ -71,7 +71,7 @@ struct TrackAddToday: View {
         .trackEntrySheet(item: $opened)
         .task { await openFromLaunch() }
         .navigationDestination(isPresented: $opensBloodTest) {
-            LabRoute.bloodPanel.page
+            LabRoute.bloodPanel.page.somaScrollEdgeFade()
         }
     }
 

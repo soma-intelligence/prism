@@ -124,19 +124,29 @@ struct TrackRitualsTests {
         #expect(summary.streakText == "3 days running")
     }
 
-    @Test("The effect line asks for days until Soma has them, then says the move plainly")
+    @Test("The effect stays unsaid until there is one, then reads in a few words")
     func effectWords() {
         var summary = TrackRitualSummary(moment: .evening, doneToday: 0, steps: 3, shares: [], streak: 0,
                                          keptThisWeek: 0, effect: EffectMath.Effect(delta: nil, held: 0, tries: 1))
-        #expect(summary.effectText == "Keep it a few days and Soma shows what it does for your deep sleep.")
+        #expect(summary.effectText == nil)
+        summary.effect = EffectMath.Effect(delta: 0.2, held: 3, tries: 6)
+        #expect(summary.effectText == nil)
         summary.effect = EffectMath.Effect(delta: 12.4, held: 5, tries: 6)
-        #expect(summary.effectText == "Your deep sleep runs +12 min on nights you keep it.")
+        #expect(summary.effectText == "+12 min deep sleep")
         summary.moment = .morning
         summary.effect = EffectMath.Effect(delta: -3, held: 1, tries: 6)
-        #expect(summary.effectText == "Your evening HRV runs -3 ms on days you keep it.")
-        for text in [summary.effectText] {
-            #expect(!text.contains("\u{2014}") && !text.contains("\u{2013}"))
-        }
+        #expect(summary.effectText == "-3 ms HRV")
+    }
+
+    @Test("The kept line says the run, else the week, else nothing")
+    func keptWords() {
+        var summary = TrackRitualSummary(moment: .evening, doneToday: 0, steps: 3, shares: [], streak: 0,
+                                         keptThisWeek: 0, effect: EffectMath.Effect(delta: nil, held: 0, tries: 0))
+        #expect(summary.keptText == nil)
+        summary.keptThisWeek = 2
+        #expect(summary.keptText == "2 of 7 this week")
+        summary.streak = 4
+        #expect(summary.keptText == "4 days running")
     }
 
     // MARK: Quick add

@@ -6,8 +6,9 @@
 import SwiftUI
 import SomaUI
 
-/// Daily steps: today against the usual day, fourteen days of bars, the last
-/// four weeks, and the month so far against the one before.
+/// Daily steps: today on the metric stage with thirty days of bars against
+/// the usual day, the last four weeks, and the month so far against the one
+/// before.
 ///
 /// Every number is a daily total from Health's own statistics, so a phone and
 /// a watch that both counted a walk count it once.
@@ -25,16 +26,15 @@ struct StepsPage: View {
             reason: lead?.reason ?? report.reason,
             stats: []
         ) {
-            SomaChartCard(eyebrow: "Steps", value: report.today, unit: "so far today", note: report.usualNote) {
-                MetricDailyBars(
-                    values: report.days,
-                    usual: report.usual,
-                    aspect: .activity,
-                    leadingLabel: report.axis.0,
-                    middleLabel: report.axis.1,
-                    trailingLabel: report.axis.2
-                )
-            }
+            AspectStage(
+                aspect: .activity,
+                lead: .days(report.stage, caption: "Today, so far", value: report.today, unit: "steps",
+                            higherIsBetter: true, format: MetricWords().whole),
+                values: report.stage,
+                unit: "steps",
+                scale: nil,
+                format: { MetricWords().whole($0) }
+            )
             MetricRowsCard(eyebrow: "Week by week", rows: report.weeks.isEmpty
                 ? [MetricRowItem("No steps yet", detail: "Your phone and watch count them as you move.")]
                 : report.weeks)
@@ -68,6 +68,8 @@ struct StepsReport {
     var usual: ClosedRange<Double>?
     var usualNote: String
     var days: [Double?]
+    /// The stage's days, the last thirty, today last.
+    var stage: [Double?]
     var axis: (String?, String?, String?)
     var weeks: [MetricRowItem]
     var monthTitle: String
@@ -76,6 +78,7 @@ struct StepsReport {
     var monthCurve: [Double]
 
     static let shownDays = 14
+    static let stageDays = 30
 
     static func make(totals: [Date: Double], now: Date, calendar: Calendar = .current, locale: Locale = .current) -> StepsReport {
         let words = MetricWords(calendar: calendar, locale: locale)
@@ -142,6 +145,9 @@ struct StepsReport {
             usualNote: usual.map { "Usually \(words.whole($0.lowerBound)) to \(words.whole($0.upperBound)) a day. The last 14 days." }
                 ?? "The last 14 days. A usual day shows once a week is counted.",
             days: days,
+            stage: (0..<stageDays).map { index in
+                calendar.date(byAdding: .day, value: index - (stageDays - 1), to: today).flatMap { totals[$0] }
+            },
             axis: words.axis(days: shownDays, now: now),
             weeks: rows,
             monthTitle: "\(monthName) so far",

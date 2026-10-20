@@ -124,9 +124,11 @@ struct LabBandLine: View {
             return item.isFlagged ? ("Out of range", theme.colors.statusOut.color) : nil
         }
         if item.isFlagged || !band.contains(position) {
-            return (position > band.upperBound ? "Above normal" : "Below normal", theme.colors.statusOut.color)
+            // The lab's own reference range, not the person's usual: said
+            // as the lab's, never as a clinical "normal".
+            return (position > band.upperBound ? "Above the lab’s range" : "Below the lab’s range", theme.colors.statusOut.color)
         }
-        return ("Normal range", theme.colors.statusNormal.color)
+        return ("Within the lab’s range", theme.colors.statusNormal.color)
     }
 }
 
@@ -379,7 +381,7 @@ struct LabSheet<Content: View>: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
+            SomaPageScroll {
                 VStack(alignment: .leading, spacing: theme.metrics.leadSpacing) {
                     SomaPageHero(eyebrow: eyebrow, title: title, reason: reason)
                     VStack(alignment: .leading, spacing: theme.metrics.cardSpacing) {

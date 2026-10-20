@@ -34,7 +34,7 @@ struct PageScaffold<Content: View>: View {
     }
 
     var body: some View {
-        ScrollView {
+        SomaPageScroll {
             VStack(alignment: .leading, spacing: theme.metrics.browseSectionSpacing) {
                 VStack(alignment: .leading, spacing: theme.metrics.cardHeaderSpacing) {
                     Text(eyebrow)
@@ -90,7 +90,7 @@ struct ListScaffold<Content: View>: View {
     }
 
     var body: some View {
-        ScrollView {
+        SomaPageScroll {
             VStack(alignment: .leading, spacing: theme.metrics.browseSectionSpacing) {
                 VStack(alignment: .leading, spacing: theme.metrics.cardHeaderSpacing) {
                     Text(eyebrow)

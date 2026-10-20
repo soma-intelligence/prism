@@ -3,18 +3,19 @@
 //  Prism
 //
 //  The page every metric opens on, from a Body tile, a Today row, a
-//  category or the Vault: today's value and what it means, one chart over a
-//  chosen span against the person's usual, a few facts, and where the
-//  readings came from. The long words wait behind the info control.
+//  category or the Vault: today's value and what it means over one tall
+//  chart of a chosen span against the person's usual, one quiet line, and
+//  where the readings came from. The long words wait behind the info control.
 //
 
 import SwiftUI
 import SomaUI
 import HealthExportCore
 
-/// One data type, top to bottom: the hero (when the number is from, the
-/// number, one line on what it means), the range picker, the chart with the
-/// usual band behind it, at most three facts, then the sources and the way
+/// One data type, top to bottom: the stage (when the number is from, the
+/// number, one line on what it means, over the chart with the usual band,
+/// the average and the high and low on it; reading the chart reads the
+/// number), one quiet line and the span picker, then the sources and the way
 /// into every reading. The category's other types sit in the title's menu;
 /// what the metric is and how its band is read sit in the info sheet.
 ///
@@ -63,6 +64,11 @@ struct VaultDataTypePage: View {
         if let type { return BodyCategory.containing(type)?.hue ?? .other }
         return .sleep
     }
+    /// The aspect whose wash the page wears: the category's, or the score's.
+    private var aspect: SomaAspect? {
+        if let type { return BodyCategory.containing(type)?.aspect }
+        return score?.aspect
+    }
     private var isSleep: Bool { identifier == MetricProfile.sleep }
     private var isCount: Bool { type?.metric.kind == .category && !isSleep }
     private var dayIsUseful: Bool { type != nil && !isSleep && !isCount && hours.filter { $0.value != nil }.count >= 3 }
@@ -86,30 +92,9 @@ struct VaultDataTypePage: View {
         let metrics = theme.metrics
         let detail = self.detail
 
-        ScrollView {
+        SomaPageScroll {
             VStack(alignment: .leading, spacing: metrics.leadSpacing) {
-                SomaMetricHero(
-                    caption: detail.caption,
-                    value: detail.heroValue,
-                    unit: detail.unit,
-                    meaning: detail.meaning?.text,
-                    tone: detail.meaning?.tone ?? .neutral
-                )
-
-                VStack(alignment: .leading, spacing: metrics.cardSpacing) {
-                    if offered.count > 1 {
-                        SomaSegmentedControl(
-                            segments: offered.map { SomaSegment(id: $0, title: LocalizedStringResource(stringLiteral: MetricPageWords.title($0))) },
-                            selection: Binding(get: { span }, set: { period = $0 })
-                        )
-                        .frame(maxWidth: .infinity)
-                    }
-                    chart(detail)
-                }
-
-                if !detail.facts.isEmpty {
-                    SomaFactStrip(detail.facts)
-                }
+                stage(detail)
 
                 sources
             }
@@ -117,7 +102,9 @@ struct VaultDataTypePage: View {
             .frame(maxWidth: metrics.pageMaxWidth, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
-        .background(theme.colors.canvas.color.ignoresSafeArea())
+        // The aspect's weather across the top, as on the score pages and the
+        // category pages that open this one.
+        .aspectWash(aspect)
         .navigationTitle(title)
 #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
@@ -162,25 +149,42 @@ struct VaultDataTypePage: View {
 
     // MARK: - Parts
 
+    /// The head and the chart as one piece: the number and what it means
+    /// over the span's chart, the quiet line and the span picker under it.
     @ViewBuilder
-    private func chart(_ detail: Detail) -> some View {
+    private func stage(_ detail: Detail) -> some View {
+        let lead = SomaMetricLead(
+            caption: detail.caption,
+            value: detail.heroValue,
+            unit: detail.unit,
+            meaning: detail.meaning?.text,
+            tone: detail.meaning?.tone ?? .neutral
+        )
+        let periods = offered.count > 1
+            ? offered.map { SomaSegment(id: $0, title: LocalizedStringResource(stringLiteral: MetricPageWords.title($0))) }
+            : []
         if master != nil {
-            SomaMetricChart(
+            SomaMetricStage(
+                lead: lead,
                 buckets: detail.buckets,
                 style: chartStyle,
                 hue: hue,
                 domain: detail.domain,
-                bandLabels: detail.bandLabels,
-                summaryLabel: detail.summaryLabel,
-                summaryValue: detail.summaryValue,
-                unit: detail.unit
+                usualLabel: detail.usualLabel,
+                average: detail.average,
+                summary: detail.summaryLabel,
+                note: detail.note,
+                periods: periods,
+                period: Binding(get: { span }, set: { period = $0 })
             )
             // A sibling is another metric: it draws in afresh rather than
             // morphing out of the last one.
             .id(shown)
         } else {
-            Color.clear
-                .frame(height: theme.metrics.metricChartHeight + theme.metrics.leadSpacing * 2)
+            // Holds the stage's room until the metric is read, so the
+            // sources under it never jump.
+            SomaMetricStage(lead: lead, buckets: [], style: chartStyle, hue: hue, domain: 0...1, summary: detail.summaryLabel)
+                .opacity(0)
         }
     }
 
@@ -252,10 +256,10 @@ struct VaultDataTypePage: View {
         var isReference = false
         var buckets: [SomaChartBucket] = []
         var domain: ClosedRange<Double> = 0...1
-        var bandLabels: (low: String, high: String)?
+        var usualLabel: String?
+        var average: SomaChartAverage?
         var summaryLabel = ""
-        var summaryValue: String?
-        var facts: [SomaFact] = []
+        var note: String?
     }
 
     private var detail: Detail {
@@ -303,15 +307,23 @@ struct VaultDataTypePage: View {
                 master, band: band, intervals: span.buckets(endingAt: now, calendar: calendar), calendar: calendar
             )
         }
+        let openLast = todayOpen && span != .day
         detail.buckets = folded.enumerated().map { index, bucket in
-            SomaChartBucket(
+            let note = MetricPageWords.meaning(
+                value: bucket.value, band: bucket.band, isReference: standing.isReference, known: known,
+                todayOpen: openLast && index == folded.count - 1, risingIsGood: profile.risingIsGood,
+                format: format, unit: unitLabel
+            )
+            return SomaChartBucket(
                 id: index,
                 value: bucket.value,
                 low: bucket.secondary,
                 band: bucket.band,
                 axisLabel: MetricPageWords.axisLabel(span, index: index, count: folded.count, start: bucket.interval.start, calendar: calendar),
                 readout: MetricPageWords.readout(span, interval: bucket.interval),
-                valueText: bucket.value.map { value in bucket.secondary.map { "\(format(value))/\(format($0))" } ?? format(value) }
+                valueText: bucket.value.map { value in bucket.secondary.map { "\(format(value))/\(format($0))" } ?? format(value) },
+                note: note?.text,
+                tone: note?.tone ?? .neutral
             )
         }
         let values = folded.compactMap(\.value) + folded.compactMap(\.secondary)
@@ -320,34 +332,30 @@ struct VaultDataTypePage: View {
             zeroBased: profile.chart == .bars
         )
         if let range = folded.compactMap(\.band).last {
-            detail.bandLabels = (format(range.lowerBound), format(range.upperBound))
+            detail.usualLabel = MetricPageWords.usualKey(range, isReference: standing.isReference, format: format)
         }
         detail.summaryLabel = MetricPageWords.summaryLabel(span, kind: kind, span: window, now: now, calendar: calendar)
         let shownValues = folded.compactMap(\.value)
-        if !shownValues.isEmpty {
-            let summary = span == .day && profile.accumulates
-                ? shownValues.reduce(0, +)
-                : shownValues.reduce(0, +) / Double(shownValues.count)
-            detail.summaryValue = format(summary)
+        // A day of a total is a sum, not a level: no average line across
+        // its hours.
+        if !shownValues.isEmpty, !(span == .day && profile.accumulates), score?.isClock != true {
+            let mean = shownValues.reduce(0, +) / Double(shownValues.count)
+            detail.average = SomaChartAverage(value: mean, text: MetricPageWords.averageKey(mean, kind: kind, format: format, unit: unitLabel))
         }
 
-        // At most three facts: the usual, the month against the one before,
-        // and either where body composition is heading or how many days sat
-        // in the band.
+        // One quiet line: the month against the one before, and either where
+        // body composition is heading or how many days sat in the band. The
+        // usual and the average are on the chart's key.
         let openTail = todayOpen ? 1 : 0
-        var facts = [MetricPageWords.usualFact(band: standing.band, isReference: standing.isReference, format: format)]
-        if score?.isClock != true, let trend = MetricPageWords.trendFact(
+        let trend = score?.isClock == true ? nil : MetricPageWords.trendFact(
             days: master.days, openDayTail: openTail, risingIsGood: profile.risingIsGood,
             accumulates: profile.accumulates, format: format
-        ) {
-            facts.append(trend)
-        }
-        if profile.projects, let projected = MetricPageWords.projectionFact(MetricDetailMath.projections(master.days), format: format, unit: unitLabel) {
-            facts.append(projected)
-        } else if let inBand = MetricPageWords.daysInBandFact(days: master.days, band: band, openDayTail: openTail) {
-            facts.append(inBand)
-        }
-        detail.facts = known == 0 ? [] : facts
+        )
+        let projected = profile.projects
+            ? MetricPageWords.projectionFact(MetricDetailMath.projections(master.days), format: format, unit: unitLabel)
+            : nil
+        let inBand = projected == nil ? MetricPageWords.daysInBandFact(days: master.days, band: band, openDayTail: openTail) : nil
+        detail.note = known == 0 ? nil : MetricPageWords.note(trend: trend, projection: projected, inBand: inBand)
         return detail
     }
 

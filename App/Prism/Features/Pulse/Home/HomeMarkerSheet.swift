@@ -145,11 +145,10 @@ struct HomeMarkerSheet: View {
                 HomeReason(reason(series))
             }
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(HomeMarker.allCases) { option in
-                        HomeChip(title: option.chip, isOn: option == marker) { marker = option }
-                    }
+            // Every marker in lines that wrap, never a row that scrolls sideways.
+            SomaFlowLayout(spacing: 8) {
+                ForEach(HomeMarker.allCases) { option in
+                    HomeChip(title: option.chip, isOn: option == marker) { marker = option }
                 }
             }
 

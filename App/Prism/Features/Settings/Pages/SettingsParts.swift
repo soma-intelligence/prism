@@ -94,17 +94,14 @@ struct SettingsLine<Trailing: View>: View {
     }
 }
 
-/// The switch every settings line uses, in the accent.
+/// The switch every settings line uses: Soma's own, which reads in dark
+/// appearance where the system switch in the accent does not.
 struct SettingsSwitch: View {
     let title: String
     @Binding var isOn: Bool
 
-    @Environment(\.somaTheme) private var theme
-
     var body: some View {
-        Toggle(title, isOn: $isOn)
-            .labelsHidden()
-            .tint(theme.colors.accent.color)
+        SomaSwitch(Text(title), isOn: $isOn)
     }
 }
 

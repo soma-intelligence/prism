@@ -134,19 +134,23 @@ public struct SomaHabitMark: View {
 
 // MARK: - Answer switch
 
-/// A done or not done answer on the trailing edge of a habit card: two square
-/// cells in one recessed track, a cross and a check.
+/// A done or not done answer on the trailing edge of a habit card: three
+/// slots in one recessed track, a cross, a dash and a check, and a raised
+/// knob that rests on one of them.
 ///
-/// Unanswered, both sit flat and faint. A yes fills its cell with the row's
-/// tone and draws its check; a no raises its cell in the ink's quiet step and
-/// draws its cross. The chosen cell slides between the two on a short spring;
-/// tapping the chosen one again clears the answer. Under Reduce Motion the
-/// state simply changes. Every change lands with a selection haptic.
+/// The knob always shows where the answer is: on the dash in the middle
+/// while nothing is entered, on the cross for not done, on the check for
+/// done, where it fills with the row's tone. A tap on a slot moves the knob
+/// there; a tap on the chosen cross or check, or on the dash, clears the
+/// answer back to the middle. The knob slides on a short spring and its
+/// colour follows it; the marks never redraw, so nothing flickers mid move:
+/// a mark takes the knob's ink exactly where the knob covers it. Under
+/// Reduce Motion the knob simply lands. Every change lands with a selection
+/// haptic.
 public struct SomaAnswerSwitch: View {
     @Binding private var value: Bool?
     private let tone: SomaTrackTone
 
-    @Namespace private var cell
     @Environment(\.somaTheme) private var theme
     @Environment(\.colorScheme) private var scheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -156,7 +160,8 @@ public struct SomaAnswerSwitch: View {
         self.tone = tone
     }
 
-    /// The answers in the order VoiceOver steps through them: no, none, yes.
+    /// The answers in the order the slots sit and VoiceOver steps through
+    /// them: no, none, yes.
     public static let order: [Bool?] = [false, nil, true]
 
     /// What VoiceOver says the answer is.
@@ -176,19 +181,53 @@ public struct SomaAnswerSwitch: View {
         return order[min(max(index + steps, 0), order.count - 1)]
     }
 
-    /// What a tap on one cell leaves: that answer, or none when it was
-    /// already chosen.
-    public static func tapping(_ answer: Bool, on value: Bool?) -> Bool? {
+    /// What a tap on one slot leaves: that answer, or none when it was
+    /// already chosen. The dash always leaves none.
+    public static func tapping(_ answer: Bool?, on value: Bool?) -> Bool? {
         value == answer ? nil : answer
+    }
+
+    /// Which slot the knob rests on, 0 to 2, left to right.
+    public static func slot(_ value: Bool?) -> Int {
+        order.firstIndex(of: value) ?? 1
     }
 
     public var body: some View {
         let metrics = theme.metrics
+        let slot = metrics.trackAnswerSlotWidth
+        let height = metrics.trackAnswerCellHeight
+        let knob = RoundedRectangle(cornerRadius: metrics.trackAnswerCornerRadius - metrics.trackAnswerInset, style: .continuous)
+        let offset = CGFloat(Self.slot(value)) * slot
 
-        HStack(spacing: 0) {
-            segment(false)
-            segment(true)
+        ZStack(alignment: .leading) {
+            marks(chosen: false)
+            knobFill(knob)
+                .frame(width: slot, height: height)
+                .offset(x: offset)
+            marks(chosen: true)
+                .mask(alignment: .leading) {
+                    knob.frame(width: slot, height: height).offset(x: offset)
+                }
+            HStack(spacing: 0) {
+                ForEach(Array(Self.order.enumerated()), id: \.offset) { _, answer in
+                    Button {
+                        choose(Self.tapping(answer, on: value))
+                    } label: {
+                        Color.clear
+                            .frame(width: slot, height: height)
+                            // Taller to a thumb than to the eye: the reach
+                            // is added for the hit test and taken back for
+                            // the layout.
+                            .padding(.vertical, metrics.trackAnswerReach)
+                            .contentShape(.rect)
+                            .padding(.vertical, -metrics.trackAnswerReach)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(Text(Self.spokenValue(answer)))
+                }
+            }
         }
+        .frame(width: slot * CGFloat(Self.order.count), height: height)
         .padding(metrics.trackAnswerInset)
         .background(
             RoundedRectangle(cornerRadius: metrics.trackAnswerCornerRadius, style: .continuous)
@@ -212,83 +251,64 @@ public struct SomaAnswerSwitch: View {
         if reduceMotion { value = answer } else { withAnimation(theme.motion.trackAnswer) { value = answer } }
     }
 
-    private func segment(_ answer: Bool) -> some View {
+    /// The three marks in a row: faint at rest, or in the ink each takes
+    /// under the knob.
+    private func marks(chosen: Bool) -> some View {
         let metrics = theme.metrics
-        let motion = theme.motion
         let colors = theme.colors
-        let isChosen = value == answer
-        let inner = metrics.trackAnswerCornerRadius - metrics.trackAnswerInset
-        let idle = colors.inkSecondary.color.opacity(metrics.trackAnswerIdleOpacity)
-        let ink = answer ? colors.surface.color : colors.inkPrimary.color
-        let glyph = SomaAnswerMarkShape(isYes: answer)
         let stroke = StrokeStyle(lineWidth: metrics.trackAnswerGlyphStroke, lineCap: .round, lineJoin: .round)
 
-        return Button {
-            choose(Self.tapping(answer, on: value))
-        } label: {
-            ZStack {
-                glyph
-                    .stroke(idle, style: stroke)
-                    .opacity(isChosen ? 0 : 1)
-                glyph
-                    .trim(from: 0, to: isChosen ? 1 : 0)
-                    .stroke(ink, style: stroke)
-                    .animation(reduceMotion ? nil : (isChosen ? motion.trackMarkDraw : motion.trackPress), value: isChosen)
-            }
-            .frame(width: metrics.trackAnswerGlyph, height: metrics.trackAnswerGlyph)
-            .frame(width: metrics.trackAnswerCellWidth, height: metrics.trackAnswerCellHeight)
-            .background {
-                if isChosen {
-                    chosenCell(answer, radius: inner)
-                        .matchedGeometryEffect(id: "cell", in: cell)
-                        .transition(reduceMotion ? .identity : .scale(scale: motion.trackAnswerFrom).combined(with: .opacity))
+        return HStack(spacing: 0) {
+            ForEach(Array(Self.order.enumerated()), id: \.offset) { _, answer in
+                let ink: Color = if !chosen {
+                    colors.inkSecondary.color.opacity(metrics.trackAnswerIdleOpacity)
+                } else {
+                    switch answer {
+                    case true?: colors.surface.color
+                    case false?: colors.inkPrimary.color
+                    case nil: colors.inkSecondary.color
+                    }
                 }
+                SomaAnswerMarkShape(answer: answer)
+                    .stroke(ink, style: stroke)
+                    .frame(width: metrics.trackAnswerGlyph, height: metrics.trackAnswerGlyph)
+                    .frame(width: metrics.trackAnswerSlotWidth, height: metrics.trackAnswerCellHeight)
             }
-            // Taller to a thumb than to the eye: the reach is added for the
-            // hit test and taken back for the layout.
-            .padding(.vertical, metrics.trackAnswerReach)
-            .contentShape(.rect)
-            .padding(.vertical, -metrics.trackAnswerReach)
         }
-        .buttonStyle(SomaAnswerPressStyle())
-        .accessibilityLabel(Text(answer ? "Done" : "Not done"))
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 
-    @ViewBuilder
-    private func chosenCell(_ answer: Bool, radius: CGFloat) -> some View {
+    /// The knob: the row's tone on a yes, else a raised surface (an ink
+    /// wash over the track in dark, where the surface is the card's own).
+    /// One shape whose colour moves with it, never two crossfading.
+    private func knobFill(_ knob: RoundedRectangle) -> some View {
         let metrics = theme.metrics
         let colors = theme.colors
-        let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
-        if answer {
-            shape.fill(tone.color)
-        } else if scheme == .dark {
-            shape.fill(colors.inkPrimary.color.opacity(metrics.trackAnswerNoOpacity))
-        } else {
-            shape.fill(colors.surface.color)
-                .shadow(color: colors.inkPrimary.color.opacity(metrics.journalChoiceShadowOpacity),
-                        radius: metrics.journalChoiceShadowRadius, y: 0.5)
-        }
+        let isYes = value == true
+        let isDark = scheme == .dark
+        let base: Color = isYes ? tone.color : (isDark ? colors.surfaceRecessed.color : colors.surface.color)
+
+        return knob.fill(base)
+            .overlay(knob.fill(colors.inkPrimary.color.opacity(isDark && !isYes ? metrics.trackAnswerNoOpacity : 0)))
+            .shadow(color: colors.inkPrimary.color.opacity(isDark ? 0 : metrics.journalChoiceShadowOpacity),
+                    radius: metrics.journalChoiceShadowRadius, y: 0.5)
+            .allowsHitTesting(false)
     }
 }
 
-/// A cell giving way under the finger: a small sink, no dim.
-private struct SomaAnswerPressStyle: ButtonStyle {
-    @Environment(\.somaTheme) private var theme
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed && !reduceMotion ? theme.motion.trackPressScale : 1)
-            .animation(reduceMotion ? nil : theme.motion.trackPress, value: configuration.isPressed)
-    }
-}
-
-/// A check or a cross as a line on a 24 unit grid, so it can draw itself.
+/// A check, a cross or a dash as a line on a 24 unit grid, so it can draw
+/// itself.
 public struct SomaAnswerMarkShape: Shape {
-    public let isYes: Bool
+    /// True for the check, false for the cross, nil for the dash.
+    public let answer: Bool?
+
+    public init(answer: Bool?) {
+        self.answer = answer
+    }
 
     public init(isYes: Bool) {
-        self.isYes = isYes
+        self.answer = isYes
     }
 
     public func path(in rect: CGRect) -> Path {
@@ -297,15 +317,19 @@ public struct SomaAnswerMarkShape: Shape {
         let placement = CGAffineTransform(translationX: rect.midX - side / 2, y: rect.midY - side / 2)
             .scaledBy(x: scale, y: scale)
         var path = Path()
-        if isYes {
+        switch answer {
+        case true?:
             path.move(to: CGPoint(x: 4, y: 12.5))
             path.addLine(to: CGPoint(x: 9.5, y: 18))
             path.addLine(to: CGPoint(x: 20, y: 6.5))
-        } else {
+        case false?:
             path.move(to: CGPoint(x: 6, y: 6))
             path.addLine(to: CGPoint(x: 18, y: 18))
             path.move(to: CGPoint(x: 18, y: 6))
             path.addLine(to: CGPoint(x: 6, y: 18))
+        case nil:
+            path.move(to: CGPoint(x: 7, y: 12))
+            path.addLine(to: CGPoint(x: 17, y: 12))
         }
         return path.applying(placement)
     }

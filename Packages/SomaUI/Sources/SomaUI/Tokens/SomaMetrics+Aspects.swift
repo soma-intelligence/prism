@@ -35,3 +35,18 @@ public extension SomaMetrics {
     var quietPillHeight: CGFloat { 40 }
     var quietPillPadding: CGFloat { 16 }
 }
+
+/// The aspect backdrop's photograph and colour field: how much of the page's
+/// ground veils the photograph from the bar down, how strong and how soft
+/// the colour field is, and where its fade passes the middle.
+public extension SomaMetrics {
+    /// The ground over the photograph at its top, a third of the way down
+    /// and two thirds of the way down; it is whole at the foot.
+    var backdropVeilOpacities: (top: Double, third: Double, lower: Double) { (0.08, 0.5, 0.82) }
+    var backdropFieldOpacityLight: Double { 0.55 }
+    var backdropFieldOpacityDark: Double { 0.7 }
+    var backdropFieldBlur: CGFloat { 30 }
+    /// The field's fade at its middle stop, from whole at the top to none
+    /// at the foot.
+    var backdropFadeMiddleOpacity: Double { 0.8 }
+}

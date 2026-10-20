@@ -6,8 +6,8 @@
 import SwiftUI
 import SomaUI
 
-/// Daily strain against the target band: fourteen days of bars, thirty days
-/// split into in, above and below, and how the target is set.
+/// Daily strain against the target band: the metric stage over the days,
+/// thirty days split into in, above and below, and how the target is set.
 ///
 /// Strain and its target are the
 /// scores `SomaScores` already works out; this page only counts the days.
@@ -16,7 +16,6 @@ struct StrainPerformancePage: View {
     @Environment(\.somaTheme) private var theme
 
     private var words: MetricWords { MetricWords() }
-    static let shownDays = 14
 
     var body: some View {
         let scores = health.scores
@@ -25,8 +24,6 @@ struct StrainPerformancePage: View {
         let study = target.map { StrainStudy(series: series, target: $0) }
         let average = StrainStudy.average(series, days: 7)
         let lead = MetricLead.override(health.status)
-        let recent = Array(series.suffix(Self.shownDays))
-        let axis = words.axis(days: Self.shownDays, now: .now)
 
         TabPartScaffold(
             aspect: .activity,
@@ -35,22 +32,26 @@ struct StrainPerformancePage: View {
             reason: lead?.reason ?? reason(average: average, target: target, study: study),
             stats: []
         ) {
-            SomaChartCard(
-                eyebrow: "Daily strain",
-                value: scores?.strain.map(String.init),
-                unit: "today, of 100",
-                note: target.map { "Target \($0.lowerBound) to \($0.upperBound) today. The last 14 days." }
-                    ?? "The last 14 days. A target shows once recovery has a week of nights."
-            ) {
-                MetricDailyBars(
-                    values: recent.isEmpty ? Array(repeating: nil, count: Self.shownDays) : recent,
-                    usual: target.map { Double($0.lowerBound)...Double($0.upperBound) },
-                    aspect: .activity,
-                    leadingLabel: axis.0,
-                    middleLabel: axis.1,
-                    trailingLabel: axis.2
-                )
-            }
+            AspectStage(
+                aspect: .activity,
+                lead: SomaMetricLead(
+                    caption: "Today",
+                    value: scores?.strain.map(String.init),
+                    unit: "of 100",
+                    meaning: Self.meaning(strain: scores?.strain, target: target),
+                    tone: Self.tone(strain: scores?.strain, target: target)
+                ),
+                dial: SomaStageDial(aspect: .activity, scale: .fill(top: 100), value: scores?.strain.map(Double.init),
+                                    usual: target.map { Double($0.lowerBound)...Double($0.upperBound) }),
+                values: series,
+                unit: nil,
+                scale: nil,
+                higherIsBetter: nil,
+                bands: target.map { band in
+                    // Today's target is the only one kept: it stands on today.
+                    Array(repeating: nil, count: max(0, series.count - 1)) + [Double(band.lowerBound)...Double(band.upperBound)]
+                }
+            )
             MetricSplitCard(
                 eyebrow: "\(SomaScores.seriesDays) days against the target",
                 parts: [
@@ -75,6 +76,20 @@ struct StrainPerformancePage: View {
         .navigationTitle("Strain performance")
         .task { await health.loadScores() }
         .refreshable { await health.loadScores(force: true) }
+    }
+
+    /// Today's strain against today's target, in a few words.
+    static func meaning(strain: Int?, target: ClosedRange<Int>?) -> String? {
+        guard let strain else { return "No strain yet today" }
+        guard let target else { return nil }
+        if strain < target.lowerBound { return "Below today's target" }
+        if strain > target.upperBound { return "Above today's target" }
+        return "In today's target"
+    }
+
+    static func tone(strain: Int?, target: ClosedRange<Int>?) -> SomaCueTone {
+        guard let strain, let target else { return .neutral }
+        return target.contains(strain) ? .good : .watch
     }
 
     private func headline(study: StrainStudy?, scores: SomaScores?) -> String {

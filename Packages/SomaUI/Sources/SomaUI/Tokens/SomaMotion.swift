@@ -30,11 +30,14 @@ public struct SomaMotion: Sendable, Equatable {
     /// One full turn of the orb. Slow enough that the turn reads as the
     /// planet moving rather than as a spinner.
     public var orbTurnDuration: Double
-    /// One part of a tab giving way to the next, from the segmented control.
+    /// One part of a tab giving way to the next, from the segmented control:
+    /// the new part slides in from the side of the segment chosen while the
+    /// old one leaves by the other. A spring without bounce, as long as the
+    /// pill's `selection`, so the page and the pill land together; a page
+    /// that overshot would show a sliver of its neighbour.
     public var partSwitch: Animation
-    /// How far a part slides as it comes in, in points. Short: the page is
-    /// replaced in place, not carried across the screen.
-    public var partSlide: CGFloat
+    /// The same handover under Reduce Motion: a quick cross fade in place.
+    public var partFadeDuration: Double
     /// A tab settling in after the bar selects it.
     public var tabEntrance: Animation
     /// The blur a page arrives out of, and leaves into.
@@ -66,9 +69,9 @@ public struct SomaMotion: Sendable, Equatable {
         spinDuration: Double = 16,
         breathDuration: Double = 2.6,
         orbBlendDuration: Double = 3.2,
-        orbTurnDuration: Double = 600,
-        partSwitch: Animation = .smooth(duration: 0.42),
-        partSlide: CGFloat = 36,
+        orbTurnDuration: Double = 240,
+        partSwitch: Animation = .smooth(duration: 0.3),
+        partFadeDuration: Double = 0.18,
         tabEntrance: Animation = .smooth(duration: 0.5),
         arrivalBlur: CGFloat = 8,
         arrivalScale: CGFloat = 0.985,
@@ -87,7 +90,7 @@ public struct SomaMotion: Sendable, Equatable {
         self.orbBlendDuration = orbBlendDuration
         self.orbTurnDuration = orbTurnDuration
         self.partSwitch = partSwitch
-        self.partSlide = partSlide
+        self.partFadeDuration = partFadeDuration
         self.tabEntrance = tabEntrance
         self.arrivalBlur = arrivalBlur
         self.arrivalScale = arrivalScale

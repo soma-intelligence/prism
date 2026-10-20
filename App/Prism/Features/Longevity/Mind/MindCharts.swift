@@ -223,7 +223,7 @@ struct MindReasonText: View {
 
 #if DEBUG
 #Preview("Mind charts") {
-    ScrollView {
+    SomaPageScroll {
         VStack(spacing: 16) {
             SomaCard { MindEnergyChart(slots: MindInnerSpace.preview.slots, curve: MindInnerSpace.preview.energyCurve) }
             SomaCard { MindWeekBars(bars: MindInnerSpace.preview.week) }

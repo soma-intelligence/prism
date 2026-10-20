@@ -236,4 +236,27 @@ struct MetricPageWordsTests {
             #expect(!section.body.lowercased().contains("diagnos"))
         }
     }
+
+    @Test("The chart's key names the band and the average in a few words")
+    func chartKey() {
+        #expect(MetricPageWords.usualKey(56...58, isReference: false, format: plain) == "Usual 56 to 58")
+        #expect(MetricPageWords.usualKey(7_100...9_400, isReference: false, format: plain) == "Usual 7.1K to 9.4K")
+        #expect(MetricPageWords.usualKey(95...100, isReference: true, format: plain) == "Typical 95 to 100")
+        #expect(MetricPageWords.averageKey(58, kind: .reading(manyADay: false), format: plain, unit: "bpm") == "Average 58 bpm")
+        #expect(MetricPageWords.averageKey(8_288, kind: .total, format: plain, unit: "steps") == "Daily average 8,288 steps")
+        #expect(MetricPageWords.averageKey(92, kind: .score, format: plain, unit: nil) == "Average 92")
+    }
+
+    @Test("The quiet line under the chart folds the trend and the days in the band, or where the body is heading")
+    func chartNote() {
+        let trend = SomaFact("30 day trend", value: "Up 5%", detail: "From 55", tone: .watch)
+        let steady = SomaFact("30 day trend", value: "Steady", detail: "Around 58")
+        let days = SomaFact("Usual days", value: "18 of 30")
+        let range = SomaFact("Days in range", value: "30 of 30")
+        let heading = SomaFact("In 30 days", value: "75.9 kg", detail: "\u{00B1} 0.6")
+        #expect(MetricPageWords.note(trend: trend, projection: nil, inBand: days) == "Up 5% on the 30 days before · 18 of 30 days in your usual")
+        #expect(MetricPageWords.note(trend: steady, projection: nil, inBand: range) == "Steady over 30 days · 30 of 30 days in the typical range")
+        #expect(MetricPageWords.note(trend: nil, projection: heading, inBand: days) == "About 75.9 kg in 30 days")
+        #expect(MetricPageWords.note(trend: nil, projection: nil, inBand: nil) == nil)
+    }
 }

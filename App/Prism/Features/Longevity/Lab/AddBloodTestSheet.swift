@@ -25,7 +25,7 @@ struct AddBloodTestSheet: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
+            SomaPageScroll {
                 VStack(alignment: .leading, spacing: theme.metrics.leadSpacing) {
                     SomaPageHero(
                         eyebrow: "Blood panel",
@@ -205,7 +205,7 @@ struct BloodPanelConfirmView: View {
     var body: some View {
         let filled = draft.lines.filter { !$0.text.isEmpty }
         let doubtful = draft.lines.filter(\.needsALook).count
-        ScrollView {
+        SomaPageScroll {
             VStack(alignment: .leading, spacing: theme.metrics.leadSpacing) {
                 SomaPageHero(
                     eyebrow: "Panel of \(draft.sampledAt.formatted(.dateTime.day().month(.wide).year()))",

@@ -81,7 +81,7 @@ struct MindStressRadarPage: View {
         .task {
             _ = await MindCalendar.requestAccess()
             let start = calendar.date(byAdding: .day, value: -30, to: todayStart) ?? todayStart
-            events = MindCalendar.events(from: start, to: now.addingTimeInterval(24 * 60 * 60))
+            events = await MindCalendar.events(from: start, to: now.addingTimeInterval(24 * 60 * 60))
             let read = await MindLoad.inputs(health)
             inputs = read
             curves = await MindJourneyLoad.curves(health, inputs: read, days: 30)

@@ -21,4 +21,10 @@ public extension SomaPreviewSamples {
     static let soundHeadphones: Double = 83
     static let temperatureNow: Double = 18
     static let temperatureRange: ClosedRange<Double> = 12...21
+    /// Thirty nights slept: most at home, a few at a friend's across town.
+    static let sleepHeat: [SomaHeatPoint] = [
+        SomaHeatPoint(id: "home", latitude: 37.4443, longitude: -122.1598, weight: 1),
+        SomaHeatPoint(id: "home.2", latitude: 37.4445, longitude: -122.1601, weight: 0.45),
+        SomaHeatPoint(id: "friend", latitude: 37.4468, longitude: -122.1552, weight: 0.2),
+    ]
 }

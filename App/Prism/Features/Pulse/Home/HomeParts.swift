@@ -31,7 +31,7 @@ struct HomeSheet<Content: View>: View {
         let metrics = theme.metrics
 
         NavigationStack {
-            ScrollView {
+            SomaPageScroll {
                 VStack(alignment: .leading, spacing: metrics.leadSpacing) {
                     VStack(alignment: .leading, spacing: metrics.cardHeaderSpacing) {
                         HomeEyebrow(eyebrow)
@@ -78,7 +78,7 @@ struct HomePage<Content: View>: View {
     var body: some View {
         let metrics = theme.metrics
 
-        ScrollView {
+        SomaPageScroll {
             VStack(alignment: .leading, spacing: metrics.cardSpacing) {
                 content
             }
@@ -124,7 +124,7 @@ struct HomeInputSheet<Content: View>: View {
         let metrics = theme.metrics
 
         NavigationStack {
-            ScrollView {
+            SomaPageScroll {
                 VStack(alignment: .leading, spacing: metrics.leadSpacing) {
                     content
                 }

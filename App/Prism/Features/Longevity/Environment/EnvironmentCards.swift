@@ -8,14 +8,17 @@ import Charts
 import SomaUI
 
 /// Everything the Environment lens draws, without the scroll view around
-/// it: the weather pill, the three stats, then light, air, sound and sleep.
-/// Every card is a button; the lens decides what each one opens.
+/// it: one block for now (where you are, the weather, air quality, UV and
+/// daylight), then light, air, sound and sleep. Every card is a button; the
+/// lens decides what each one opens.
 struct EnvironmentLensContent: View {
     let report: EnvironmentReport
     let sky: EnvironmentSky
     let bedroom: EnvironmentBedroom
     var here = EnvironmentHere(access: .denied, place: nil, isHere: false)
-    var sleepPlaces: [EnvironmentSleepPlace] = []
+    var sleepHeat = SleepPlaceHeat()
+    var sleepMain: SleepPlaceCluster?
+    var sleepPending: SleepPlaceCluster?
     var open: (EnvironmentMeasure) -> Void = { _ in }
     var openBedroom: () -> Void = {}
     var openPlaces: () -> Void = {}
@@ -28,27 +31,8 @@ struct EnvironmentLensContent: View {
         let colors = theme.colors
 
         VStack(alignment: .leading, spacing: metrics.leadSpacing) {
-            VStack(alignment: .leading, spacing: metrics.leadSpacing) {
-                Button { open(.temperature) } label: {
-                    SomaWeatherPill(symbol: report.outside?.symbol ?? "cloud.sun.fill",
-                                    value: report.outside?.temperature.map { "\(Int($0.rounded()))°C" },
-                                    place: here.place?.name ?? (here.place == nil ? nil : "Here"))
-                }
-                .buttonStyle(.somaGlassPress)
-
-                SomaStatRow(stats) { stat in
-                    switch stat.id {
-                    case "Air quality": open(.air)
-                    case "UV now": open(.uv)
-                    default: open(.daylight)
-                    }
-                }
-            }
-            .padding(.top, metrics.heroTopPadding)
-
-            EnvironmentSection("Where you are") {
-                EnvironmentWhereCard(here: here, report: report, sky: sky, open: open, requestLocation: requestLocation)
-            }
+            EnvironmentNowCard(here: here, report: report, sky: sky, open: open, requestLocation: requestLocation)
+                .padding(.top, metrics.heroTopPadding)
 
             EnvironmentSection("Light") {
                 EnvironmentTap { open(.daylight) } label: {
@@ -73,8 +57,9 @@ struct EnvironmentLensContent: View {
             }
 
             EnvironmentSection("Sleep") {
+                EnvironmentSleepPlacesCard(heat: sleepHeat, main: sleepMain, pending: sleepPending,
+                                           here: here.exact ?? here.place, open: openPlaces)
                 EnvironmentBedroomCard(bedroom: bedroom, open: openBedroom, openPlaces: openPlaces)
-                EnvironmentSleepPlacesCard(places: sleepPlaces, open: openPlaces)
             }
 
             EnvironmentSection("Days outside") {
@@ -90,26 +75,6 @@ struct EnvironmentLensContent: View {
             }
         }
         .foregroundStyle(colors.inkPrimary.color)
-    }
-
-    private var stats: [SomaStat] {
-        let uvStatus = EnvironmentMeasure.uv.status(EnvironmentMeasure.uv.current(report), report: report, colors: theme.colors)
-        let daylightStatus = EnvironmentMeasure.daylight.status(report.daylight, report: report, colors: theme.colors)
-        let uv = EnvironmentMeasure.uv.current(report)
-        let aqi = report.outside?.aqi
-        let airStatus = EnvironmentMeasure.air.status(aqi, report: report, colors: theme.colors)
-        return [
-            SomaStat("Air quality", value: aqi.map(EnvironmentMeasure.air.format),
-                     cue: airStatus.map { LocalizedStringResource(stringLiteral: $0.word) },
-                     cueTone: (aqi ?? 0) > 100 ? .watch : (aqi == nil ? .neutral : .good)),
-            SomaStat("UV now", value: uv.map(EnvironmentMeasure.uv.format),
-                     cue: uvStatus.map { LocalizedStringResource(stringLiteral: $0.word) },
-                     cueTone: (uv ?? 0) >= 6 ? .watch : .neutral),
-            SomaStat("Daylight", value: report.daylight.map(EnvironmentMeasure.daylight.format), unit: "min",
-                     trend: report.isDaylightLow ? .down : nil,
-                     cue: daylightStatus.map { LocalizedStringResource(stringLiteral: $0.word) },
-                     cueTone: report.isDaylightLow ? .watch : (daylightStatus == nil ? .neutral : .good)),
-        ]
     }
 }
 
@@ -498,7 +463,7 @@ struct EnvironmentValue: View {
             Text(verbatim: text ?? "-")
                 .somaFont(theme.typography.metric)
                 .foregroundStyle(text == nil ? colors.inkSecondary.color : (tint ?? colors.inkPrimary.color))
-                .somaRollingNumber(text)
+                .somaRollingNumber(text, holdsWidth: !unit.isEmpty)
             if text != nil, !unit.isEmpty {
                 Text(verbatim: unit)
                     .somaFont(theme.typography.caption)
@@ -527,7 +492,7 @@ private struct EnvironmentFigure: View {
                 Text(verbatim: value ?? "-")
                     .somaFont(theme.typography.rowValue)
                     .foregroundStyle(value == nil ? colors.inkSecondary.color : colors.inkPrimary.color)
-                    .somaRollingNumber(value)
+                    .somaRollingNumber(value, holdsWidth: unit != nil)
                 if let unit, value != nil {
                     Text(verbatim: unit)
                         .somaFont(theme.typography.caption)

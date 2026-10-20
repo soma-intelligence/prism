@@ -9,9 +9,10 @@ import SomaUI
 /// The Pulse tab's Trends page: cause and effect on the person's own days.
 ///
 /// Each card is one link (yesterday's strain and today's recovery, a night
-/// after alcohol and its sleep score), strongest first, said as a plain
-/// headline with one number under it and the two sides' averages on one
-/// track. A link that has too few days, or whose difference sits inside the
+/// after alcohol and its sleep score), strongest first: the cause's glyph
+/// leading to the effect's, a plain headline with one number under it, and
+/// the two sides as a pair of columns, before and after, every day a faint
+/// dot and the averages joined (owner, 2026-10-20: more visual). A link that has too few days, or whose difference sits inside the
 /// outcome's day to day noise, is never drawn: it is named in one "Still
 /// learning" row at the foot (owner, 2026-10-03: link cause and effect,
 /// visuals first, fewer words; 2026-10-19: less scientific).
@@ -88,7 +89,11 @@ struct PulseLinksList: View {
                         lowLabel: link.driver.sideLabels.low,
                         tone: link.tone,
                         high: link.result.high.map { $0 * link.outcome.scale },
-                        low: link.result.low.map { $0 * link.outcome.scale }
+                        low: link.result.low.map { $0 * link.outcome.scale },
+                        cause: link.driver.aspect,
+                        effect: link.outcome.aspect,
+                        highText: link.outcome.columnText(link.result.high),
+                        lowText: link.outcome.columnText(link.result.low)
                     )
                     .contentShape(.rect)
                 }
@@ -109,7 +114,7 @@ struct PulseLinksList: View {
 
 #if DEBUG
 #Preview("Trends") {
-    ScrollView {
+    SomaPageScroll {
         PulseLinksList(links: CauseLinks.preview, today: CauseLinks.previewToday)
             .padding()
     }

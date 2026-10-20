@@ -120,6 +120,10 @@ struct MindLensModel: Equatable, Sendable, Codable {
 
     /// Today's stress, half hour by half hour, sleep and workouts left out.
     var stress: [MindStressSample] = []
+    /// Last night, read on the same scale, so the line reads night then
+    /// day. Nil without a night that ended today (and in a snapshot kept
+    /// before the night was read).
+    var night: MindStressNight?
     /// The last fourteen days, oldest first, today last.
     var moods: [MindMoodDay] = []
     /// The last seven days of mindful minutes, today last.
@@ -146,6 +150,7 @@ struct MindLensModel: Equatable, Sendable, Codable {
         inner: MindInnerSpace,
         stress: ScorePages.Stress?,
         heatmap: MindHeatmap,
+        night: MindStressNight? = nil,
         moods: [MindMoodEntry],
         feelings: [Date: Int],
         now: Date,
@@ -163,6 +168,7 @@ struct MindLensModel: Equatable, Sendable, Codable {
             stress: (stress?.line ?? [])
                 .filter { $0.start >= today }
                 .map { MindStressSample(start: $0.start, value: min(100, max(0, $0.value))) },
+            night: night,
             moods: moodDays(moods, feelings: feelings, today: today, calendar: calendar),
             week: inner.week,
             heatmap: heatmap

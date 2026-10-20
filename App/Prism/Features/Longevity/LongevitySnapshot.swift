@@ -27,16 +27,15 @@ struct BodyLensSnapshot: Codable, Equatable {
 }
 
 /// What the Environment lens draws from its reads: the report with the
-/// weather laid in, last night outside and in the bedroom, where you are
-/// (the rounded place and its name, never the device's own position) and
-/// the places you slept.
+/// weather laid in, last night outside and in the bedroom, and where you
+/// are (the rounded place and its name, never the device's own position).
+/// Sleep places are not kept here: ``SleepPlaceFinder`` keeps its own file.
 struct EnvironmentLensSnapshot: Codable, Equatable {
     var report: EnvironmentReport
     var outdoorNight: Double?
     var noise: Double?
     var place: EnvironmentSun.Place?
     var isHere: Bool
-    var sleepPlaces: [EnvironmentSleepPlace]
 }
 
 /// A lens's values and when they were read.

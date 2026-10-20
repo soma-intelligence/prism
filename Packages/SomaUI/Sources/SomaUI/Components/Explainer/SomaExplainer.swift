@@ -50,7 +50,7 @@ public struct SomaExplainer<Hero: View, Content: View>: View {
         let type = theme.typography
         let colors = theme.colors
 
-        ScrollView {
+        SomaPageScroll {
             VStack(alignment: .leading, spacing: metrics.explainerSectionSpacing) {
                 hero
                     .frame(maxWidth: .infinity)

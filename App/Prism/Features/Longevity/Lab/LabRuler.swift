@@ -54,6 +54,7 @@ struct LabRuler: View {
                 context.stroke(needle, with: .color(theme.colors.inkPrimary.color), lineWidth: 2)
             }
             .contentShape(.rect)
+            .somaClaimsSwipe()
             .gesture(
                 DragGesture(minimumDistance: 1)
                     .onChanged { drag in

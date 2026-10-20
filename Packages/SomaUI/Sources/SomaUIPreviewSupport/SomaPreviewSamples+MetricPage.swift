@@ -63,4 +63,35 @@ public extension SomaPreviewSamples {
         SomaInfoSection("Your usual", body: "The range your last two weeks sat in. It moves with you."),
         SomaInfoSection("Unit", body: "Steps"),
     ]
+
+    /// A score page's readings, as rows: name, when, value, the week.
+    struct ReadingSample: Identifiable, Sendable {
+        public let id: String
+        public let caption: String?
+        public let value: String?
+        public let unit: String?
+        public let week: [Double?]
+    }
+
+    static let readings: [ReadingSample] = [
+        ReadingSample(id: "Resting heart rate", caption: "Today", value: "58", unit: "bpm", week: metricResting),
+        ReadingSample(id: "Heart rate variability", caption: "Today", value: "42", unit: "ms", week: [44, 47, 40, 41, 43, 39, 42]),
+        ReadingSample(id: "Cardio fitness", caption: "Oct 12", value: "41.2", unit: "VO2 max", week: []),
+        ReadingSample(id: "Heart rate recovery", caption: nil, value: nil, unit: nil, week: []),
+    ]
+
+    /// A month of walking speed, km/h, oldest first, two days unread, for a
+    /// trend tile and a biomarker row.
+    static let walkingSpeedMonth: [Double?] = [
+        4.9, 5.0, 4.8, 4.9, 5.1, nil, 5.0, 4.9, 5.0, 5.2, 5.1, 4.9, 5.0, 5.1, 5.0,
+        5.2, 5.1, nil, 5.0, 5.2, 5.3, 5.1, 5.0, 5.2, 5.1, 5.3, 5.2, 5.1, 5.2, 5.1,
+    ]
+
+    /// A fortnight of nights, bed and wake as clock hours, one missing.
+    static let sleepWindows: [SomaSleepWindow] = {
+        let letters = ["M", "T", "W", "T", "F", "S", "S", "M", "T", "W", "T", "F", "S", "S"]
+        let beds: [Double?] = [22.6, 23.1, 22.8, nil, 23.4, 0.6, 23.9, 22.7, 22.9, 23.0, 22.5, 23.6, 0.2, 22.8]
+        let wakes: [Double?] = [6.3, 6.5, 6.4, nil, 6.6, 8.4, 7.9, 6.2, 6.4, 6.5, 6.3, 7.0, 8.6, 6.2]
+        return letters.indices.map { SomaSleepWindow(id: $0, label: letters[$0], bed: beds[$0], wake: wakes[$0]) }
+    }()
 }

@@ -181,6 +181,7 @@ struct MindBreatheCard: View {
 
     @Environment(\.somaTheme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.somaPartIsShown) private var partIsShown
 
     var body: some View {
         let metrics = theme.metrics
@@ -189,7 +190,7 @@ struct MindBreatheCard: View {
 
         Button(action: action) {
             HStack(spacing: metrics.cardSpacing) {
-                TimelineView(.animation(paused: reduceMotion)) { context in
+                TimelineView(.animation(paused: reduceMotion || !partIsShown)) { context in
                     let scale = reduceMotion ? 1 : MindBreatheSheet.breath(at: context.date.timeIntervalSinceReferenceDate).scale
                     ZStack {
                         Circle()
@@ -420,7 +421,7 @@ struct MindGlyphGrid: View {
 #if DEBUG
 #Preview("Mind lens cards") {
     NavigationStack {
-        ScrollView {
+        SomaPageScroll {
             VStack(spacing: 16) {
                 MindMindfulCard(week: MindLensModel.preview.week, goal: MindLensModel.mindfulGoal)
                 MindBreatheCard {}

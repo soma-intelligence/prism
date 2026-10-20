@@ -53,7 +53,7 @@ struct TabPartScaffold<Cards: View>: View {
     var body: some View {
         let metrics = theme.metrics
 
-        ScrollView {
+        SomaPageScroll {
             VStack(alignment: .leading, spacing: metrics.leadSpacing) {
                 if let hero {
                     hero

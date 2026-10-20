@@ -13,48 +13,50 @@ Their text is a work of the United States federal government and is in the publi
 
 NIH has not reviewed or endorsed Prism or these adaptations. Each article says so in its own text: "This is general wellness information adapted from an NIH article, not reviewed or endorsed by NIH. It is not personal medical advice." No NIH images are bundled.
 
-## MuscleMap drawings
+## Muscle figure (Z-Anatomy, BodyParts3D)
 
-The muscle drawings in `Packages/SomaUI/Sources/SomaUI/Components/Readings/MuscleArt/` are vendored from MuscleMap (https://github.com/melihcolpan/MuscleMap). Each Swift file there carries the lines:
+The muscle figure on Body (muscle freshness) is a set of images in `Packages/SomaUI/Sources/SomaUI/Resources/MuscleFigure/`: the body front and back as light and shade, and one mask per muscle group and side. They are rendered from:
 
-```
-//  Copyright © 2026 Melih Colpan. All rights reserved.
-//  Licensed under the MIT License.
-```
+- Z-Anatomy, the libre 3D atlas of anatomy (https://github.com/Z-Anatomy/Models-of-human-anatomy), by Gauthier Kervyn and the Z-Anatomy contributors, licensed under CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/);
+- whose muscle meshes come from BodyParts3D, The Database Center for Life Science (https://dbarchive.biosciencedbc.jp/en/bodyparts3d/), licensed under CC BY-SA 2.1 Japan (https://creativecommons.org/licenses/by-sa/2.1/jp/).
 
-The full license is `LICENSE-MuscleMap.txt` in the same folder, and the app shows it in Settings, About, Open source. Soma's changes: the types are renamed with a `MuscleArt` prefix and kept internal; the path data is unchanged.
+Credit line, as the app shows it in Settings, About, Open source:
+
+"Muscle illustrations rendered from Z-Anatomy, the libre 3D atlas of anatomy (CC BY-SA 4.0), based on BodyParts3D, The Database Center for Life Science (CC BY-SA 2.1 Japan). The illustrations are shared under CC BY-SA 4.0."
+
+Share alike applies to the images: they are adaptations, so the files in that folder are shared under CC BY-SA 4.0, not under the AGPL, and anyone may reuse them on those terms. `NOTICE.txt` in the same folder repeats this. Soma's changes: the muscles chosen and lit for a front and a back view, rendered to grey shading with one mask per muscle group. The atlas also bundles an inner ear model (CC BY-NC-SA 4.0) and a kidney model (CC BY-NC 4.0); neither is used. The render script lives in the private Soma_iOS repository (`scripts/muscle-render/`) and is not part of this export.
 
 ## Unsplash photographs
 
-Eighteen photographs in `App/Prism/Assets.xcassets` come from Unsplash and are used under the Unsplash License (https://unsplash.com/license). The license asks for no credit. Prism gives one anyway, in the article reader and in Settings, About.
+Eighteen photographs in `App/Prism/Assets.xcassets` come from Unsplash and are used under the Unsplash License (https://unsplash.com/license). The license asks for no credit. Prism gives one anyway: each of the twelve article covers is credited under the cover, in its article's reader, and the six landscapes in Settings, About. Soma cropped each one to its slot and gave the set one gentle grade (muted colour, soft contrast, lifted blacks, a warm balance); nothing else was changed.
 
 Article covers, `Assets.xcassets/Articles` (credits in `App/Prism/Core/Articles/BundledArticles.swift`):
 
 | Article | Photographer | Unsplash photo |
 |---|---|---|
-| sleep-regularity | Suhas Hanjar | https://unsplash.com/photos/PgROW5b4Sw0 |
-| deep-sleep | Quentin Schulz | https://unsplash.com/photos/7_jpPTmV65E |
-| daylight-and-your-body-clock | Hoover Tung | https://unsplash.com/photos/DjlNzHuv_Ck |
-| hrv-basics | Ryan Stone | https://unsplash.com/photos/jV2cNlH4e6A |
-| alcohol-and-sleep | Denis Sousa | https://unsplash.com/photos/PzZnixZv12U |
-| resting-heart-rate-trends | Giana Bleu | https://unsplash.com/photos/fnQ_Zk9TQQg |
-| zone-2-training | Viktor Bystrov | https://unsplash.com/photos/Gi0OMNguFaw |
-| vo2-max-and-longevity | Alban Rozes | https://unsplash.com/photos/DhGC1dVw0Tg |
-| strength-and-lean-mass | Alora Griffiths | https://unsplash.com/photos/hvFrA-iKQd0 |
-| caffeine-timing | Dani | https://unsplash.com/photos/ZLqxSzvVr7I |
-| protein-and-muscle | Shelley Pauls | https://unsplash.com/photos/t4X660oKiYs |
-| breathing-and-stress | Ant Rozetsky | https://unsplash.com/photos/q-DJ9XhKkhA |
+| sleep-regularity | Efe Kekikciler | https://unsplash.com/photos/APy5TV9HrVo |
+| deep-sleep | Christopher Farrugia | https://unsplash.com/photos/FqOMlLb5o7Y |
+| daylight-and-your-body-clock | Lawless Capture | https://unsplash.com/photos/_-_OBX0mOJI |
+| hrv-basics | Kateryna Hliznitsova | https://unsplash.com/photos/biHkVTrULUQ |
+| alcohol-and-sleep | Alexey Demidov | https://unsplash.com/photos/HBOL4tVLmCU |
+| resting-heart-rate-trends | Alexander Grey | https://unsplash.com/photos/8wcV6KTFdG8 |
+| zone-2-training | Tiberiu Popa | https://unsplash.com/photos/9qrMsQDaUXQ |
+| vo2-max-and-longevity | Gabriel Francesco | https://unsplash.com/photos/3hD1VIDhIlw |
+| strength-and-lean-mass | Rafik Wahba | https://unsplash.com/photos/IFSFaEGoBU8 |
+| caffeine-timing | ibmoon Kim | https://unsplash.com/photos/8uJjd2XjoFA |
+| protein-and-muscle | Siora Photography | https://unsplash.com/photos/DCOiZhT-WkI |
+| breathing-and-stress | Tom Garritty | https://unsplash.com/photos/xJN1Pi7Cy6U |
 
 Landscapes, `Assets.xcassets/Landscape` (credits in `App/Prism/Features/Settings/Pages/AboutPage.swift`):
 
 | Aspect | Photograph | Photographer | Unsplash photo |
 |---|---|---|---|
-| Sleep | Half Dome under moon in Yosemite | Casey Horner | https://unsplash.com/photos/mPnxwQBtUZE |
-| Mind | Lake reflection | Thomas Grams | https://unsplash.com/photos/1Q578d01zas |
-| Body | Sand dunes | raouf bedrani | https://unsplash.com/photos/oVWm9rQpbq0 |
-| Heart | Calm water at golden hour | Linus Nylund | https://unsplash.com/photos/JP23z_-dA74 |
-| Gut | Valley from a high point | Nils Schirmer | https://unsplash.com/photos/qWmUGrV8B54 |
-| Activity | Mountain at sunrise | Mario von Rotz | https://unsplash.com/photos/HHYpIR68Eds |
+| Sleep | Moss in a pool of light, dark forest | Matthieu Lemarchal | https://unsplash.com/photos/rCgw95aGmVs |
+| Mind | Light rays in a mossy redwood forest | Landon Parenteau | https://unsplash.com/photos/D0pMST46enU |
+| Body | Warm moss on the forest floor | Erik Mclean | https://unsplash.com/photos/Qk28DEeEKc8 |
+| Heart | Sunrise through the trees | Etienne Delorieux | https://unsplash.com/photos/Nmd9UJLoCE4 |
+| Gut | Fronds against the dark | Mohamed Elwaid | https://unsplash.com/photos/vcrRGVsivK0 |
+| Activity | A ray of sunlight on a mossy path | Sini Tiainen | https://unsplash.com/photos/T2EvkDxqvMY |
 
 ## Apple symbols and fonts
 

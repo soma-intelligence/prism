@@ -701,7 +701,7 @@
 				<key>INFOPLIST_FILE</key>
 				<string>Prism-Info.plist</string>
 				<key>INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription</key>
-				<string>Soma reads when you are busy and what each event is called, to place walks and breathing in your real gaps and to set meetings against your stress. It never reads an event's notes or who was invited.</string>
+				<string>Soma reads when you are busy and what each event is called, to place walks and breathing in your real gaps and to learn which parts of your week line up with stress. It only reads, on this iPhone, and never reads an event's notes or who was invited.</string>
 				<key>INFOPLIST_KEY_NSCameraUsageDescription</key>
 				<string>Soma uses the camera to photograph a lab report, or you standing for a body measurement, and only when you open it.</string>
 				<key>INFOPLIST_KEY_NSHealthShareUsageDescription</key>
@@ -815,7 +815,7 @@
 				<key>INFOPLIST_FILE</key>
 				<string>Prism-Info.plist</string>
 				<key>INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription</key>
-				<string>Soma reads when you are busy and what each event is called, to place walks and breathing in your real gaps and to set meetings against your stress. It never reads an event's notes or who was invited.</string>
+				<string>Soma reads when you are busy and what each event is called, to place walks and breathing in your real gaps and to learn which parts of your week line up with stress. It only reads, on this iPhone, and never reads an event's notes or who was invited.</string>
 				<key>INFOPLIST_KEY_NSCameraUsageDescription</key>
 				<string>Soma uses the camera to photograph a lab report, or you standing for a body measurement, and only when you open it.</string>
 				<key>INFOPLIST_KEY_NSHealthShareUsageDescription</key>

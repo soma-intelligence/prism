@@ -131,6 +131,16 @@ final class JournalStore {
         return base.appending(path: "journal.json")
     }
 
+    /// Back to the starter tags with no day kept, file and all, for "Erase
+    /// data on this iPhone".
+    func erase() {
+        tags = Self.starterTags
+        days = [:]
+        questions = JournalQuestions()
+        // The questions wrote the file again on their way out.
+        if let url { try? FileManager.default.removeItem(at: url) }
+    }
+
     // MARK: Reading
 
     var offeredTags: [JournalTag] { tags.filter(\.isOffered) }

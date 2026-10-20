@@ -159,7 +159,7 @@ struct HomeEditTodaySheet: View {
                     .foregroundStyle(theme.colors.inkSecondary.color)
             }
         }
-        .tint(theme.colors.accent.color)
+        .toggleStyle(.soma)
         .listRowBackground(theme.colors.surface.color)
     }
 }
