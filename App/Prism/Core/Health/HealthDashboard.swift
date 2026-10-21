@@ -373,18 +373,31 @@ final class HealthDashboard {
             return
         }
 
-        let now = Date()
+        let now = NextMoveClock.now(calendar: calendar)
         // The scores are read alongside the page's own inputs and fed into it:
         // the row under the orb and the energy card are scores.
         async let scoresRead: Void = loadScores(force: force)
         async let motionRead: Void = motion.refresh()
+        // The night's breathing and wrist temperature, read without asking,
+        // so the orb and the next move page weigh the same signals.
+        async let respiratory = source.home(HomeMetric.respiratoryRate, days: 31, now: now, calendar: calendar)
+        async let wrist = source.home(HomeMetric.wristTemperature, days: 31, now: now, calendar: calendar)
         var inputs = await PulseInputs.read(from: source, now: now, calendar: calendar)
         await scoresRead
         await motionRead
         // Health lags the phone through the day: the higher count wins.
         inputs.stepsToday = MotionMerge.preferred(health: inputs.stepsToday, phone: motion.today?.steps)
-        today = PulseToday.make(from: inputs, scores: scores, calendar: calendar)
-        todayReadAt = now
+        let context = NextMoveContext.make(
+            inputs: inputs, scores: scores, log: .shared,
+            respiratory: await respiratory, wristTemperature: await wrist, calendar: calendar
+        )
+        let history = NextMoveHistoryStore.shared.history(on: now, calendar: calendar)
+        let page = PulseToday.make(from: inputs, scores: scores, context: context, history: history, calendar: calendar)
+        if let cue = page.cue, !cue.moveID.hasPrefix("steady.") {
+            NextMoveHistoryStore.shared.noteShown(cue.moveID, at: now, calendar: calendar)
+        }
+        today = page
+        todayReadAt = Date()
     }
 
     /// Reads ninety days of the store and works out Soma's scores.

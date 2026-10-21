@@ -51,19 +51,10 @@ struct PulseWording {
 
     // MARK: - The day's parts
 
-    enum Part { case morning, afternoon, evening }
-
-    func part(of date: Date) -> Part {
-        switch calendar.component(.hour, from: date) {
-        case ..<12: .morning
-        case ..<17: .afternoon
-        default: .evening
-        }
-    }
-
-    /// The title over the moves: they are for what is left of the day.
-    func movesTitle(at date: Date) -> String {
-        part(of: date) == .evening ? "Tonight" : "For today"
+    /// The title over the moves: they are for what is left of the person's
+    /// own day.
+    func movesTitle(_ part: NextMoveDayPart) -> String {
+        part == .evening || part == .night ? "Tonight" : "For today"
     }
 
     // MARK: - The orb

@@ -21,6 +21,8 @@ struct HomeDay: Sendable {
     var workouts: [PulseWorkout]
     var context: NextMoveContext
     var moves: [NextMoveCandidate]
+    /// What the orb says now: the first move, or the calm default.
+    var cue: NextMoveCandidate?
     /// Half hours of the day on the stress strip.
     var slots: [MindSlot]
     /// Today's energy from midnight to now.
@@ -30,14 +32,14 @@ struct HomeDay: Sendable {
 
     static let empty = HomeDay(
         inputs: PulseInputs(now: Date()), scores: nil, lastNight: nil, nights: [], peaks: [], workouts: [],
-        context: NextMoveContext(now: Date()), moves: [], slots: [], curve: []
+        context: NextMoveContext(now: Date()), moves: [], cue: nil, slots: [], curve: []
     )
 
     /// Reads the day. The breathing and wrist temperature of the night are
     /// asked for here, when a page that shows them opens, not at launch.
     @MainActor
     static func load(health: HealthDashboard, log: HomeLog, track: TrackLogStore = .shared, calendar: Calendar = .current) async -> HomeDay {
-        let now = Date()
+        let now = NextMoveClock.now(calendar: calendar)
         guard let source = await health.prepare([HomeMetric.respiratoryRate, HomeMetric.wristTemperature]) else {
             return make(inputs: PulseInputs(now: now), scores: nil, log: log, track: track, calendar: calendar)
         }
@@ -92,9 +94,13 @@ struct HomeDay: Sendable {
             guard fraction >= 0, fraction <= 1 else { return nil }
             return MindEnergyPoint(dayFraction: fraction, level: point.level)
         }
+        let history = NextMoveHistoryStore.shared.history(on: now, calendar: calendar)
+        let arbiter = NextMoveArbiter()
+        let moves = arbiter.rank(context, history: history)
         return HomeDay(
             inputs: inputs, scores: scores, lastNight: lastNight, nights: nights, peaks: peaks,
-            workouts: workouts, context: context, moves: NextMoveArbiter().rank(context),
+            workouts: workouts, context: context, moves: moves,
+            cue: inputs.isEmpty ? nil : (moves.first ?? NextMoveSteady.cue(context)),
             slots: slots, curve: curve
         )
     }

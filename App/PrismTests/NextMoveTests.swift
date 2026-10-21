@@ -26,11 +26,14 @@ struct NextMoveTests {
         NextMoveContext(now: at(hour, minute), calendar: calendar)
     }
 
-    @Test("An empty context proposes nothing but the evening check-in")
+    @Test("An empty context proposes nothing but the evening check-in, once the log was read")
     func empty() {
         let arbiter = NextMoveArbiter()
         #expect(arbiter.winner(context(15)) == nil)
-        #expect(arbiter.winner(context(20))?.id == "eveningCheckIn.answer")
+        var evening = context(20)
+        #expect(arbiter.winner(evening) == nil)
+        evening.checkedInToday = false
+        #expect(arbiter.winner(evening)?.id == "eveningCheckIn.answer")
     }
 
     @Test("Two stress peaks ask for breathing, inside its hours only")
@@ -97,19 +100,38 @@ struct NextMoveTests {
         #expect(walk?.door == .walk(minutes: 20))
     }
 
-    @Test("Sleep debt speaks only near bedtime")
+    @Test("A short night is a plan for the day in the morning, and a bedtime only in the evening")
     func sleepDebt() {
         var ctx = context(10)
         ctx.sleepSeconds = 6 * 3600
         ctx.sleepNeedSeconds = 7.5 * 3600
         ctx.habitualBedHour = 23
+        let morning = NextMoveArbiter().rank(ctx).first { $0.domain == .sleep }
+        #expect(morning?.id == "sleepDebt.easyDay")
+        #expect(morning?.title == "Easy day after a short night")
+        #expect(morning?.message.contains("keep coffee before 15:00") == true)
+        #expect(morning?.message.lowercased().contains("bed") == false)
+        #expect(morning?.why == "Slept 6 h, 1 h 30 under your usual")
+
+        ctx.now = at(16)
         #expect(NextMoveArbiter().rank(ctx).contains { $0.domain == .sleep } == false)
 
         ctx.now = at(21)
         let sleep = NextMoveArbiter().rank(ctx).first { $0.domain == .sleep }
         #expect(sleep?.id == "sleepDebt.extendTonight")
         #expect(sleep?.tier == .urgent)
-        #expect(sleep?.title == "Bed 90 minutes earlier")
+        #expect(sleep?.title == "In bed by 22:15")
+        #expect(sleep?.orbWord == "Bed early")
+    }
+
+    @Test("Bedtime unknown: an early night, never a made up clock time")
+    func sleepDebtWithoutBedtime() {
+        var ctx = context(21)
+        ctx.sleepSeconds = 6 * 3600
+        ctx.sleepNeedSeconds = 7.5 * 3600
+        let sleep = NextMoveArbiter().rank(ctx).first { $0.domain == .sleep }
+        #expect(sleep?.title == "An early night tonight")
+        #expect(NextMoveArbiter().rank(ctx).contains { $0.id == "caffeine.lastCall" } == false)
     }
 
     @Test("Late at night the lights-out move reads the usual bedtime on the clock face")
@@ -153,18 +175,35 @@ struct NextMoveTests {
         #expect(NextMoveArbiter().winner(ctx) == nil)
     }
 
-    @Test("Windows wrap past midnight")
-    func windows() {
-        let night = NextMoveWindow(startHour: 23, endHour: 5)
-        #expect(night.contains(hour: 23))
-        #expect(night.contains(hour: 2))
-        #expect(!night.contains(hour: 5))
-        #expect(!night.contains(hour: 12))
-        #expect(NextMoveWindow(startHour: 19, endHour: 0).contains(hour: 23))
+    @Test("The day's parts follow the person's own wake and bed, not the clock")
+    func dayParts() {
+        let usual = NextMoveDay(usualWakeHour: 7, usualBedHour: 23)
+        #expect(usual.part(at: at(8), calendar: calendar) == .morning)
+        #expect(usual.part(at: at(12), calendar: calendar) == .midday)
+        #expect(usual.part(at: at(16), calendar: calendar) == .afternoon)
+        #expect(usual.part(at: at(20), calendar: calendar) == .evening)
+        #expect(usual.part(at: at(23, 30), calendar: calendar) == .night)
+        #expect(usual.part(at: at(2), calendar: calendar) == .night)
+        // Up a little before the usual wake: already the morning.
+        #expect(usual.part(at: at(6, 30), calendar: calendar) == .morning)
+
+        var owl = NextMoveDay(usualWakeHour: 9.5, usualBedHour: 1.5)
+        #expect(owl.part(at: at(8), calendar: calendar) == .night)
+        #expect(owl.part(at: at(12, 30), calendar: calendar) == .morning)
+        #expect(owl.part(at: at(23, 30), calendar: calendar) == .evening)
+        #expect(owl.part(at: at(2), calendar: calendar) == .night)
+        // Woken early today: the day starts then.
+        owl.wokeToday = at(7, 50)
+        #expect(owl.part(at: at(8), calendar: calendar) == .morning)
     }
 
-    @Test("Impact is the product of three factors")
+    @Test("Impact is the product of its factors, confidence included")
     func impact() {
+        #expect(NextMoveImpact(severity: 100, leverage: 100, timeliness: 100, confidence: 70).score == 70)
+        #expect(NextMoveImpact.confidence(samples: 5, minimum: 5, full: 21) == 70)
+        #expect(NextMoveImpact.confidence(samples: 30, minimum: 5, full: 21) == 100)
+        #expect(NextMoveImpact.confidence(samples: 30, minimum: 5, full: 21, isFresh: false) == 80)
+        #expect(NextMoveImpact.confidence(samples: 3, minimum: 5, full: 21) == 0)
         #expect(NextMoveImpact(severity: 100, leverage: 100, timeliness: 100).score == 100)
         #expect(NextMoveImpact(severity: 50, leverage: 80, timeliness: 50).score == 20)
         #expect(NextMoveImpact(severity: 0, leverage: 80, timeliness: 50).score == 0)

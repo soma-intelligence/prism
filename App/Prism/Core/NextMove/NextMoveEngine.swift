@@ -4,7 +4,9 @@
 //
 //  The Next Best Action engine. Plain values and pure functions: a rule reads a context built from
 //  what Health and the person's own logs hold, and proposes one move with the
-//  number that asked for it. The arbiter gates, collapses by domain and ranks.
+//  number that asked for it, for the parts of the person's own day it fits.
+//  The arbiter gates, settles contradictions, rests what was already said,
+//  collapses by domain and ranks; with nothing worth saying it says so.
 //
 
 import Foundation
@@ -36,6 +38,7 @@ enum NextMoveSignal: Sendable, CaseIterable {
     case recoveryScore, recoveryObjective
     case restingHeartRate, restingHeartRateBaseline
     case stressScore, stressPeaks
+    case heartRateVariability
     case exercise, exerciseUsual
     case water, waterTarget
     case caffeine
@@ -46,33 +49,45 @@ enum NextMoveSignal: Sendable, CaseIterable {
     case eveningCheckIn
 }
 
-/// The hours a move is worth reading. Outside them it leaves the race.
-///
-/// An end before the start wraps past midnight: 23 to 5 is the night.
-struct NextMoveWindow: Equatable, Sendable {
-    var startHour: Int
-    var endHour: Int
-
-    func contains(hour: Int) -> Bool {
-        if startHour == endHour { return true }
-        if startHour < endHour { return hour >= startHour && hour < endHour }
-        return hour >= startHour || hour < endHour
-    }
+/// Which way a move pushes the day. Effort and ease never reach the card
+/// together: an easy day wins.
+enum NextMoveStance: Sendable {
+    case effort, ease, neutral
 }
 
-/// Severity, leverage and timeliness, each 0 to 100, and the rank they make.
+/// Severity, leverage, timeliness and confidence, each 0 to 100, and the
+/// rank they make.
+///
+/// Severity is how far a signal sits from this person's own usual, and
+/// confidence how much that usual and the reading can be trusted: a fresh
+/// reading against a month of days scores higher than yesterday's against a
+/// handful.
 struct NextMoveImpact: Equatable, Sendable {
     let severity: Int
     let leverage: Int
     let timeliness: Int
+    let confidence: Int
     let score: Int
 
-    init(severity: Int, leverage: Int, timeliness: Int) {
+    init(severity: Int, leverage: Int, timeliness: Int, confidence: Int = 100) {
         self.severity = Self.clamp(severity)
         self.leverage = Self.clamp(leverage)
         self.timeliness = Self.clamp(timeliness)
-        let product = self.severity * self.leverage * self.timeliness
-        score = product > 0 ? max(1, product / 10_000) : 0
+        self.confidence = Self.clamp(confidence)
+        let product = self.severity * self.leverage * self.timeliness * self.confidence
+        score = product > 0 ? max(1, product / 1_000_000) : 0
+    }
+
+    /// Confidence in a usual read from `samples` days or nights: 70 at the
+    /// fewest the rule accepts, all of it from `full` on, and a fifth less
+    /// when the reading is not from today.
+    /// An unknown count (a context built by hand) is taken as enough.
+    static func confidence(samples: Int?, minimum: Int, full: Int, isFresh: Bool = true) -> Int {
+        guard let samples else { return isFresh ? 100 : 80 }
+        guard samples >= minimum else { return 0 }
+        let span = max(1, full - minimum)
+        let base = 70 + 30 * min(samples - minimum, span) / span
+        return isFresh ? base : base * 4 / 5
     }
 
     /// How far a value has gone, as a share of the distance that counts as
@@ -95,6 +110,9 @@ struct NextMoveImpact: Equatable, Sendable {
 enum NextMoveLeverage {
     static let sleepDebt = 100
     static let lateNight = 95
+    static let bedtime = 60
+    static let readyToTrain = 66
+    static let lowVariability = 78
     static let illnessWatch = 96
     static let recoveryDeficit = 90
     static let restingHeartRate = 86
@@ -113,7 +131,9 @@ enum NextMoveAsk {
     static func protein(grams shortfall: Int) -> Int { clamp(shortfall, step: 5, floor: 5, ceiling: 60) }
     static func energy(kcal shortfall: Int) -> Int { clamp(shortfall, step: 50, floor: 50, ceiling: 800) }
     static func movement(minutes shortfall: Int) -> Int { clamp(shortfall, step: 5, floor: 10, ceiling: 60) }
-    static func sleepEarlier(minutes debt: Int) -> Int { clamp(debt, step: 5, floor: 15, ceiling: 90) }
+    /// How much earlier to sleep after a short night: half the debt, in
+    /// quarter hours, between a quarter hour and an hour.
+    static func sleepEarlier(minutes debt: Int) -> Int { clamp(debt / 2, step: 15, floor: 15, ceiling: 60) }
 
     private static func clamp(_ raw: Int, step: Int, floor: Int, ceiling: Int) -> Int {
         min(ceiling, max(floor, (max(0, raw) / step) * step))
@@ -145,7 +165,7 @@ struct NextMoveCandidate: Equatable, Sendable {
     var domain: NextMoveDomain
     var tier: NextMoveTier
     var impact: NextMoveImpact
-    /// What the orb and the card say: short, an instruction.
+    /// What the card says: short, an instruction.
     var title: String
     /// Why, in one or two sentences, the first one carrying the number.
     var message: String
@@ -154,7 +174,13 @@ struct NextMoveCandidate: Equatable, Sendable {
     var aspect: SomaAspect
     var door: NextMoveDoor
     var actionTitle: String
-    var window: NextMoveWindow?
+    /// The two words the orb wears.
+    var orbWord: String
+    /// One plain line from the evidence: what asked for the move.
+    var why: String
+    var stance: NextMoveStance = .neutral
+    /// The parts of the person's day the move is worth reading in.
+    var parts: Set<NextMoveDayPart> = NextMoveDayPart.awake
     var expiresAt: Date?
 }
 
@@ -168,8 +194,14 @@ protocol NextMoveRule: Sendable {
 }
 
 /// Runs the rules and decides which moves may reach the card, most pressing
-/// first. Evidence, actionability, timing and
-/// contradiction gates, then one candidate per domain, then tier, impact and id.
+/// first.
+///
+/// Gates, in order: the evidence a rule needs, a receipt and a real impact,
+/// the part of the person's day, contradictions (no effort on a day that
+/// asks for ease), what this person already acted on, and a rest for advice
+/// that has led for hours. Then one candidate per domain, ranked by tier,
+/// impact and id. A weak candidate (impact under ``minimumScore``) never
+/// leads: the calm default is truer than a cue that barely applies.
 struct NextMoveArbiter {
     let rules: [any NextMoveRule]
 
@@ -177,18 +209,23 @@ struct NextMoveArbiter {
         self.rules = rules
     }
 
-    /// Moves that advise more effort. Never offered while recovery is
-    /// well under the person's own usual.
-    static let effortIDs: Set<String> = ["movementGap.walk"]
+    /// The lowest impact a move may lead with, unless it is urgent.
+    static let minimumScore = 10
 
-    func rank(_ ctx: NextMoveContext) -> [NextMoveCandidate] {
-        let admitted = rules
+    func rank(_ ctx: NextMoveContext, history: NextMoveHistory = .empty) -> [NextMoveCandidate] {
+        let part = ctx.part
+        let evaluated = rules
             .filter { rule in rule.requiredSignals.allSatisfy(ctx.has) }
             .compactMap { rule in rule.evaluate(ctx) }
             .filter { !$0.evidence.isEmpty && $0.impact.score > 0 }
             .filter { candidate in candidate.expiresAt.map { $0 > ctx.now } ?? true }
-            .filter { candidate in candidate.window.map { $0.contains(hour: ctx.hour) } ?? true }
-            .filter { !contradicts($0, ctx) }
+            .filter { $0.parts.contains(part) }
+            .filter { $0.tier == .urgent || $0.impact.score >= Self.minimumScore }
+            .filter { !history.acted.contains($0.id) }
+            .filter { $0.tier == .urgent || !history.isResting($0.id, at: ctx.now) }
+
+        let easing = ctx.asksForEase || evaluated.contains { $0.stance == .ease }
+        let admitted = evaluated.filter { !(easing && $0.stance == .effort) }
 
         var best: [NextMoveDomain: NextMoveCandidate] = [:]
         for candidate in admitted {
@@ -202,14 +239,14 @@ struct NextMoveArbiter {
         }
     }
 
-    func winner(_ ctx: NextMoveContext) -> NextMoveCandidate? {
-        rank(ctx).first
+    func winner(_ ctx: NextMoveContext, history: NextMoveHistory = .empty) -> NextMoveCandidate? {
+        rank(ctx, history: history).first
     }
 
-    private func contradicts(_ candidate: NextMoveCandidate, _ ctx: NextMoveContext) -> Bool {
-        guard Self.effortIDs.contains(candidate.id),
-              let recovery = ctx.recoveryScore, let objective = ctx.recoveryObjective else { return false }
-        return objective - recovery >= RecoveryDeficitRule.minimumGap
+    /// The one cue for now: the winner, or the calm default when nothing is
+    /// worth saying.
+    func cue(_ ctx: NextMoveContext, history: NextMoveHistory = .empty) -> NextMoveCandidate {
+        winner(ctx, history: history) ?? NextMoveSteady.cue(ctx)
     }
 
     static func isHigher(_ lhs: NextMoveCandidate, _ rhs: NextMoveCandidate) -> Bool {

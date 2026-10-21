@@ -232,7 +232,7 @@ struct OnboardingFlow: View {
     }
 
     private var todayAction: PulseNowAction {
-        PulseNowAction.make(moves: [], at: Date())
+        PulseNowAction.make(today: nil, at: Date())
     }
 
     @ViewBuilder

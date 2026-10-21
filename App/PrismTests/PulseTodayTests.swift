@@ -112,7 +112,7 @@ struct PulseTodayTests {
 
     // MARK: - Sleep
 
-    @Test("A night well under the usual carries the day, and says by how much")
+    @Test("A night well under the usual carries the morning, and says by how much")
     func shortNightCarriesSleep() {
         var samples: [HealthReading] = []
         for offset in -14 ... -1 { samples += night(hours: 7.5, day: offset) }
@@ -124,14 +124,30 @@ struct PulseTodayTests {
         #expect(today.sleep.value == nil)
         #expect(today.sleepCard.value == "5:30")
         #expect(today.carrying == .sleep)
-        #expect(today.headline == "A short night to make up.")
-        #expect(today.reason.contains("You slept 5:30, 2 h under your usual."))
+        // At ten in the morning a short night is a plan for the day, never a
+        // bedtime.
+        #expect(today.headline == "Easy day after a short night")
+        #expect(today.reason.contains("You slept 5 h 30, 2 h under your usual."))
         #expect(today.moves.first?.aspect == .sleep)
-        // The helper gets into bed ten minutes before sleep: 22:50, rounded
-        // down to the quarter hour.
-        #expect(today.moves.first?.title == "In bed by 22:45")
+        #expect(today.moves.first?.title == "Easy day after a short night")
+        #expect(today.cue?.orb == "Go easy")
+        #expect(today.cue?.why == "Slept 5 h 30, 2 h under your usual")
         #expect(today.events.first?.title == "Woke up")
         #expect(today.events.first?.detail == "Slept 5:30, 60 min of deep sleep.")
+    }
+
+    @Test("At eight in the morning nothing says go to bed, and the orb does not wind down")
+    func noBedtimeInTheMorning() {
+        for lastNight in [5.5, 7.5] {
+            var samples: [HealthReading] = []
+            for offset in -14 ... -1 { samples += night(hours: 7.5, day: offset) }
+            samples += night(hours: lastNight, day: 0)
+            let today = page(PulseInputs(now: at(8), sleep: samples))
+            #expect(!today.moves.contains { $0.title.hasPrefix("In bed") }, "\(today.moves.map(\.title))")
+            let orb = PulseNowAction.make(today: today, at: at(8), calendar: calendar)
+            #expect(String(localized: orb.label) != "Wind down")
+            #expect(String(localized: orb.label) == (lastNight < 7 ? "Go easy" : "Steady day"))
+        }
     }
 
     @Test("Bedtime comes from the month's longest nights")
@@ -147,6 +163,8 @@ struct PulseTodayTests {
         let today = page(PulseInputs(now: at(21), sleep: samples))
         let move = today.moves.first { $0.aspect == .sleep }
 
+        // The helper gets into bed ten minutes before sleep: 22:20, rounded
+        // down to the quarter hour.
         #expect(move?.title == "In bed by 22:15")
         #expect(move?.reason == "Your longest nights this month started before 22:30.")
     }
@@ -189,7 +207,8 @@ struct PulseTodayTests {
         #expect(peaks.first?.time == "14:30")
         #expect(peaks.first?.detail == "Heart at 104 while still, 49 above resting.")
         #expect(today.carrying == .mind)
-        #expect(today.headline == "Slow the afternoon down.")
+        #expect(today.headline == "Breathe for 10 minutes")
+        #expect(today.cue?.why == "Heart 49 above resting at 14:30, while still")
     }
 
     @Test("Without any steps today, stillness cannot be told, so nothing is called a peak")
@@ -237,7 +256,7 @@ struct PulseTodayTests {
         // The Mind value is a score now, so HRV shows in the move instead.
         #expect(today.mind.value == nil)
         #expect(today.moves.first?.aspect == .mind)
-        #expect(today.moves.first?.reason == "Slow breathing can bring your HRV back toward your usual 48 ms.")
+        #expect(today.moves.first?.reason == "HRV is 38 ms, under your usual 48. Slow breathing and an easy pace help it come back.")
     }
 
     // MARK: - Workouts

@@ -22,7 +22,9 @@ struct FixtureHealthSource: HealthSampleSource {
 
     private let readings: [String: [HealthReading]]
 
-    init(now: Date = .now, calendar: Calendar = .current) {
+    /// The year ends at the Next move clock, so `-nextmove.now HH:mm` shows a
+    /// day read up to that time.
+    init(now: Date = NextMoveClock.now(), calendar: Calendar = .current) {
         readings = Self.build(now: now, calendar: calendar)
     }
 

@@ -96,6 +96,8 @@ private struct PulseLead: View {
     @Environment(AppRouter.self) private var router
     /// The quick add, lifted by a long press on the orb.
     @State private var quickAdd: HomeSheetRoute?
+    /// The moves ticked off today: the orb moves past them.
+    @AppStorage(PulseDoneMoves.key) private var doneMoves = ""
 
     var body: some View {
         let metrics = theme.metrics
@@ -104,7 +106,9 @@ private struct PulseLead: View {
             // One orb, one action: the move that matters now, never a carousel
             // to swipe through (owner, 2026-10-03). Tapping it opens that
             // move's page.
-            let now = PulseNowAction.make(moves: today?.moves ?? [], at: Date())
+            let now = PulseNowAction.make(
+                today: today, done: PulseDoneMoves(stored: doneMoves).aspects(on: Date()), at: NextMoveClock.now()
+            )
             SomaOrb(aspect: now.aspect, label: now.label)
                 .frame(maxWidth: .infinity)
                 .padding(.top, metrics.heroTopPadding)
@@ -280,7 +284,7 @@ private struct PulseMovesCard: View {
                                 reason: nil,
                                 isDone: done.contains(move.aspect)
                             ) {
-                                toggle(move.aspect)
+                                toggle(move)
                             }
                         }
                     } else {
@@ -296,10 +300,16 @@ private struct PulseMovesCard: View {
         .accessibilityHint(Text("Opens the next move and why."))
     }
 
-    private func toggle(_ aspect: SomaAspect) {
+    private func toggle(_ move: PulseToday.Move) {
         var moves = PulseDoneMoves(stored: doneMoves)
-        moves.toggle(aspect, on: Date())
+        moves.toggle(move.aspect, on: Date())
         doneMoves = moves.stored
+        // The engine hears it too, so the next read moves past it.
+        if !move.moveID.isEmpty {
+            NextMoveHistoryStore.shared.noteActed(
+                move.moveID, moves.aspects(on: Date()).contains(move.aspect), at: NextMoveClock.now()
+            )
+        }
     }
 }
 
@@ -484,19 +494,23 @@ enum TodayRoutes {
     static let nightCard = ScoreRoute.lastNight
 }
 
-/// The orb's one action, set for this moment of the day.
+/// The orb's one action, set for this moment of the person's day.
 ///
-/// The day's first move when the read found one (they arrive already ranked
-/// by what matters most now). Without one, the hour decides: light and
-/// movement in the morning, a walk at midday, a slower afternoon, winding
-/// down in the evening.
+/// The engine's cue when the read found one, or the next move not ticked off
+/// yet, or the calm default for this part of the day. Only before anything
+/// was read does the clock decide: light and movement in the morning, a walk
+/// at midday, a slower afternoon, winding down in the evening.
 struct PulseNowAction: Equatable {
     var aspect: SomaAspect
     var label: LocalizedStringResource
 
-    static func make(moves: [PulseToday.Move], at date: Date, calendar: Calendar = .current) -> PulseNowAction {
-        if let first = moves.first {
-            return PulseNowAction(aspect: first.aspect, label: PulseWording.orbMove(first.aspect))
+    static func make(today: PulseToday?, done: Set<SomaAspect> = [], at date: Date, calendar: Calendar = .current) -> PulseNowAction {
+        if let today, let cue = today.cue {
+            let order = [cue] + today.moves + [today.steady].compactMap { $0 }
+            let isSteady: (PulseToday.Move) -> Bool = { $0.moveID.hasPrefix("steady.") }
+            if let move = order.first(where: { isSteady($0) || !done.contains($0.aspect) }) {
+                return PulseNowAction(move)
+            }
         }
         let aspect: SomaAspect = switch calendar.component(.hour, from: date) {
         case 5..<11: .body
@@ -505,6 +519,16 @@ struct PulseNowAction: Equatable {
         default: .sleep
         }
         return PulseNowAction(aspect: aspect, label: PulseWording.orbMove(aspect))
+    }
+
+    init(aspect: SomaAspect, label: LocalizedStringResource) {
+        self.aspect = aspect
+        self.label = label
+    }
+
+    init(_ move: PulseToday.Move) {
+        aspect = move.aspect
+        label = move.orb.isEmpty ? PulseWording.orbMove(move.aspect) : LocalizedStringResource(stringLiteral: move.orb)
     }
 }
 

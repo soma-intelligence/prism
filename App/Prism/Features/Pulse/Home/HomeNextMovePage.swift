@@ -20,11 +20,11 @@ struct HomeNextMovePage: View {
     private var log: HomeLog { .shared }
 
     var body: some View {
-        let move = day?.moves.first
+        let move = day?.cue
 
         HomePage("Next move") {
             SomaPageHero(
-                eyebrow: "Now · \(HomeFormat.clock(day?.now ?? Date()))",
+                eyebrow: "Now · \(HomeFormat.clock(day?.now ?? NextMoveClock.now()))",
                 title: move?.title ?? (day == nil ? "Reading your day." : "Nothing presses right now."),
                 reason: move?.message ?? (day == nil
                     ? "Asking Apple Health for last night, today and the month before."
@@ -42,8 +42,11 @@ struct HomeNextMovePage: View {
                     .padding(.top, 8)
             }
 
-            if let move {
+            if let move, !(move.evidence.isEmpty && move.why.isEmpty) {
                 HomeRowsCard(caption: "Why this move") {
+                    if !move.why.isEmpty {
+                        HomeWhyLine(text: move.why)
+                    }
                     ForEach(Array(move.evidence.enumerated()), id: \.offset) { _, evidence in
                         HomeValueRow(name: evidence.label, value: evidence.value)
                     }
@@ -74,9 +77,9 @@ struct HomeNextMovePage: View {
                 }
             }
 
-            if (day?.moves.count ?? 0) > 1, let rest = day?.moves.dropFirst() {
+            if let rest = day?.moves.filter({ $0.id != move?.id }), !rest.isEmpty {
                 HomeRowsCard(caption: "Also today") {
-                    ForEach(Array(rest), id: \.id) { candidate in
+                    ForEach(rest, id: \.id) { candidate in
                         HomeValueRow(name: candidate.title, detail: candidate.evidence.first.map { "\($0.label): \($0.value)" }, value: nil)
                     }
                 }
@@ -146,5 +149,20 @@ struct HomeNextMovePage: View {
         case .nutrition, .logMeal: sheet = .foodLog
         case .quickAdd: sheet = .quickAdd
         }
+    }
+}
+
+/// The move's one line of why, read before the numbers behind it.
+private struct HomeWhyLine: View {
+    let text: String
+
+    @Environment(\.somaTheme) private var theme
+
+    var body: some View {
+        Text(text)
+            .somaFont(theme.typography.body)
+            .foregroundStyle(theme.colors.inkPrimary.color)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
