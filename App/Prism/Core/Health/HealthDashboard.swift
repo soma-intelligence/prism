@@ -59,6 +59,11 @@ final class HealthDashboard {
     /// Whether the scores were read in this process.
     var hasReadScores: Bool { scoresReadAt != nil }
 
+    /// Whether a scores read is in flight. A score that is nil while this is
+    /// true is on its way, and is drawn as a placeholder rather than as the
+    /// dash that means the store holds nothing.
+    var isReadingScores: Bool { scoresTask != nil }
+
     /// Whether the latest readings were read in this process.
     var hasReadReadings: Bool { readingsReadAt != nil }
 
@@ -73,7 +78,13 @@ final class HealthDashboard {
     }
 
     private let source: any HealthSampleSource
+    /// The store as it was handed in, before the sanitising wrapper: what a
+    /// check on the kind of store reads (the real one, the empty launch).
+    private let rawSource: any HealthSampleSource
     private let calendar: Calendar
+
+    /// Whether this is the empty store of a UI test or screenshot launch.
+    var readsEmptyStore: Bool { rawSource is EmptyHealthSource }
 
     /// The iPhone's own steps and movement, from Core Motion. Asked for in the
     /// same moment as Health, and merged into the day's counts below.
@@ -94,14 +105,55 @@ final class HealthDashboard {
     /// and arriving after the answer.
     private var inFlight: [Set<String>: Task<Void, Error>] = [:]
 
+    /// Where the last read is kept between launches. Nil for a preview or a
+    /// test, which must neither read nor leave a file.
+    @ObservationIgnored private let snapshots: HealthSnapshotStore?
+    /// When the numbers on screen were read, while they come from the last
+    /// launch rather than this one. Nil once the first read of this launch has
+    /// replaced them; the pages show their update indicator until then.
+    private(set) var cachedAt: Date?
+    /// Whether a read of this launch is running over cached numbers.
+    var isShowingCache: Bool { cachedAt != nil }
+
     init(
         source: any HealthSampleSource = HealthKitSampleSource(),
         calendar: Calendar = .current,
-        motion: PhoneMotion? = nil
+        motion: PhoneMotion? = nil,
+        snapshots: HealthSnapshotStore? = nil
     ) {
-        self.source = source
+        // Every read goes through the one border that drops what no page can
+        // draw (a NaN, an infinity, a sample that ends before it starts).
+        self.source = source is SanitizedHealthSource ? source : SanitizedHealthSource(base: source)
+        self.rawSource = source
         self.calendar = calendar
         self.motion = motion ?? PhoneMotion(calendar: calendar)
+        self.snapshots = snapshots
+        // The last launch's numbers, shown at once and replaced by the first
+        // read. Read synchronously: the file is small, and a page that draws
+        // before it would flash dashes, the very thing it is here to stop.
+        if let snapshot = snapshots?.load(calendar: calendar) {
+            scores = snapshot.scores
+            today = snapshot.today
+            readings = snapshot.readings
+            durations = snapshot.durations
+            cachedAt = snapshot.savedAt
+            if snapshot.scores != nil || snapshot.today != nil { status = .ready }
+        }
+    }
+
+    /// Writes what is on screen for the next launch, off the main actor.
+    private func persist() {
+        guard let snapshots else { return }
+        let snapshot = HealthSnapshot(savedAt: Date(), scores: scores, today: today,
+                                      readings: readings, durations: durations)
+        Task.detached(priority: .utility) { try? snapshots.save(snapshot) }
+    }
+
+    /// Marks the cached numbers replaced, once both halves of the first
+    /// screen (the scores and the Today page) have been read this launch.
+    private func settleCache() {
+        guard cachedAt != nil, scoresReadAt != nil, todayReadAt != nil || today == nil else { return }
+        cachedAt = nil
     }
 
     /// Metrics the dashboard pages actually show.
@@ -138,6 +190,10 @@ final class HealthDashboard {
 
     func setScan(_ new: HealthFullScan?) { scan = new }
 
+    /// Today's scores as the widgets last kept them, before any read: see
+    /// `SomaScores+LastKnown.swift`. Leaves `hasReadScores` false.
+    func setLastKnownScores(_ known: SomaScores) { scores = known }
+
     /// Everything the platform will let the app ask to read.
     ///
     /// `readable`, never `all`: naming a correlation in a read request raises
@@ -168,7 +224,7 @@ final class HealthDashboard {
         // The real store gets every type in one sheet, the first time
         // anything is asked: see `HealthAccess`. A fixture or the empty
         // source still answers for just what was named.
-        let asksEverything = source is HealthKitSampleSource
+        let asksEverything = rawSource is HealthKitSampleSource
         let task = Task { [source, motion] in
             if asksEverything {
                 try await HealthAccess.requestEverything(motion: motion)
@@ -187,6 +243,12 @@ final class HealthDashboard {
         if asksEverything {
             asked.formUnion(HealthMetricCatalog.readable.filter(\.isReadAuthorizable).map(\.identifier))
         }
+    }
+
+    /// True once `identifier` has been asked for, launch sheet or page:
+    /// what the cycle log checks before it writes a sensitive type.
+    func hasAsked(_ identifier: String) -> Bool {
+        asked.contains(identifier)
     }
 
     func recordChunk(_ results: [(String, Bool)]) {
@@ -220,7 +282,10 @@ final class HealthDashboard {
             return
         }
 
-        if status == .idle { status = .loading }
+        switch status {
+        case .idle, .failed: status = .loading
+        case .loading, .ready, .unavailable: break
+        }
         do {
             try await request(Self.displayed)
         } catch {
@@ -233,59 +298,103 @@ final class HealthDashboard {
             return
         }
         await load()
-        status = .ready
+        if status != .ready { status = .ready }
+    }
+
+    /// Asks again after a request that failed, then reads what the pages show.
+    ///
+    /// What a "Try again" calls: the failed request was never answered, so
+    /// it is entitled to ask once more, and the Today page is read fresh.
+    func retry() async {
+        await start()
+        guard status == .ready else { return }
+        await loadToday(force: true)
     }
 
     /// Re-reads everything for today. Safe to call on a pull to refresh.
+    ///
+    /// The reads go out together rather than one after another: each is its
+    /// own Health query, and a dozen of them queued in a row was most of the
+    /// time a page spent on its dashes.
     func load() async {
         let now = Date()
         let dayStart = calendar.startOfDay(for: now)
         // A night's sleep starts the previous evening, so it is read over a
         // window that reaches back past midnight rather than over the day.
         let nightStart = calendar.date(byAdding: .hour, value: -18, to: now) ?? dayStart
+        let identifiers = Self.displayed.map(\.identifier)
 
-        for metric in Self.displayed {
-            switch metric.identifier {
-            case "HKCategoryTypeIdentifierSleepAnalysis":
-                durations[metric.identifier] = try? await source.totalDuration(
-                    metric, from: nightStart, to: now, codes: HealthCategoryValue.asleep
-                )
+        let read = await withTaskGroup(of: LoadedValue.self) { [source] group in
+            for identifier in identifiers {
+                group.addTask {
+                    guard let metric = HealthMetricCatalog.metric(for: identifier) else { return .skipped }
+                    switch identifier {
+                    case "HKCategoryTypeIdentifierSleepAnalysis":
+                        return .duration(identifier, try? await source.totalDuration(
+                            metric, from: nightStart, to: now, codes: HealthCategoryValue.asleep
+                        ))
 
-            case "HKCategoryTypeIdentifierMindfulSession":
-                durations[metric.identifier] = try? await source.totalDuration(
-                    metric, from: dayStart, to: now
-                )
+                    case "HKCategoryTypeIdentifierMindfulSession":
+                        return .duration(identifier, try? await source.totalDuration(
+                            metric, from: dayStart, to: now
+                        ))
 
-            case "HKQuantityTypeIdentifierHeartRate",
-                 "HKWorkoutTypeIdentifier",
-                 "HKCharacteristicTypeIdentifierDateOfBirth":
-                // Read by the Today page in `loadToday()`, as samples over a
-                // window rather than as one value.
-                continue
+                    case "HKQuantityTypeIdentifierHeartRate",
+                         "HKWorkoutTypeIdentifier",
+                         "HKCharacteristicTypeIdentifierDateOfBirth":
+                        // Read by the Today page in `loadToday()`, as samples over a
+                        // window rather than as one value.
+                        return .skipped
 
-            case "HKQuantityTypeIdentifierBodyMass",
-                 "HKQuantityTypeIdentifierVO2Max",
-                 "HKQuantityTypeIdentifierRestingHeartRate",
-                 "HKQuantityTypeIdentifierHeartRateVariabilitySDNN":
-                // These are measured rarely; the last known value is the answer,
-                // not today's average, which is usually missing.
-                readings[metric.identifier] = try? await source.latest(metric)
+                    case "HKQuantityTypeIdentifierBodyMass",
+                         "HKQuantityTypeIdentifierVO2Max",
+                         "HKQuantityTypeIdentifierRestingHeartRate",
+                         "HKQuantityTypeIdentifierHeartRateVariabilitySDNN":
+                        // These are measured rarely; the last known value is the answer,
+                        // not today's average, which is usually missing.
+                        return .reading(identifier, try? await source.latest(metric))
 
-            default:
-                readings[metric.identifier] = try? await source.summary(
-                    metric, from: dayStart, to: now
-                )
+                    default:
+                        return .reading(identifier, try? await source.summary(
+                            metric, from: dayStart, to: now
+                        ))
+                    }
+                }
+            }
+            // Read without a request of its own: on the real store the one sheet
+            // already named it, and `displayed` stays what the pages show.
+            group.addTask {
+                guard let distance = HealthMetricCatalog.metric(for: "HKQuantityTypeIdentifierDistanceWalkingRunning") else {
+                    return .skipped
+                }
+                return .distance(try? await source.summary(distance, from: dayStart, to: now))
+            }
+            var found: [LoadedValue] = []
+            for await value in group { found.append(value) }
+            return found
+        }
+
+        for value in read {
+            switch value {
+            case .reading(let identifier, let reading): readings[identifier] = reading
+            case .duration(let identifier, let seconds): durations[identifier] = seconds
+            case .distance(let reading): healthDistanceToday = reading
+            case .skipped: break
             }
         }
-
-        // Read without a request of its own: on the real store the one sheet
-        // already named it, and `displayed` stays what the pages show.
-        if let distance = HealthMetricCatalog.metric(for: Self.distanceIdentifier) {
-            healthDistanceToday = try? await source.summary(distance, from: dayStart, to: now)
-        }
+        if readings != self.readings { self.readings = readings }
+        if durations != self.durations { self.durations = durations }
         readingsReadAt = now
         displayedReadAt = now
         await motion.refresh()
+    }
+
+    /// One answer from the reads in ``load()``, carried back to the main actor.
+    nonisolated private enum LoadedValue: Sendable {
+        case reading(String, HealthReading?)
+        case duration(String, TimeInterval?)
+        case distance(HealthReading?)
+        case skipped
     }
 
     // MARK: - The phone and Health, merged
@@ -366,6 +475,12 @@ final class HealthDashboard {
         }
         if !force, let readAt = todayReadAt, Date().timeIntervalSince(readAt) < 60 { return }
 
+        // A first read, or a retry after one that failed, says it is reading;
+        // a refresh over a page already drawn keeps what is on screen.
+        switch status {
+        case .idle, .failed: status = .loading
+        case .loading, .ready, .unavailable: break
+        }
         do {
             try await request(Self.displayed)
         } catch {
@@ -375,7 +490,11 @@ final class HealthDashboard {
 
         let now = NextMoveClock.now(calendar: calendar)
         // The scores are read alongside the page's own inputs and fed into it:
-        // the row under the orb and the energy card are scores.
+        // the row under the orb and the energy card are scores. They read
+        // ninety days and the page reads one, so the page is drawn as soon as
+        // its own inputs are in, on the scores already held, and drawn again
+        // when the new scores land. Waiting for both left the first launch on
+        // dashes for as long as the slower read took.
         async let scoresRead: Void = loadScores(force: force)
         async let motionRead: Void = motion.refresh()
         // The night's breathing and wrist temperature, read without asking,
@@ -383,21 +502,16 @@ final class HealthDashboard {
         async let respiratory = source.home(HomeMetric.respiratoryRate, days: 31, now: now, calendar: calendar)
         async let wrist = source.home(HomeMetric.wristTemperature, days: 31, now: now, calendar: calendar)
         var inputs = await PulseInputs.read(from: source, now: now, calendar: calendar)
-        await scoresRead
         await motionRead
         // Health lags the phone through the day: the higher count wins.
         inputs.stepsToday = MotionMerge.preferred(health: inputs.stepsToday, phone: motion.today?.steps)
-        let context = NextMoveContext.make(
-            inputs: inputs, scores: scores, log: .shared,
-            respiratory: await respiratory, wristTemperature: await wrist, calendar: calendar
-        )
-        let history = NextMoveHistoryStore.shared.history(on: now, calendar: calendar)
-        let page = PulseToday.make(from: inputs, scores: scores, context: context, history: history, calendar: calendar)
-        if let cue = page.cue, !cue.moveID.hasPrefix("steady.") {
-            NextMoveHistoryStore.shared.noteShown(cue.moveID, at: now, calendar: calendar)
-        }
-        today = page
-        todayReadAt = Date()
+        let made = PulseToday.make(from: inputs, scores: scores, calendar: calendar)
+        if made != today { today = made }
+        todayReadAt = now
+        if status == .loading { status = .ready }
+
+        await scoresRead
+        today = PulseToday.make(from: inputs, scores: scores, calendar: calendar)
     }
 
     /// Reads ninety days of the store and works out Soma's scores.
@@ -435,8 +549,12 @@ final class HealthDashboard {
             let now = Date()
             let inputs = await SomaScoresReader.read(from: source, now: now, calendar: calendar)
             let computed = await Self.compute(inputs)
-            self.scores = computed
+            // An unchanged answer is not written: the write alone would
+            // redraw every page that shows a score.
+            if computed != self.scores { self.scores = computed }
             self.scoresReadAt = now
+            self.persist()
+            self.settleCache()
         }
         scoresTask = task
         await task.value
@@ -497,8 +615,22 @@ final class HealthDashboard {
             }
         }
 
-        for metric in askable {
-            readings[metric.identifier] = try? await source.latest(metric)
+        // Together, not in a row: a category page opening on twenty metrics
+        // waited for twenty queries back to back.
+        let identifiers = askable.map(\.identifier)
+        let latest = await withTaskGroup(of: (String, HealthReading?).self) { [source] group in
+            for identifier in identifiers {
+                group.addTask {
+                    guard let metric = HealthMetricCatalog.metric(for: identifier) else { return (identifier, nil) }
+                    return (identifier, try? await source.latest(metric))
+                }
+            }
+            var found: [(String, HealthReading?)] = []
+            for await pair in group { found.append(pair) }
+            return found
+        }
+        for (identifier, reading) in latest {
+            readings[identifier] = reading
         }
         readingsReadAt = Date()
     }

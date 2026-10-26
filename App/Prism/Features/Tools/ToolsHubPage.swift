@@ -24,11 +24,15 @@ struct ToolsHubPage: View {
         let digest = ToolDigest(inputs: model.current, scores: health.scores, store: store.record)
         let speaking = ToolKind.allCases.filter { store.isOn($0) && digest.hasNews($0) }
 
+        // Before the first read nothing has been asked, so "quiet" would be a
+        // guess: the hero says it is reading instead, in the same place.
+        let hasRead = model.inputs != nil
+
         ToolPage("Tools") {
             ToolHero(eyebrow: ToolFormat.day(model.current.now, weekday: true),
-                     headline: headline(speaking.count),
-                     lead: speaking.isEmpty ? "Nothing needs you right now." : speaking.prefix(3).map { digest.line($0) }.joined(separator: " "),
-                     rest: speaking.isEmpty ? "Each tool speaks up when it has something new." : "The others keep quiet until they do.")
+                     headline: hasRead ? headline(speaking.count) : "Reading your day.",
+                     lead: !hasRead ? "Each tool is checking Apple Health for what changed." : speaking.isEmpty ? "Nothing needs you right now." : speaking.prefix(3).map { digest.line($0) }.joined(separator: " "),
+                     rest: !hasRead ? nil : speaking.isEmpty ? "Each tool speaks up when it has something new." : "The others keep quiet until they do.")
 
             ForEach(ToolKind.Group.allCases) { group in
                 ToolEyebrow(group.rawValue)
@@ -47,7 +51,7 @@ struct ToolsHubPage: View {
             }
         }
         .task { await model.load(health) }
-        .refreshable { await model.load(health, force: true) }
+        .somaRefreshable { await model.load(health, force: true) }
     }
 
     private var orbSide: CGFloat { theme.metrics.checkDiameter * 1.6 }
@@ -78,7 +82,7 @@ private struct ToolHubRow: View {
             HStack(spacing: theme.metrics.moveRowGap) {
                 PulseMiniOrb(aspect: kind.aspect, diameter: orbSide)
                 VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 6) {
+                    HStack(spacing: theme.metrics.spaceS) {
                         Text(kind.title)
                             .somaFont(type.body)
                             .foregroundStyle(colors.inkPrimary.color)

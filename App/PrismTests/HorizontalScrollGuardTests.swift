@@ -28,7 +28,11 @@ struct HorizontalScrollGuardTests {
     /// Files allowed a horizontal scroll view, and why. Empty: nothing on a
     /// page needs one. The developer capture surface under `Features/Dev` is
     /// not a page a person sees and is left out below.
-    static let allowed: [String: String] = [:]
+    static let allowed: [String: String] = [
+        // A chart's periods: one whole week, month or year a page, swiped like
+        // the pages of a book. The page itself never moves sideways.
+        "SomaPeriodPager.swift": "a chart pages whole periods",
+    ]
 
     private static var sources: [URL] {
         let root = StyleGuardTests.root

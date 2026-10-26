@@ -61,7 +61,7 @@ struct MindHabitsPage: View {
                     title: "A day without \(cost.title.localizedLowercase)",
                     detail: "It was on \(recent) of the last 4 days. A day without it is worth about \(MindHabitEffects.points(delta)) \(lens.when)."
                 ) {
-                    SomaOrb(aspect: lens == .recovery ? .mind : .sleep, scale: .mini)
+                    SomaObjectIcon(aspect: lens == .recovery ? .mind : .sleep, size: .row)
                 }
             }
         }
@@ -130,7 +130,7 @@ struct MindHabitRow: View {
                     .foregroundStyle(colors.inkSecondary.color)
             }
             Spacer(minLength: 8)
-            VStack(alignment: .trailing, spacing: 6) {
+            VStack(alignment: .trailing, spacing: theme.metrics.spaceS) {
                 Text(value)
                     .somaFont(type.rowValue)
                     .foregroundStyle(habit.isCost ? colors.danger.color : colors.inkPrimary.color)

@@ -95,7 +95,6 @@ struct TrackControlGallery: View {
         VStack(spacing: theme.metrics.cardSpacing) {
             Text(title)
                 .somaFont(theme.typography.eyebrow)
-                .textCase(.uppercase)
                 .foregroundStyle(theme.colors.inkSecondary.color)
                 .frame(maxWidth: .infinity, alignment: .leading)
             content()

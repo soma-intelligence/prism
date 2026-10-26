@@ -8,7 +8,7 @@ import SwiftUI
 /// The six parts of a person Soma reads, in the order the orb pages through
 /// them: the whole body first, then head to toe, the way the website's hero
 /// tours them.
-public enum SomaAspect: String, CaseIterable, Identifiable, Sendable {
+public enum SomaAspect: String, CaseIterable, Identifiable, Sendable, Codable {
     case body
     case mind
     case sleep

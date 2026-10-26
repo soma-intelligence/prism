@@ -50,7 +50,6 @@ struct SupplementWindowPage: View {
                     VStack(alignment: .leading, spacing: theme.metrics.cardHeaderSpacing) {
                         Text("Your day")
                             .somaFont(theme.typography.eyebrow)
-                            .textCase(.uppercase)
                             .foregroundStyle(theme.colors.inkSecondary.color)
                         ToolSlotRail(slots: plan.slots.map { slot in
                             let time = SomaTools.SupplementTimingEngine.time(for: slot.slot, wake: wake, calendar: day.calendar)

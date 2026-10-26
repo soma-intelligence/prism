@@ -21,6 +21,8 @@ enum SettingsRoute: Hashable, Identifiable {
     case notifications
     /// What usual means: focus, ranges, goals, zones and how Soma answers.
     case customization
+    /// Which model writes Ask's answers.
+    case askModel
     /// What the plus in Ask's composer offers.
     case shortcuts
     case programs
@@ -92,6 +94,8 @@ enum SettingsRoute: Hashable, Identifiable {
             NotificationsPage()
         case .customization:
             CustomizationPage()
+        case .askModel:
+            AskModelPage()
         case .shortcuts:
             ShortcutsPage()
         case .programs:

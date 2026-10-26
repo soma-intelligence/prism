@@ -62,10 +62,10 @@ public struct SomaFloatingHeader<Leading: View, Trailing: View>: View {
                     }
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 8)
+            .padding(.horizontal, theme.metrics.spaceL)
+            .padding(.top, theme.metrics.spaceS)
         }
-        .animation(.easeInOut(duration: 0.2), value: isScrolled)
+        .animation(theme.motion.fade, value: isScrolled)
     }
 }
 

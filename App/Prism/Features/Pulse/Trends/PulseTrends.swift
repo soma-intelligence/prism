@@ -575,7 +575,7 @@ extension PulseTrends {
             steps: starts.map { inputs.stepsByDay[$0] },
             exerciseMinutes: starts.map { inputs.exerciseByDay[$0] },
             sleepSamples: inputs.sleep.compactMap {
-                ScoringSleepSample(code: Int($0.value), start: $0.start, end: $0.end, source: "Preview")
+                ScoringSleepSample(code: $0.code, start: $0.start, end: $0.end, source: "Preview")
             }
         )
         return make(from: inputs, scores: SomaScores.compute(scoring), calendar: calendar)

@@ -57,7 +57,10 @@ extension SomaTools {
     /// tobacco history, which two catalog items are gated on.
     ///
     /// A closed enum rather than free text: the engine must never infer a risk
-    /// from anything except an explicit answer.
+    /// from anything except an explicit answer. A family flag is answered
+    /// on the ledger, or by a first degree relative in the medical record's
+    /// family history (`MedicalRecord.screeningRisks`, folded in by
+    /// `ScreeningLedger.withFamilyHistory`).
     nonisolated enum ScreeningRiskFlag: String, Codable, Sendable, CaseIterable {
         case familyColorectal
         case familyBreastOvarian
@@ -116,6 +119,13 @@ extension SomaTools {
         }
     }
 
+    /// A cadence that takes over from a given age, e.g. cervical screening
+    /// moving from cytology every three years to HPV testing every five at 30.
+    nonisolated struct ScreeningAgeBand: Sendable, Equatable {
+        let fromAge: Int
+        let intervalMonths: Int
+    }
+
     /// One screening in the catalog.
     nonisolated struct ScreeningItem: Sendable, Equatable, Identifiable {
         /// Stable key, also the `itemID` persisted on every record. Never
@@ -131,6 +141,10 @@ extension SomaTools {
         let stopAge: Int?
         /// nil means once in a lifetime: one record settles it forever.
         let intervalMonths: Int?
+        /// Cadences that replace `intervalMonths` from an age on, youngest
+        /// first. Read at the age the screening was done, so a test done at 29
+        /// keeps the cadence of 29.
+        let ageIntervals: [ScreeningAgeBand]
         /// An item gated on a risk flag stays `.discussOnly` until that flag is
         /// answered true. This keeps a lung CT from telling a lifelong
         /// non smoker they are overdue.
@@ -149,6 +163,7 @@ extension SomaTools {
              startAge: Int,
              stopAge: Int? = nil,
              intervalMonths: Int?,
+             ageIntervals: [ScreeningAgeBand] = [],
              requiresRiskFlag: ScreeningRiskFlag? = nil,
              evidence: String,
              citation: String,
@@ -161,10 +176,19 @@ extension SomaTools {
             self.startAge = startAge
             self.stopAge = stopAge
             self.intervalMonths = intervalMonths
+            self.ageIntervals = ageIntervals
             self.requiresRiskFlag = requiresRiskFlag
             self.evidence = evidence
             self.citation = citation
             self.modifiers = modifiers
+        }
+
+        /// The catalog cadence at `age`: the last band the age has reached,
+        /// else `intervalMonths`. nil stays once in a lifetime.
+        func intervalMonths(atAge age: Int?) -> Int? {
+            guard let base = intervalMonths else { return nil }
+            guard let age else { return base }
+            return ageIntervals.last { age >= $0.fromAge }?.intervalMonths ?? base
         }
     }
 

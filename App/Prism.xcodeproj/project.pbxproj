@@ -701,15 +701,17 @@
 				<key>INFOPLIST_FILE</key>
 				<string>Prism-Info.plist</string>
 				<key>INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription</key>
-				<string>Soma reads when you are busy and what each event is called, to place walks and breathing in your real gaps and to learn which parts of your week line up with stress. It only reads, on this iPhone, and never reads an event's notes or who was invited.</string>
+				<string>Soma reads when you are busy, what each event is called and who a meeting is with, to place walks and breathing in your real gaps and to set meetings against your stress. Who you meet stays on this device. It never reads an event's notes or its place.</string>
 				<key>INFOPLIST_KEY_NSCameraUsageDescription</key>
-				<string>Soma uses the camera to photograph a lab report, or you standing for a body measurement, and only when you open it.</string>
+				<string>Soma uses the camera to photograph a lab report or a urine test strip, or you standing for a body measurement, and only when you open it.</string>
 				<key>INFOPLIST_KEY_NSHealthShareUsageDescription</key>
 				<string>Soma reads your Health data on this device to show you how you are. Nothing is read until you allow it.</string>
 				<key>INFOPLIST_KEY_NSHealthUpdateUsageDescription</key>
 				<string>Soma saves what you log in Track to Apple Health when you allow it: a weight, a height, a drink, a meal, mindful minutes, a mood.</string>
+				<key>INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription</key>
+				<string>Soma notes the place where you slept, kept on this device, to compare your nights by place. It is never shared.</string>
 				<key>INFOPLIST_KEY_NSLocationWhenInUseUsageDescription</key>
-				<string>Soma uses your location for the day’s weather, UV, sunrise and sunset, and to show where you are and where you slept on a map. Only a rounded place is used to ask for the weather.</string>
+				<string>Soma uses your approximate location for the day’s weather, UV, sunrise and sunset, and, if you turn it on, the place where you slept, kept on this device to compare your nights by place. It is never shared.</string>
 				<key>INFOPLIST_KEY_NSMotionUsageDescription</key>
 				<string>Soma reads your steps and movement from this iPhone to track your day when your watch is not on.</string>
 				<key>INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]</key>
@@ -815,15 +817,17 @@
 				<key>INFOPLIST_FILE</key>
 				<string>Prism-Info.plist</string>
 				<key>INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription</key>
-				<string>Soma reads when you are busy and what each event is called, to place walks and breathing in your real gaps and to learn which parts of your week line up with stress. It only reads, on this iPhone, and never reads an event's notes or who was invited.</string>
+				<string>Soma reads when you are busy, what each event is called and who a meeting is with, to place walks and breathing in your real gaps and to set meetings against your stress. Who you meet stays on this device. It never reads an event's notes or its place.</string>
 				<key>INFOPLIST_KEY_NSCameraUsageDescription</key>
-				<string>Soma uses the camera to photograph a lab report, or you standing for a body measurement, and only when you open it.</string>
+				<string>Soma uses the camera to photograph a lab report or a urine test strip, or you standing for a body measurement, and only when you open it.</string>
 				<key>INFOPLIST_KEY_NSHealthShareUsageDescription</key>
 				<string>Soma reads your Health data on this device to show you how you are. Nothing is read until you allow it.</string>
 				<key>INFOPLIST_KEY_NSHealthUpdateUsageDescription</key>
 				<string>Soma saves what you log in Track to Apple Health when you allow it: a weight, a height, a drink, a meal, mindful minutes, a mood.</string>
+				<key>INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription</key>
+				<string>Soma notes the place where you slept, kept on this device, to compare your nights by place. It is never shared.</string>
 				<key>INFOPLIST_KEY_NSLocationWhenInUseUsageDescription</key>
-				<string>Soma uses your location for the day’s weather, UV, sunrise and sunset, and to show where you are and where you slept on a map. Only a rounded place is used to ask for the weather.</string>
+				<string>Soma uses your approximate location for the day’s weather, UV, sunrise and sunset, and, if you turn it on, the place where you slept, kept on this device to compare your nights by place. It is never shared.</string>
 				<key>INFOPLIST_KEY_NSMotionUsageDescription</key>
 				<string>Soma reads your steps and movement from this iPhone to track your day when your watch is not on.</string>
 				<key>INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]</key>
@@ -1326,7 +1330,6 @@
 			<key>membershipExceptions</key>
 			<array>
 				<string>Info.plist</string>
-				<string>SomaWidgets.entitlements</string>
 			</array>
 			<key>target</key>
 			<string>D70000000000000000000007</string>
@@ -1367,8 +1370,6 @@
 				<string>D70000000000000000000006</string>
 			</array>
 			<key>buildRules</key>
-			<array/>
-			<key>dependencies</key>
 			<array/>
 			<key>fileSystemSynchronizedGroups</key>
 			<array>
@@ -1595,12 +1596,10 @@
 		</dict>
 		<key>D70000000000000000000013</key>
 		<dict>
-			<key>buildActionMask</key>
-			<string>2147483647</string>
 			<key>dstPath</key>
 			<string></string>
-			<key>dstSubfolderSpec</key>
-			<string>13</string>
+			<key>dstSubfolder</key>
+			<string>PlugIns</string>
 			<key>files</key>
 			<array>
 				<string>D70000000000000000000014</string>
@@ -1609,8 +1608,6 @@
 			<string>PBXCopyFilesBuildPhase</string>
 			<key>name</key>
 			<string>Embed Foundation Extensions</string>
-			<key>runOnlyForDeploymentPostprocessing</key>
-			<string>0</string>
 		</dict>
 		<key>D70000000000000000000014</key>
 		<dict>

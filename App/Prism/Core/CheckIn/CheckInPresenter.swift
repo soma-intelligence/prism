@@ -118,6 +118,9 @@ final class CheckInPresenter {
     func presentAutomatically() -> Bool {
         let now = now()
         guard isAttached, !isFirstLaunch, session == nil else { return false }
+        // UI tests launch with `-checkin.quiet YES`: in the morning and evening
+        // windows the sheet would rise over whatever the test taps first.
+        guard !UserDefaults.standard.bool(forKey: "checkin.quiet") else { return false }
         if let opened = openedFromNotificationAt, now.timeIntervalSince(opened) < Self.notificationQuiet { return false }
         guard CheckInEngine.shouldPresentAutomatically(now: now, calendar: calendar, record: store.record(on: now)) else {
             return false
@@ -226,6 +229,13 @@ final class CheckInPresenter {
         }
         context.homeCheckInElsewhere = HomeLog.shared.checkIn(on: now) != nil && !answeredHomeHere
         context.mindAvailable = MindStore.shared.consent.isGiven
+        // The questions asked less than daily: the last day each was settled,
+        // in "Soma asks" or, for a Journal tag, answered in the Journal.
+        for question in CheckInCatalog.all where question.everyDays > 1 {
+            var dates = [store.lastSettled(question.id)]
+            if case .journalTag(let tag, _) = question.destination { dates.append(journal?.lastAnswered(tag)) }
+            if let last = dates.compactMap({ $0 }).max() { context.lastSettled[question.id] = last }
+        }
         return context
     }
 

@@ -14,7 +14,8 @@ import HealthScoring
 ///
 /// Sound is measured (Apple Health's environmental audio over the sleep
 /// window); temperature and light are what the person sets; places are set by
-/// hand, night by night.
+/// hand night by night, or detected from the phone when the person turned
+/// that on in the ledger.
 struct SleepEnvironmentSheet: View {
     let scores: SomaScores?
     let inputs: ScoreDetailInputs?
@@ -69,7 +70,7 @@ struct SleepEnvironmentSheet: View {
                     if byPlace.isEmpty {
                         Text("Three nights a place")
                             .somaFont(type.caption).foregroundStyle(colors.inkSecondary.color)
-                            .padding(.top, 10)
+                            .padding(.top, theme.metrics.spaceM)
                     } else {
                         ScoreRows(byPlace) { row in
                             HStack {
@@ -143,7 +144,9 @@ private struct BedroomTemperatureRow: View {
     }
 }
 
-/// Where you slept, night by night: tap a night to set its place.
+/// Where you slept, night by night: tap a night to set its place. The switch
+/// for detecting it lives here too, beside the nights it fills, and each night
+/// says whether its place was detected or set by hand.
 struct SleepPlaceLedgerSheet: View {
     let scores: SomaScores?
     let inputs: ScoreDetailInputs?
@@ -188,6 +191,9 @@ struct SleepPlaceLedgerSheet: View {
 
         ScoreSheet(eyebrow: "Sleep · Places", title: "Where you slept") {
             ScoreParagraph(lead: "Tap a night to set where you slept.", rest: "A place you set by hand is never replaced.")
+            #if os(iOS)
+            SleepPlaceDetectionCard()
+            #endif
             if nights.isEmpty {
                 ScoreFootnote(text: "Nights appear here once your watch records them.")
             } else {
@@ -197,10 +203,16 @@ struct SleepPlaceLedgerSheet: View {
                         VStack(alignment: .trailing, spacing: 2) {
                             Text(night.score.map { "\(Int($0.rounded()))" } ?? "-")
                                 .somaFont(type.rowValue).foregroundStyle(colors.inkPrimary.color)
-                            Text(places.place(forNightEnding: night.day).map {
-                                places.isSetByHand(forNightEnding: night.day) ? "\($0.name) · set by you" : "\($0.name) · found"
-                            } ?? "not set")
+                            let place = places.place(forNightEnding: night.day)
+                            Text(place.map { "\($0.name) · \($0.wasDetected ? "detected" : "set by you")" } ?? "not set")
                                 .somaFont(type.caption).foregroundStyle(colors.inkSecondary.color)
+                            // The street line is in the name already; the full
+                            // address adds the postcode and the building.
+                            if let address = place?.address, address != place?.name {
+                                Text(address)
+                                    .somaFont(type.caption).foregroundStyle(colors.inkSecondary.color)
+                                    .lineLimit(1).truncationMode(.middle)
+                            }
                         }
                     }
                 }
@@ -216,3 +228,87 @@ struct SleepPlaceLedgerSheet: View {
         }
     }
 }
+
+#if os(iOS)
+/// The switch for detecting where each night was slept, and the one step the
+/// Location answer still needs, if any: Always, so a night is noted even when
+/// the app stays closed, or Settings, when Location or its precision is off.
+private struct SleepPlaceDetectionCard: View {
+    @State private var recorder = SleepPlaceRecorder.shared
+    @Environment(\.somaTheme) private var theme
+    @Environment(\.openURL) private var openURL
+
+    private struct Step {
+        var title: String
+        var detail: String
+        var action: (() -> Void)?
+    }
+
+    var body: some View {
+        let type = theme.typography
+        let colors = theme.colors
+        SomaCard {
+            VStack(alignment: .leading, spacing: 0) {
+                Toggle(isOn: Binding(get: { recorder.isOn }, set: { recorder.setOn($0) })) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Detect where you sleep").somaFont(type.body).foregroundStyle(colors.inkPrimary.color)
+                        Text("Soma notes the street your phone spent the night on, and keeps it on this phone.")
+                            .somaFont(type.caption).foregroundStyle(colors.inkSecondary.color)
+                    }
+                }
+                .toggleStyle(.soma)
+                .tint(colors.accent.color)
+                .padding(.vertical, theme.metrics.scoreRowSpacing)
+                if recorder.isOn, let step {
+                    Rectangle().fill(colors.inkPrimary.color.opacity(theme.metrics.hairlineOpacity)).frame(height: 0.5)
+                    Button { step.action?() } label: {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(step.title).somaFont(type.body).foregroundStyle(colors.inkPrimary.color)
+                                Text(step.detail).somaFont(type.caption).foregroundStyle(colors.inkSecondary.color)
+                            }
+                            Spacer(minLength: theme.metrics.spaceS)
+                            if step.action != nil {
+                                Image(systemName: "chevron.right")
+                                    .somaFont(type.caption).foregroundStyle(colors.inkSecondary.color)
+                            }
+                        }
+                        .contentShape(.rect)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(step.action == nil)
+                    .padding(.vertical, theme.metrics.scoreRowSpacing)
+                }
+            }
+        }
+    }
+
+    /// What is left to do once the switch is on. Nothing while the system's
+    /// own question is still on screen.
+    private var step: Step? {
+        let settings = OpenSystemSettings(openURL: openURL)
+        switch recorder.access {
+        case .notAsked:
+            return nil
+        case .denied:
+            return Step(title: "Location is off for Soma",
+                        detail: "Turn it on in Settings, while using the app or always.",
+                        action: { settings() })
+        case _ where !recorder.isPrecise:
+            return Step(title: "Precise Location is off",
+                        detail: "Without it the place is a district, not a street. Turn it on in Settings.",
+                        action: { settings() })
+        case .whenInUse:
+            return Step(title: "Also when Soma stays closed",
+                        detail: recorder.canAskAlways
+                            ? "Allow Location always and Soma notes the place even on mornings you never open it."
+                            : "Change Location to Always in Settings and Soma notes the place even on mornings you never open it.",
+                        action: recorder.canAskAlways ? { recorder.requestAlways() } : { settings() })
+        case .always:
+            return Step(title: "Detecting every night",
+                        detail: "Even with Soma closed. A night you set by hand stays yours.",
+                        action: nil)
+        }
+    }
+}
+#endif

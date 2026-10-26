@@ -81,7 +81,7 @@ struct MindHRVPage: View {
                 actionTitle: "Start",
                 action: { isBreathing = true }
             ) {
-                SomaOrb(aspect: .mind, scale: .mini)
+                SomaObjectIcon(aspect: .mind, size: .row)
             }
         }
         .task {

@@ -13,7 +13,7 @@ import Foundation
 /// knows at runtime, so a newer metric costs one line here and an older OS
 /// simply skips it.
 ///
-/// 117 quantity types, 66 category types, the correlations, the workout
+/// 117 quantity types, 70 category types, the correlations, the workout
 /// type and the characteristics.
 public enum HealthMetricCatalog {
 
@@ -193,13 +193,17 @@ public enum HealthMetricCatalog {
         c("appleWalkingSteadinessEvent", .normal),
         c("toothbrushingEvent", .normal),
         c("handwashingEvent", .normal),
-        c("environmentalAudioExposureEvent", .normal),
+        c("audioExposureEvent", .normal),
         c("headphoneAudioExposureEvent", .normal),
-        c("abdominalCramps", .normal),
+        // The symptoms the cycle log writes (cramps, bloating, headache, hot
+        // flashes, mood, night sweats, sleep) are sensitive: logged against a
+        // cycle they say as much as the flow does, so the cycle page asks for
+        // them when it opens and the launch sheet never names them.
+        c("abdominalCramps", .normal, sensitivity: .sensitive),
         c("acne", .normal),
         c("appetiteChanges", .normal),
         c("bladderIncontinence", .normal),
-        c("bloating", .normal),
+        c("bloating", .normal, sensitivity: .sensitive),
         c("chestTightnessOrPain", .normal),
         c("chills", .normal),
         c("constipation", .normal),
@@ -212,20 +216,20 @@ public enum HealthMetricCatalog {
         c("fever", .normal),
         c("generalizedBodyAche", .normal),
         c("hairLoss", .normal),
-        c("headache", .normal),
+        c("headache", .normal, sensitivity: .sensitive),
         c("heartburn", .normal),
-        c("hotFlashes", .normal),
+        c("hotFlashes", .normal, sensitivity: .sensitive),
         c("lossOfSmell", .normal),
         c("lossOfTaste", .normal),
         c("lowerBackPain", .normal),
         c("memoryLapse", .normal),
-        c("moodChanges", .normal),
+        c("moodChanges", .normal, sensitivity: .sensitive),
         c("nausea", .normal),
-        c("nightSweats", .normal),
+        c("nightSweats", .normal, sensitivity: .sensitive),
         c("runnyNose", .normal),
         c("shortnessOfBreath", .normal),
         c("sinusCongestion", .normal),
-        c("sleepChanges", .normal),
+        c("sleepChanges", .normal, sensitivity: .sensitive),
         c("soreThroat", .normal),
         c("vomiting", .normal),
         c("wheezing", .normal),
@@ -246,6 +250,11 @@ public enum HealthMetricCatalog {
         c("pelvicPain", .normal, sensitivity: .sensitive),
         c("vaginalDryness", .normal, sensitivity: .sensitive),
         c("breastPain", .normal, sensitivity: .sensitive),
+        c("bleedingAfterPregnancy", .normal, sensitivity: .sensitive),
+        c("bleedingDuringPregnancy", .normal, sensitivity: .sensitive),
+        // iOS 27: an older OS resolves these to nil and skips them.
+        c("bleedingAfterMenopause", .normal, sensitivity: .sensitive),
+        c("menopausalState", .normal, sensitivity: .sensitive),
     ]
 
     // MARK: - Everything else

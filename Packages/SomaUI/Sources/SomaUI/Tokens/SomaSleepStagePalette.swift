@@ -5,10 +5,10 @@
 
 import Foundation
 
-/// The four sleep stages, each in its own colour: awake a warm orange that stands out of the night, then the stages
-/// darkening from a pale periwinkle for REM through blue for core to indigo
-/// for deep. The three asleep shades sit round the sleep identity's violet, so
-/// a hypnogram still reads as the sleep aspect.
+/// The four sleep stages, each in its own colour, as the earlier app paints a night:
+/// awake a red orange that stands out of the night, then the stages
+/// darkening from a pale cyan for REM through periwinkle for light sleep to
+/// royal blue for deep.
 ///
 /// The owner preferred a hypnogram in separate colours to a single hue in four
 /// shades (2026-10-03): separate colours tell the lanes apart at a glance.
@@ -25,11 +25,13 @@ public struct SomaSleepStagePalette: Sendable, Equatable {
         self.deep = deep
     }
 
-    /// Lifted a step on the light page.
+    /// Read from the earlier app's night chart (owner, 2026-10-24): awake a red orange,
+    /// REM a pale cyan, light sleep a periwinkle blue, deep a royal blue,
+    /// each a step deeper on the light page so it holds on white.
     public static let standard = SomaSleepStagePalette(
-        awake: SomaColorValue(light: 0xE8804F, dark: 0xF4A47E),
-        rem: SomaColorValue(light: 0x8C9DF0, dark: 0xAEBBFA),
-        core: SomaColorValue(light: 0x4A6FE3, dark: 0x6286F4),
-        deep: SomaColorValue(light: 0x4B3FB3, dark: 0x5D54CC)
+        awake: SomaColorValue(light: 0xE8553A, dark: 0xF2603F),
+        rem: SomaColorValue(light: 0x4FB3D9, dark: 0xA6DDF7),
+        core: SomaColorValue(light: 0x5A72F0, dark: 0x5368F2),
+        deep: SomaColorValue(light: 0x3438C2, dark: 0x2D3FD8)
     )
 }

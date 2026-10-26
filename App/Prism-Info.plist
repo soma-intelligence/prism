@@ -2,15 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>SomaSupabaseURL</key>
-	<string>$(SOMA_SUPABASE_URL)</string>
-	<key>SomaSupabasePublishableKey</key>
-	<string>$(SOMA_SUPABASE_PUBLISHABLE_KEY)</string>
 	<key>BGTaskSchedulerPermittedIdentifiers</key>
 	<array>
 		<string>Soma.Prism.cloud-sync</string>
 		<string>Soma.Prism.cloud-refresh</string>
 		<string>Soma.Prism.widgets.refresh</string>
+		<string>Soma.Prism.health-upload</string>
 	</array>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
@@ -27,6 +24,14 @@
 			</array>
 		</dict>
 	</array>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
+	<key>NSSupportsLiveActivitiesFrequentUpdates</key>
+	<true/>
+	<key>SomaSupabasePublishableKey</key>
+	<string>$(SOMA_SUPABASE_PUBLISHABLE_KEY)</string>
+	<key>SomaSupabaseURL</key>
+	<string>$(SOMA_SUPABASE_URL)</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>fetch</string>

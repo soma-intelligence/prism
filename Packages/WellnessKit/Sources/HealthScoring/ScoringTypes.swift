@@ -60,7 +60,7 @@ public struct ScoringTimedValue: Sendable, Hashable {
 }
 
 /// The night the engine treats as last night: where its window sits.
-public struct ScoringNightWindow: Sendable, Hashable {
+public struct ScoringNightWindow: Sendable, Hashable, Codable {
     public let start: Date
     public let end: Date
 

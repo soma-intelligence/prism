@@ -18,14 +18,21 @@
 import Foundation
 import HealthExportCore
 
-/// A calendar event reduced to what Mind reads: a title and its window. The
-/// notes and the attendees are never read.
+/// A calendar event reduced to what Mind reads: a title, its window, who it
+/// is with and the series it repeats in. The notes and the place are never
+/// read, and the names never leave the device.
 nonisolated struct MindCalendarEvent: Equatable, Sendable, Identifiable {
     var id: String
     var title: String
     var calendarTitle: String
     var start: Date
     var end: Date
+    /// The other people invited, by name, the person themself left out.
+    /// Rooms and resources are not people and are dropped at the source.
+    var attendees: [String] = []
+    /// Shared by every occurrence of a repeating event, nil for a one off.
+    /// Groups a series even when someone renames one occurrence.
+    var seriesID: String? = nil
 
     var minutes: Double { end.timeIntervalSince(start) / 60 }
 }

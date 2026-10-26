@@ -40,7 +40,7 @@ public extension SomaMetrics {
 
     /// The photograph that leads the Explore part.
     var pulseHeroPhotoHeight: CGFloat { 420 }
-    var pulseHeroPhotoCornerRadius: CGFloat { 20 }
+    var pulseHeroPhotoCornerRadius: CGFloat { cardCornerRadius }
     /// The tile a suggested read's orb sits on, and the orb inside it.
     var pulseTileSide: CGFloat { 64 }
     var pulseTileOrbDiameter: CGFloat { 48 }

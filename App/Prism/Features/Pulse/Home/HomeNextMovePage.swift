@@ -39,7 +39,7 @@ struct HomeNextMovePage: View {
                 note: energyNote
             ) {
                 MindEnergyChart(slots: day?.slots ?? [], curve: day?.curve ?? [])
-                    .padding(.top, 8)
+                    .padding(.top, theme.metrics.spaceS)
             }
 
             if let move, !(move.evidence.isEmpty && move.why.isEmpty) {
@@ -71,6 +71,7 @@ struct HomeNextMovePage: View {
                     NavigationLink(value: HomeRoute.medicalCard) {
                         SomaBrowseRow(title: row.title, detail: row.detail)
                     }
+                    .zoomSource(HomeRoute.medicalCard)
                     .buttonStyle(.plain)
                 } else {
                     SomaBrowseRow(title: row.title, detail: row.detail) { row.action() }
@@ -86,7 +87,7 @@ struct HomeNextMovePage: View {
             }
         }
         .task { day = await HomeDay.load(health: health, log: log) }
-        .refreshable { day = await HomeDay.load(health: health, log: log) }
+        .somaRefreshable { day = await HomeDay.load(health: health, log: log) }
         .homeSheets($sheet)
     }
 

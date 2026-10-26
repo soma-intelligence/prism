@@ -41,7 +41,7 @@ public struct SomaTopicChip: View {
                     .lineLimit(1)
                     .fixedSize()
             }
-            .padding(.horizontal, metrics.cardPadding * 0.875)
+            .padding(.horizontal, metrics.spaceM)
             .frame(minHeight: metrics.minimumTapTarget * 0.84)
             .background(Capsule().fill(fill))
             .contentShape(.capsule)

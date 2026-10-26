@@ -6,30 +6,18 @@
 import SwiftUI
 import SomaUI
 
-/// The theme, light or dark, and the app icon.
+/// Light or dark, and the app icon. Light and dark are a list with a mark
+/// against the one in force, as the rest of Settings reads.
 ///
-/// The theme only changes what sits behind the head of a page (owner,
-/// 2026-10-03): the aspect's colour field, or a landscape photograph. Light
-/// and dark are a list with a mark against the one in force, as the rest of
-/// Settings reads.
+/// The theme picker (colour field or landscape behind each page) left with the
+/// plain grounds of the redesign (owner, 2026-10-23).
 struct AppearancePage: View {
     @AppStorage(AppearanceMode.storageKey) private var modeName = AppearanceMode.fallback.rawValue
-    @AppStorage("theme.backdrop") private var backdrop = SomaBackdropStyle.gradient.rawValue
 
     @Environment(\.somaTheme) private var theme
 
     var body: some View {
         ListScaffold(eyebrow: "Settings", title: "Appearance") {
-            SettingsSection("Theme") {
-                HStack(spacing: theme.metrics.cardSpacing) {
-                    ForEach(SomaBackdropStyle.allCases) { style in
-                        ThemeTile(style: style, isChosen: style.rawValue == backdrop) {
-                            backdrop = style.rawValue
-                        }
-                    }
-                }
-            }
-
             SettingsSection("Mode") {
                 SomaBrowseGroup(AppearanceMode.allCases, hasGlyphs: false) { mode in
                     SomaBrowseRow(
@@ -40,7 +28,7 @@ struct AppearancePage: View {
                         if mode.rawValue == modeName {
                             Image(systemName: "checkmark")
                                 .font(.system(size: theme.metrics.browseChevronSize, weight: .semibold))
-                                .foregroundStyle(theme.colors.accent.color)
+                                .foregroundStyle(theme.colors.inkPrimary.color)
                         }
                     }
                 }
@@ -50,65 +38,6 @@ struct AppearancePage: View {
             AppIconPicker()
 #endif
         }
-    }
-}
-
-/// One theme as a small picture of itself: the Mind aspect's colour field for
-/// Standard, its photograph for Landscape.
-private struct ThemeTile: View {
-    let style: SomaBackdropStyle
-    let isChosen: Bool
-    let action: () -> Void
-
-    @Environment(\.somaTheme) private var theme
-
-    var body: some View {
-        let metrics = theme.metrics
-        let radius = metrics.cardCornerRadius
-        Button(action: action) {
-            VStack(spacing: metrics.cardHeaderSpacing) {
-                swatch
-                    .frame(maxWidth: .infinity)
-                    .frame(height: metrics.minimumTapTarget * 2)
-                    .clipShape(.rect(cornerRadius: radius, style: .continuous))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: radius, style: .continuous)
-                            .strokeBorder(
-                                isChosen ? theme.colors.accent.color : theme.colors.inkPrimary.color.opacity(metrics.hairlineOpacity),
-                                lineWidth: isChosen ? 2 : 0.5
-                            )
-                    }
-                Text(style.title)
-                    .somaFont(theme.typography.caption)
-                    .foregroundStyle(isChosen ? theme.colors.inkPrimary.color : theme.colors.inkSecondary.color)
-            }
-        }
-        .buttonStyle(.somaGlassPress)
-        .accessibilityLabel(Text(style.title))
-        .accessibilityAddTraits(isChosen ? .isSelected : [])
-    }
-
-    @ViewBuilder
-    private var swatch: some View {
-        let gradient = LinearGradient(
-            colors: theme.aspects[.mind].orb.stops.map(\.color),
-            startPoint: .topLeading, endPoint: .bottomTrailing
-        )
-        if style == .landscape, Self.hasPhoto {
-            Image(SomaBackdropStyle.photoName(for: .mind))
-                .resizable()
-                .aspectRatio(contentMode: .fill)
-        } else {
-            Rectangle().fill(gradient)
-        }
-    }
-
-    private static var hasPhoto: Bool {
-#if canImport(UIKit)
-        UIImage(named: SomaBackdropStyle.photoName(for: .mind)) != nil
-#else
-        NSImage(named: SomaBackdropStyle.photoName(for: .mind)) != nil
-#endif
     }
 }
 
@@ -169,7 +98,6 @@ private struct AppIconPicker: View {
         VStack(alignment: .leading, spacing: metrics.browseHeadingSpacing) {
             Text("App icon")
                 .somaFont(theme.typography.eyebrow)
-                .textCase(.uppercase)
                 .foregroundStyle(theme.colors.inkSecondary.color)
                 .accessibilityAddTraits(.isHeader)
 

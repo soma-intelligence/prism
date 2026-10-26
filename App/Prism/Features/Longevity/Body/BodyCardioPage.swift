@@ -16,6 +16,7 @@ struct BodyCardioPage: View {
     @Environment(HealthDashboard.self) private var health
 
     @State private var page = BodyCardio.make(from: BodyCardioInputs(now: .now))
+    @State private var isTesting = false
 
     var body: some View {
         TabPartScaffold(
@@ -44,8 +45,9 @@ struct BodyCardioPage: View {
             ])
         }
         .navigationTitle("Cardio")
+        .cardioFitnessTest(isPresented: $isTesting)
         .task { await load() }
-        .refreshable { await load() }
+        .somaRefreshable { await load() }
     }
 
     private func load() async {
@@ -106,7 +108,7 @@ private struct BodyRunCard: View {
                 note: run?.note ?? "Your next run or walk with Apple Watch draws this."
             ) {
                 if let run, run.heartRate.count >= 2 {
-                    VStack(alignment: .leading, spacing: 6) {
+                    VStack(alignment: .leading, spacing: theme.metrics.spaceS) {
                         Text("Heart rate")
                             .somaFont(type.caption)
                             .foregroundStyle(colors.inkSecondary.color)

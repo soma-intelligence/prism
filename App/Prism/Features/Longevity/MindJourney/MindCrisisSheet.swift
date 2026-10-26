@@ -45,7 +45,7 @@ struct MindCrisisSheet: View {
                     } label: {
                         SomaCard {
                             HStack(spacing: theme.metrics.moveRowGap) {
-                                VStack(alignment: .leading, spacing: 3) {
+                                VStack(alignment: .leading, spacing: theme.metrics.spaceXS) {
                                     Text(line.name)
                                         .somaFont(type.cardTitle)
                                         .foregroundStyle(colors.inkPrimary.color)

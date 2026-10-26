@@ -44,6 +44,7 @@ struct CalendarPage: View {
             .frame(maxWidth: theme.metrics.pageMaxWidth, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
+        .softScrollEdges()
         .background(theme.colors.canvas.color.ignoresSafeArea())
         .toolbar {
             ToolbarItem(placement: .navigation) {
@@ -84,7 +85,6 @@ struct CalendarPage: View {
             VStack(alignment: .leading, spacing: theme.metrics.cardHeaderSpacing) {
                 Text("Calendar")
                     .somaFont(theme.typography.eyebrow)
-                    .textCase(.uppercase)
                     .foregroundStyle(theme.colors.inkSecondary.color)
                 Text(month.formatted(.dateTime.month(.wide).year()))
                     .somaFont(theme.typography.display)
@@ -111,7 +111,7 @@ struct CalendarPage: View {
     }
 
     private var legend: some View {
-        VStack(alignment: .leading, spacing: theme.metrics.scoreLabelSpacing * 2) {
+        VStack(alignment: .leading, spacing: theme.metrics.spaceXS) {
             HStack(spacing: theme.metrics.cardSpacing) {
                 legendDot(theme.colors.inkPrimary.color, "Journal")
                 HStack(spacing: theme.metrics.scoreLabelSpacing) {
@@ -151,7 +151,6 @@ struct CalendarPage: View {
         VStack(alignment: .leading, spacing: theme.metrics.cardSpacing) {
             Text("Today \u{00B7} \(Date().formatted(.dateTime.weekday(.wide).day().month(.wide)))")
                 .somaFont(theme.typography.eyebrow)
-                .textCase(.uppercase)
                 .foregroundStyle(theme.colors.inkSecondary.color)
 
             SomaScoreRow([

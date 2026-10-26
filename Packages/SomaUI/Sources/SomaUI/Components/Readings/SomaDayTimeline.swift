@@ -309,13 +309,13 @@ struct SomaDayTimelineRowView: View {
                     }
                 }
                 .frame(width: metrics.timelineDotDiameter + 1, height: metrics.timelineDotDiameter + 1)
-                .padding(2)
+                .padding(theme.metrics.spaceXXS)
                 .background(colors.canvas.color, in: .circle)
         case .now:
             Circle()
                 .fill(colors.inkPrimary.color)
                 .frame(width: metrics.timelineNowDotDiameter, height: metrics.timelineNowDotDiameter)
-                .padding(2)
+                .padding(theme.metrics.spaceXXS)
                 .background(colors.canvas.color, in: .circle)
         }
     }

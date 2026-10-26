@@ -64,7 +64,7 @@ nonisolated struct FitnessHistory: Sendable, Equatable {
                 group.addTask {
                     let heart = await samples(Metric.heartRate, from: workout.start, to: workout.end)
                     var distance: Double?
-                    if FitnessActivities.onFoot.contains(Int(workout.value)), let distanceMetric {
+                    if FitnessActivities.onFoot.contains(workout.code), let distanceMetric {
                         distance = (try? await source.total(distanceMetric, from: workout.start, to: workout.end))?.value
                     }
                     return (workout.start, heart, distance)
@@ -95,15 +95,8 @@ nonisolated struct FitnessHistory: Sendable, Equatable {
         )
     }
 
-    /// Age in whole years from the date of birth in Health.
-    static func age(in source: any HealthSampleSource) async -> Int? {
-        guard let birth = HealthMetricCatalog.metric(for: Metric.dateOfBirth),
-              let reading = try? await source.latest(birth) else { return nil }
-        return Int(reading.value)
-    }
-
-    /// One total per day for `days` days ending today, keyed by the day's
-    /// midnight. A day the store has nothing for is absent, never zero.
+    /// One total per day for the last `days` days, keyed by each day's
+    /// start, read in one statistics query. A day with nothing is absent.
     static func dailyTotals(
         _ identifier: String,
         days: Int,
@@ -111,28 +104,17 @@ nonisolated struct FitnessHistory: Sendable, Equatable {
         source: any HealthSampleSource,
         calendar: Calendar
     ) async -> [Date: Double] {
-        guard let metric = HealthMetricCatalog.metric(for: identifier) else { return [:] }
-        let today = calendar.startOfDay(for: now)
-        let starts = (0..<days).compactMap { calendar.date(byAdding: .day, value: -$0, to: today) }
+        guard let metric = HealthMetricCatalog.metric(for: identifier),
+              let start = calendar.date(byAdding: .day, value: -(days - 1), to: calendar.startOfDay(for: now))
+        else { return [:] }
+        let totals = (try? await source.dailyTotals(metric, from: start, to: now, calendar: calendar)) ?? []
+        return Dictionary(totals.map { (calendar.startOfDay(for: $0.start), $0.value) }, uniquingKeysWith: +)
+    }
 
-        return await withTaskGroup(of: (Date, Double?).self) { group in
-            var result: [Date: Double] = [:]
-            var pending = starts.makeIterator()
-
-            func add(_ day: Date) {
-                let end = min(calendar.date(byAdding: .day, value: 1, to: day) ?? now, now)
-                group.addTask { (day, (try? await source.total(metric, from: day, to: end))?.value) }
-            }
-
-            for _ in 0..<12 {
-                guard let next = pending.next() else { break }
-                add(next)
-            }
-            for await (day, value) in group {
-                if let value { result[day] = value }
-                if let next = pending.next() { add(next) }
-            }
-            return result
-        }
+    /// Age in whole years from the date of birth in Health.
+    static func age(in source: any HealthSampleSource) async -> Int? {
+        guard let birth = HealthMetricCatalog.metric(for: Metric.dateOfBirth),
+              let reading = try? await source.latest(birth) else { return nil }
+        return reading.code
     }
 }

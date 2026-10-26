@@ -125,6 +125,16 @@ public extension SomaDataScale {
         Stop(at: 120, value: .scaleGold),
     ])
 
+    /// A pollen count as its level, 0 for none to 4 for very high, the steps
+    /// the National Allergy Bureau draws for each kind: green to red.
+    static let pollen = SomaDataScale(range: 0...4, stops: [
+        Stop(at: 0, value: .scaleGreen),
+        Stop(at: 1, value: .scaleGreen),
+        Stop(at: 2, value: .scaleYellow),
+        Stop(at: 3, value: .scaleOrange),
+        Stop(at: 4, value: .scaleRed),
+    ])
+
     /// A sound level in dBA: quiet green, the 70 dB line amber, 80 and over red.
     static let soundLevel = SomaDataScale(range: 30...100, stops: [
         Stop(at: 30, value: .scaleGreen),

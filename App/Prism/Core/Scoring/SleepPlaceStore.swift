@@ -12,23 +12,32 @@ import UIKit
 /// Where each night was slept, the bedroom as the person describes it, and
 /// the city the Weather page shows.
 ///
-/// The places saved here were set by hand, from a search or from where the
-/// device was when it was set, at that exact spot, and a place set by hand is
-/// never replaced. Nights ``SleepPlaceFinder`` found at a place the person
-/// named stand in where no place was set by hand (``detected``, held in
-/// memory, never saved here). Kept on the device as one JSON file in
-/// Application Support, beside the Journal, readable once the phone has been
-/// unlocked after a restart, since a sleep visit reads it from a locked
-/// phone.
+/// A night's place is set by hand, or detected by ``SleepPlaceRecorder`` when
+/// the person turned that on: a street address from the phone's own fix. A
+/// place set by hand is never replaced, by a detection or anything else; a
+/// detected one gives way to a later detection, which is how a visit that
+/// covered the whole night corrects a morning fix. Kept on the device as one
+/// JSON file in Application Support, beside the Journal, and never sent.
 @MainActor
 @Observable
 final class SleepPlaceStore {
-    /// A named place: a city from the search, with where it is.
+    /// A named place: a city from the search, or a street the phone was on,
+    /// with where it is.
+    ///
+    /// The two newer fields are optional so a file written before them still
+    /// decodes, its places read as set by hand.
     struct Place: Codable, Hashable, Identifiable, Sendable {
         var id: String { name + "|" + String(format: "%.3f,%.3f", latitude, longitude) }
         var name: String
         var latitude: Double
         var longitude: Double
+        /// The full street address on one line, for a detected place. Nil for
+        /// a city picked by hand, and for a fix the geocoder could not name.
+        var address: String? = nil
+        /// True when Soma detected the place rather than the person setting it.
+        var isAutomatic: Bool? = nil
+
+        var wasDetected: Bool { isAutomatic == true }
     }
 
     /// The bedroom as the person describes it. Nil fields were never set.
@@ -136,13 +145,34 @@ final class SleepPlaceStore {
         nights[stamp(date)] != nil
     }
 
+    /// Sets a night's place by hand, or clears it. A place picked here is
+    /// the person's even when it came from a detected one in the recent list,
+    /// so it loses its detected mark and nothing replaces it afterwards.
     func setPlace(_ place: Place?, forNightEnding date: Date) {
         setPlace(place, stamp: stamp(date))
     }
 
     func setPlace(_ place: Place?, stamp: String) {
-        nights[stamp] = place
+        nights[stamp] = place.map { picked in
+            var place = picked
+            place.isAutomatic = nil
+            return place
+        }
         save()
+    }
+
+    /// Records a detected place for a night, unless the person set that
+    /// night's place by hand. Returns whether anything changed.
+    @discardableResult
+    func setAutomatic(_ place: Place, forNightEnding date: Date) -> Bool {
+        let key = stamp(date)
+        if let current = nights[key], !current.wasDetected { return false }
+        var detected = place
+        detected.isAutomatic = true
+        guard nights[key] != detected else { return false }
+        nights[key] = detected
+        save()
+        return true
     }
 
     /// Forgets every night, the bedroom and the Weather city, file and all,

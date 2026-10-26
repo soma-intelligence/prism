@@ -73,6 +73,7 @@ struct AddBloodTestSheet: View {
                 .frame(maxWidth: theme.metrics.pageMaxWidth, alignment: .leading)
                 .frame(maxWidth: .infinity)
             }
+            .softScrollEdges()
             .background(theme.colors.canvas.color.ignoresSafeArea())
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
@@ -245,17 +246,14 @@ struct BloodPanelConfirmView: View {
                     }
                     .buttonStyle(.plain)
 
-                    DatePicker("Blood drawn", selection: $draft.sampledAt, in: ...Date(), displayedComponents: .date)
-                        .somaFont(theme.typography.body)
-                        .foregroundStyle(theme.colors.inkPrimary.color)
-                        .padding(.horizontal, theme.metrics.browseRowPadding)
-                        .frame(minHeight: theme.metrics.browseRowMinHeight)
+                    LabDateRow(title: "Blood drawn", date: $draft.sampledAt)
                         .background(RoundedRectangle(cornerRadius: theme.metrics.browseGroupCornerRadius, style: .continuous)
                             .fill(theme.colors.surface.color))
 
                     LabPrimaryButton(title: "Save the panel", isEnabled: draft.lines.contains { $0.storageValue != nil }) {
                         store.save(draft.panel(now: .now))
                         onSaved()
+                        Confirmations.shared.done("Blood panel saved")
                     }
                     LabFootnote("Kept on this phone.")
                 }
@@ -265,6 +263,7 @@ struct BloodPanelConfirmView: View {
             .frame(maxWidth: theme.metrics.pageMaxWidth, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
+        .softScrollEdges()
         .background(theme.colors.canvas.color.ignoresSafeArea())
 #if !os(visionOS)
         // The headset's keyboard floats apart from the window.
@@ -303,24 +302,13 @@ struct BloodDraftLineView: View {
                 }
             }
             Spacer(minLength: theme.metrics.browseRowSpacing)
-            TextField("-", text: $line.text)
-                .somaFont(theme.typography.rowValue)
-                .multilineTextAlignment(.trailing)
+            LabTextField(placeholder: "-", text: $line.text)
                 .frame(maxWidth: 72)
                 #if os(iOS)
                 .keyboardType(.decimalPad)
                 #endif
                 .accessibilityLabel(Text(name))
-            Menu {
-                ForEach(units, id: \.self) { unit in
-                    Button(unit) { line.unit = unit }
-                }
-            } label: {
-                Text(line.unit.isEmpty ? "unit" : line.unit)
-                    .somaFont(theme.typography.caption)
-                    .foregroundStyle(theme.colors.inkSecondary.color)
-            }
-            .buttonStyle(.plain)
+            LabUnitMenu(units: units, unit: $line.unit)
             Image(systemName: line.needsALook ? "square.and.pencil" : "checkmark")
                 .foregroundStyle(line.needsALook ? theme.colors.accent.color : theme.colors.inkSecondary.color)
                 .opacity(line.text.isEmpty ? 0 : 1)

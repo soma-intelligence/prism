@@ -313,6 +313,30 @@ public struct SomaPen: Sendable {
 
 // MARK: - The frame
 
+/// Which part of a ``SomaPlot`` draws. A pager draws the plot on its pages
+/// and the scale once, held still over them, so the numbers never slide
+/// into the middle with a page (owner, 2026-10-24). Both keep the same
+/// layout, so the held scale sits on the pages' gridlines.
+public enum SomaPlotPart: Sendable {
+    case all
+    /// The grid, the marks and the labels under them; the scale's room kept
+    /// but empty.
+    case plot
+    /// The scale alone, in the place the whole plot would put it.
+    case scale
+}
+
+private struct SomaPlotPartKey: EnvironmentKey {
+    static let defaultValue: SomaPlotPart = .all
+}
+
+public extension EnvironmentValues {
+    var somaPlotPart: SomaPlotPart {
+        get { self[SomaPlotPartKey.self] }
+        set { self[SomaPlotPartKey.self] = newValue }
+    }
+}
+
 /// A chart in the house style: the plot with its hairline grid, the scale on
 /// the trailing edge and the labels under it. The caller draws its marks in
 /// `draw` with the space and the pen.
@@ -342,6 +366,7 @@ public struct SomaPlot: View {
     private let draw: (GraphicsContext, SomaPlotSpace, SomaPen) -> Void
 
     @Environment(\.somaTheme) private var theme
+    @Environment(\.somaPlotPart) private var part
 
     public init(
         scale: SomaPlotScale?,
@@ -371,19 +396,19 @@ public struct SomaPlot: View {
         let scale = scale
         let draw = draw
 
-        HStack(alignment: .top, spacing: metrics.chartLabelGap) {
+        HStack(alignment: .plotTop, spacing: metrics.chartLabelGap) {
             VStack(spacing: metrics.chartLabelGap) {
                 if !marks.isEmpty {
-                    GeometryReader { proxy in
-                        let width = proxy.size.width - inset * 2
-                        ForEach(marks, id: \.self) { mark in
+                    // Labels that would touch drop to the next line rather
+                    // than overlap, so the strip grows a line per crowd.
+                    SomaPlotMarkLanes(fractions: marks.map(\.fraction), inset: inset, gap: metrics.chartLabelGap) {
+                        ForEach(Array(marks.enumerated()), id: \.offset) { _, mark in
                             Text(verbatim: mark.label)
                                 .lineLimit(1)
                                 .fixedSize()
-                                .offset(x: inset + width * CGFloat(min(max(mark.fraction, 0), 1)))
                         }
                     }
-                    .frame(height: metrics.chartPlotInset * 3)
+                    .frame(minHeight: metrics.chartPlotInset * 3, alignment: .bottom)
                     .somaFont(theme.typography.caption)
                     .foregroundStyle(theme.colors.inkSecondary.color)
                     .accessibilityHidden(true)
@@ -399,6 +424,8 @@ public struct SomaPlot: View {
                     draw(context, space, pen)
                 }
                 .frame(height: plotHeight)
+                .alignmentGuide(.plotTop) { $0[.top] }
+                .opacity(part == .scale ? 0 : 1)
 
                 if !xLabels.isEmpty {
                     if labelsUnderBars {
@@ -420,6 +447,7 @@ public struct SomaPlot: View {
                     }
                 }
             }
+            .opacity(part == .scale ? 0 : 1)
 
             if showsScale, let scale {
                 ZStack(alignment: .leading) {
@@ -430,9 +458,10 @@ public struct SomaPlot: View {
                     }
                 }
                 .frame(height: plotHeight)
-                .padding(.top, marks.isEmpty ? 0 : metrics.chartPlotInset * 3 + metrics.chartLabelGap)
+                .alignmentGuide(.plotTop) { $0[.top] }
                 .somaFont(theme.typography.captionValue)
                 .foregroundStyle(theme.colors.inkSecondary.color)
+                .opacity(part == .plot ? 0 : 1)
                 .accessibilityHidden(true)
             }
         }
@@ -442,6 +471,87 @@ public struct SomaPlot: View {
     private func offset(of tick: Double, in scale: SomaPlotScale, height: CGFloat, inset: CGFloat) -> CGFloat {
         let space = SomaPlotSpace(size: CGSize(width: inset * 4, height: height), domain: scale.domain, inset: inset)
         return space.y(tick) - height / 2
+    }
+}
+
+extension VerticalAlignment {
+    /// The top of a plot's drawing area, so the scale beside it lines up
+    /// with the plot however tall the mark labels above it grow.
+    private enum PlotTop: AlignmentID {
+        static func defaultValue(in context: ViewDimensions) -> CGFloat { context[.top] }
+    }
+
+    static let plotTop = VerticalAlignment(PlotTop.self)
+}
+
+/// The words over a plot, each at its share of the way across. A word that
+/// would touch the one before it on a line drops to the next line, so two
+/// meals an hour apart read as two words, never as one smudge.
+struct SomaPlotMarkLanes: Layout {
+    let fractions: [Double]
+    let inset: CGFloat
+    let gap: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let width = proposal.width ?? 0
+        let (_, lanes) = arrange(width: width, subviews: subviews)
+        return CGSize(width: width, height: height(lanes: lanes, subviews: subviews))
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let (starts, lanes) = arrange(width: bounds.width, subviews: subviews)
+        let line = lineHeight(subviews)
+        let used = (lanes.max() ?? 0) + 1
+        for (index, subview) in subviews.enumerated() {
+            // The first line sits nearest the plot; later ones stack above.
+            let row = CGFloat(used - 1 - lanes[index])
+            subview.place(at: CGPoint(x: bounds.minX + starts[index], y: bounds.minY + row * line),
+                          proposal: .unspecified)
+        }
+    }
+
+    /// Where each word starts, kept inside the strip, and its line.
+    private func arrange(width: CGFloat, subviews: Subviews) -> ([CGFloat], [Int]) {
+        let span = max(width - inset * 2, 0)
+        let widths = subviews.map { $0.sizeThatFits(.unspecified).width }
+        let starts = zip(fractions, widths).map { fraction, word in
+            min(inset + span * CGFloat(min(max(fraction, 0), 1)), max(width - word, 0))
+        }
+        return (starts, Self.lanes(starts: starts, widths: widths, gap: gap))
+    }
+
+    private func lineHeight(_ subviews: Subviews) -> CGFloat {
+        subviews.map { $0.sizeThatFits(.unspecified).height }.max() ?? 0
+    }
+
+    private func height(lanes: [Int], subviews: Subviews) -> CGFloat {
+        guard let last = lanes.max() else { return 0 }
+        return CGFloat(last + 1) * lineHeight(subviews)
+    }
+
+    /// The line each word takes, in reading order: the first line it fits
+    /// on, a gap clear of the word already there, or a new line under the
+    /// rest. Pure, so the rule is tested without drawing.
+    ///
+    /// - Parameters:
+    ///   - starts: where each word begins, in points.
+    ///   - widths: how wide each word is.
+    /// - Returns: a line per word, 0 the first.
+    static func lanes(starts: [CGFloat], widths: [CGFloat], gap: CGFloat) -> [Int] {
+        var ends: [CGFloat] = []
+        var lanes = Array(repeating: 0, count: starts.count)
+        for index in starts.indices.sorted(by: { starts[$0] < starts[$1] }) {
+            let start = starts[index]
+            let end = start + (index < widths.count ? widths[index] : 0)
+            if let free = ends.firstIndex(where: { $0 + gap <= start }) {
+                lanes[index] = free
+                ends[free] = end
+            } else {
+                lanes[index] = ends.count
+                ends.append(end)
+            }
+        }
+        return lanes
     }
 }
 
@@ -542,14 +652,22 @@ public struct SomaHypnogram: View {
     private let showsLaneTitles: Bool
 
     @Environment(\.somaTheme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorScheme) private var colorScheme
+    /// Where the finger reads the night, 0 to 1 by time. Nil when not
+    /// reading.
+    @State private var scrub: CGFloat?
+    /// Latched once a drag reads as a vertical scroll, so the page keeps it.
+    @State private var scrubIsScroll = false
 
-    /// Clock labels under the plot and the lane names beside it.
-    public init(runs: [SomaStageRun], xLabels: [String] = [], laneHeight: CGFloat? = nil) {
+    /// Clock labels under the plot and the lane names beside it, unless
+    /// `laneTitles` is off, for a strip too small to carry them.
+    public init(runs: [SomaStageRun], xLabels: [String] = [], laneHeight: CGFloat? = nil, laneTitles: Bool = true) {
         self.runs = runs.sorted { $0.start < $1.start }
         self.xLabels = xLabels
         self.laneHeight = laneHeight
         self.ends = nil
-        self.showsLaneTitles = true
+        self.showsLaneTitles = laneTitles
     }
 
     /// Full width, the night's two ends under it: bed under a moon, wake under
@@ -566,19 +684,154 @@ public struct SomaHypnogram: View {
         let metrics = theme.metrics
         let lane = laneHeight ?? (ends == nil ? metrics.hypnogramLaneHeight : metrics.hypnogramTallLaneHeight)
 
-        HStack(alignment: .top, spacing: metrics.chartLabelGap) {
+        if let ends {
+            night(lane: lane, ends: ends)
+        } else {
+            compact(lane: lane)
+        }
+    }
+
+    // MARK: The night, as a card's subject
+
+    /// The night as one chart, after the earlier app's: each lane named on the leading
+    /// edge with the time spent in it, slim blocks joined by fine steps, the
+    /// clock under it from bed to wake, and a readout over it that a
+    /// sideways drag turns into the stage and time under the finger, the
+    /// block there lit and the others dimmed.
+    private func night(lane: CGFloat, ends: (bed: String, wake: String)) -> some View {
+        let metrics = theme.metrics
+        let colors = theme.colors
+        let type = theme.typography
+        let read = scrub.flatMap { reading(at: $0) }
+
+        return VStack(alignment: .leading, spacing: metrics.cardSpacing) {
+            // The readout: the night's span at rest, the stage under the
+            // finger while reading.
+            HStack(alignment: .firstTextBaseline, spacing: metrics.spaceS) {
+                if let read {
+                    Circle().fill(read.stage.color(theme)).frame(width: 8, height: 8)
+                    Text(read.stage.title)
+                        .somaFont(type.cardTitle)
+                        .foregroundStyle(colors.inkPrimary.color)
+                    Text(verbatim: Self.clock(read.date))
+                        .somaFont(type.captionValue)
+                        .foregroundStyle(colors.inkSecondary.color)
+                } else {
+                    Text("Stages")
+                        .somaFont(type.body)
+                        .foregroundStyle(colors.inkSecondary.color)
+                }
+                Spacer(minLength: 0)
+            }
+            .frame(height: type.cardTitle.size * 1.4)
+            .animation(reduceMotion ? nil : theme.motion.quick, value: read?.stage)
+
+            // A copy of the earlier app's night chart (owner, 2026-10-24): the lanes
+            // named against an axis on the left, tall blocks ringed in a
+            // dark shade of their colour, and links that carry that ring
+            // from one block to the next as one outline.
+            let gutter = metrics.hypnogramLaneLabelWidth
+            let height = lane * CGFloat(SomaSleepStage.allCases.count)
+            VStack(spacing: metrics.chartLabelGap) {
+                GeometryReader { proxy in
+                    let layout = NightLayout(runs: runs, size: CGSize(width: proxy.size.width, height: height),
+                                             lane: lane, gutter: gutter, metrics: metrics)
+                    ZStack(alignment: .topLeading) {
+                        nightChart(layout, lit: read?.run)
+
+                        VStack(alignment: .trailing, spacing: 0) {
+                            ForEach(SomaSleepStage.allCases, id: \.self) { stage in
+                                Text(stage.title)
+                                    .somaFont(type.caption)
+                                    .foregroundStyle(colors.inkSecondary.color)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.7)
+                                    .padding(.trailing, metrics.spaceXS)
+                                    .frame(width: gutter, height: lane, alignment: .topTrailing)
+                            }
+                        }
+                        .accessibilityHidden(true)
+
+                        if let scrub {
+                            Rectangle()
+                                .fill(colors.inkPrimary.color.opacity(0.5))
+                                .frame(width: 1)
+                                .offset(x: layout.plotX + scrub * layout.plotWidth)
+                        }
+                    }
+                    .contentShape(.rect)
+                    .simultaneousGesture(scrubGesture(width: proxy.size.width, gutter: layout.plotX))
+                }
+                .frame(height: height)
+
+                // Bed under the night's first edge, wake under its last.
+                HStack {
+                    Text(verbatim: ends.bed)
+                    Spacer(minLength: 0)
+                    Text(verbatim: ends.wake)
+                }
+                .somaFont(type.captionValue)
+                .foregroundStyle(colors.inkSecondary.color)
+                .padding(.leading, gutter)
+                .accessibilityHidden(true)
+            }
+        }
+        .sensoryFeedback(.selection, trigger: read?.run)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("Sleep stages"))
+        .accessibilityValue(Text(summary))
+    }
+
+    /// The stretch, stage and moment under the finger.
+    private struct Reading: Equatable {
+        let run: Int
+        let stage: SomaSleepStage
+        let date: Date
+    }
+
+    private func reading(at share: CGFloat) -> Reading? {
+        guard let first = runs.first?.start, let last = runs.map(\.end).max() else { return nil }
+        let date = first.addingTimeInterval(last.timeIntervalSince(first) * Double(min(max(share, 0), 1)))
+        guard let index = runs.lastIndex(where: { $0.start <= date }) else { return nil }
+        return Reading(run: index, stage: runs[index].stage, date: date)
+    }
+
+    private func scrubGesture(width: CGFloat, gutter: CGFloat) -> some Gesture {
+        DragGesture(minimumDistance: 10)
+            .onChanged { value in
+                guard !scrubIsScroll else { return }
+                if scrub == nil, abs(value.translation.height) > abs(value.translation.width) {
+                    scrubIsScroll = true
+                    return
+                }
+                scrub = min(max((value.location.x - gutter) / max(width - gutter, 1), 0), 1)
+            }
+            .onEnded { _ in
+                scrub = nil
+                scrubIsScroll = false
+            }
+    }
+
+    /// 23:40, on the 24 hour clock whatever the locale, the way the bed and
+    /// wake times beside it are written. A format style with the hour's
+    /// day period left out still counts to twelve in a 12 hour locale, which
+    /// put a 18:21 sunset at 06:21.
+    static func clock(_ date: Date, calendar: Calendar = .current) -> String {
+        let parts = calendar.dateComponents([.hour, .minute], from: date)
+        return String(format: "%02d:%02d", parts.hour ?? 0, parts.minute ?? 0)
+    }
+
+    // MARK: Compact, among other readings
+
+    private func compact(lane: CGFloat) -> some View {
+        let metrics = theme.metrics
+
+        return HStack(alignment: .top, spacing: metrics.chartLabelGap) {
             VStack(spacing: metrics.chartLabelGap) {
                 plot(lane: lane)
                     .frame(height: lane * CGFloat(SomaSleepStage.allCases.count))
 
-                if let ends {
-                    HStack {
-                        endChip(symbol: "moon.fill", time: ends.bed)
-                        Spacer(minLength: metrics.chartLabelGap)
-                        endChip(symbol: "sun.max.fill", time: ends.wake)
-                    }
-                    .accessibilityHidden(true)
-                } else if !xLabels.isEmpty {
+                if !xLabels.isEmpty {
                     SomaAxisLabels(xLabels)
                 }
             }
@@ -601,67 +854,196 @@ public struct SomaHypnogram: View {
         .accessibilityValue(Text(summary))
     }
 
+    /// The compact strip's canvas.
     private func plot(lane: CGFloat) -> some View {
+        let pen = SomaPen(theme)
+        let shades = Dictionary(uniqueKeysWithValues: SomaSleepStage.allCases.map { ($0, $0.color(theme)) })
+        let runs = runs
+        return Canvas { context, size in
+            compactPlot(context, size: size, lane: lane, pen: pen, shades: shades, runs: runs)
+        }
+    }
+
+    /// Where everything on the night chart sits.
+    private struct NightLayout {
+        struct Block {
+            let index: Int
+            let stage: SomaSleepStage
+            let rect: CGRect
+        }
+
+        /// A link: a line in the rims' shade from the middle of one block to
+        /// the middle of the next, standing in the gap between them and
+        /// passing behind both, as the earlier app draws it.
+        struct Link {
+            let upper: SomaSleepStage
+            let lower: SomaSleepStage
+            let rect: CGRect
+        }
+
+        let size: CGSize
+        let axisX: CGFloat
+        let plotX: CGFloat
+        let plotWidth: CGFloat
+        let blocks: [Block]
+        let links: [Link]
+
+        init(runs: [SomaStageRun], size: CGSize, lane: CGFloat, gutter: CGFloat, metrics: SomaMetrics) {
+            self.size = size
+            axisX = gutter
+            plotX = gutter + metrics.hypnogramPlotInset
+            plotWidth = max(size.width - plotX - metrics.hypnogramPlotInset, 1)
+            guard let first = runs.first?.start, let last = runs.map(\.end).max() else {
+                blocks = []; links = []
+                return
+            }
+            let span = max(last.timeIntervalSince(first), 1)
+            let plotX = plotX, plotWidth = plotWidth
+            func x(_ date: Date) -> CGFloat { plotX + plotWidth * CGFloat(date.timeIntervalSince(first) / span) }
+            func mid(_ stage: SomaSleepStage) -> CGFloat { lane * (CGFloat(stage.rawValue) + 0.5) }
+            let height = lane * metrics.hypnogramNightBlockShare
+            let minimum = metrics.hypnogramNightMinBlockWidth
+
+            // A block never starts inside the one before it, which a short
+            // run widened to the minimum would otherwise reach into, and two
+            // blocks in a row keep a gap between them for the link to stand
+            // in.
+            var blocks: [Block] = []
+            var reach = -CGFloat.infinity
+            for (index, run) in runs.enumerated() {
+                // A short gap to the stretch before is closed, so the two
+                // blocks meet on one seam.
+                let closes = index > 0 && run.start.timeIntervalSince(runs[index - 1].end) < 120
+                let x0 = closes ? reach : max(x(run.start), reach)
+                let width = max(x(run.end) - x0, minimum)
+                reach = x0 + width
+                let gap = metrics.hypnogramNightBlockGap / 2
+                blocks.append(Block(index: index, stage: run.stage,
+                                    rect: CGRect(x: x0 + gap, y: mid(run.stage) - height / 2,
+                                                 width: max(width - gap * 2, 2), height: height)))
+            }
+            var links: [Link] = []
+            for index in blocks.indices.dropFirst() {
+                let previous = runs[index - 1], next = runs[index]
+                guard previous.stage != next.stage, next.start.timeIntervalSince(previous.end) < 120 else { continue }
+                let goingDown = next.stage.rawValue > previous.stage.rawValue
+                let upper = blocks[goingDown ? index - 1 : index]
+                let lower = blocks[goingDown ? index : index - 1]
+                // In the seam between the two blocks, from the middle of the
+                // upper to the middle of the lower, so the line touches both
+                // sides and never hangs under one block into empty lane, as
+                // the reference design draws it (owner, 2026-10-25: the stalk out of the
+                // block's foot read as broken).
+                let seam = (blocks[index - 1].rect.maxX + blocks[index].rect.minX) / 2
+                let width = metrics.hypnogramLinkWidth
+                links.append(Link(upper: upper.stage, lower: lower.stage,
+                                  rect: CGRect(x: seam - width / 2, y: upper.rect.midY,
+                                               width: width, height: lower.rect.midY - upper.rect.midY)))
+            }
+            self.blocks = blocks
+            self.links = links
+        }
+    }
+
+    /// The chart in one canvas: axes, links, then blocks, on the card's own
+    /// ground (owner, 2026-10-24: no sky behind it).
+    private func nightChart(_ layout: NightLayout, lit: Int?) -> some View {
+        let metrics = theme.metrics
+        let pen = SomaPen(theme)
+        let dark = colorScheme == .dark
+        let shades = Dictionary(uniqueKeysWithValues: SomaSleepStage.allCases.map { ($0, $0.color(theme)) })
+        let fallback = theme.colors.inkSecondary.color
+        // The shade a block is ringed in: its colour sunk most of the way
+        // into the card, which gives the earlier app's slate, navy and brown rims, a
+        // step lighter than the ground. The links are all in REM's, the earlier app's
+        // slate, whatever they join.
+        let ground = theme.colors.surface.color
+        func rim(_ stage: SomaSleepStage) -> Color {
+            dark ? shades[stage, default: fallback].mix(with: ground, by: metrics.hypnogramRimShade)
+                : shades[stage, default: fallback].mix(with: .black, by: metrics.hypnogramRimShade * 0.6)
+        }
+        let linkShade = rim(.rem)
+        return Canvas { context, size in
+            // The axes: left and foot, a hairline on the right.
+            var axes = Path()
+            axes.move(to: CGPoint(x: layout.axisX + 0.5, y: 0))
+            axes.addLine(to: CGPoint(x: layout.axisX + 0.5, y: size.height - 0.5))
+            axes.addLine(to: CGPoint(x: size.width, y: size.height - 0.5))
+            context.stroke(axes, with: .color(pen.grid), lineWidth: 1)
+            var right = Path()
+            right.move(to: CGPoint(x: size.width - 0.5, y: 0))
+            right.addLine(to: CGPoint(x: size.width - 0.5, y: size.height))
+            context.stroke(right, with: .color(pen.grid.opacity(0.5)), lineWidth: 0.5)
+
+            // The links first, behind everything, then the rims, then the
+            // fills.
+            let ring = metrics.hypnogramRimWidth
+            func fill(_ stage: SomaSleepStage) -> Color { shades[stage, default: fallback] }
+            func shape(_ rect: CGRect, corner: CGFloat) -> Path {
+                Path(roundedRect: rect, cornerRadius: corner, style: .continuous)
+            }
+            func isLit(_ index: Int) -> Bool { lit == nil || lit == index }
+
+            for link in layout.links {
+                context.fill(Path(link.rect), with: .color(linkShade))
+            }
+            for block in layout.blocks {
+                let corner = min(metrics.hypnogramNightBlockRadius, block.rect.width / 2, block.rect.height / 2)
+                context.fill(shape(block.rect, corner: corner),
+                             with: .color(rim(block.stage).opacity(isLit(block.index) ? 1 : 0.4)))
+            }
+            for block in layout.blocks {
+                let corner = min(metrics.hypnogramNightBlockRadius, block.rect.width / 2, block.rect.height / 2)
+                let inner = block.rect.insetBy(dx: min(ring, block.rect.width / 4), dy: ring)
+                let innerCorner = min(max(corner - ring, 2), inner.width / 2, inner.height / 2)
+                context.fill(shape(inner, corner: innerCorner),
+                             with: .color(fill(block.stage).opacity(isLit(block.index) ? 1 : 0.35)))
+            }
+        }
+        .allowsHitTesting(false)
+    }
+
+    /// The compact strip among other readings: a faint grid, slim blocks and
+    /// a hairline step between them.
+    private func compactPlot(_ context: GraphicsContext, size: CGSize, lane: CGFloat, pen: SomaPen,
+                             shades: [SomaSleepStage: Color], runs: [SomaStageRun]) {
         let metrics = theme.metrics
         let lanes = SomaSleepStage.allCases
-        let pen = SomaPen(theme)
-        let shades = Dictionary(uniqueKeysWithValues: lanes.map { ($0, $0.color(theme)) })
-        let runs = runs
         let block = lane * metrics.hypnogramBlockShare
         let radius = metrics.hypnogramBlockRadius
         let connector = metrics.hypnogramConnectorWidth
 
-        return Canvas { context, size in
-            for index in 0...lanes.count {
-                let y = index == lanes.count ? size.height - 0.25 : CGFloat(index) * lane + 0.25
-                pen.gridline(context, y: y, to: size.width)
-            }
-            guard let first = runs.first?.start, let last = runs.map(\.end).max() else { return }
-            let span = max(last.timeIntervalSince(first), 1)
-            func x(_ date: Date) -> CGFloat { size.width * CGFloat(date.timeIntervalSince(first) / span) }
-            func mid(_ stage: SomaSleepStage) -> CGFloat { lane * (CGFloat(stage.rawValue) + 0.5) }
-
-            // The joins first, so the blocks sit on top of them. Each runs from
-            // the middle of one block to the middle of the next and fades from
-            // the first stage's colour into the second's.
-            for (previous, next) in zip(runs, runs.dropFirst()) where previous.stage != next.stage {
-                guard next.start.timeIntervalSince(previous.end) < 120 else { continue }
-                let stepX = min(max(x(next.start), connector / 2), size.width - connector / 2)
-                let from = CGPoint(x: stepX, y: mid(previous.stage))
-                let to = CGPoint(x: stepX, y: mid(next.stage))
-                var step = Path()
-                step.move(to: from)
-                step.addLine(to: to)
-                let colors = [shades[previous.stage, default: pen.inkSecondary], shades[next.stage, default: pen.inkSecondary]]
-                context.stroke(step, with: .linearGradient(Gradient(colors: colors), startPoint: from, endPoint: to),
-                               lineWidth: connector)
-            }
-            for run in runs {
-                let x0 = x(run.start)
-                let width = max(x(run.end) - x0, connector * 2)
-                let rect = CGRect(x: x0, y: mid(run.stage) - block / 2, width: width, height: block)
-                context.fill(Path(roundedRect: rect, cornerRadius: min(radius, width / 2), style: .continuous),
-                             with: .color(shades[run.stage, default: pen.inkSecondary]))
-            }
+        for index in 0...lanes.count {
+            let y = index == lanes.count ? size.height - 0.25 : CGFloat(index) * lane + 0.25
+            pen.gridline(context, y: y, to: size.width)
         }
-    }
+        guard let first = runs.first?.start, let last = runs.map(\.end).max() else { return }
+        let span = max(last.timeIntervalSince(first), 1)
+        func x(_ date: Date) -> CGFloat { size.width * CGFloat(date.timeIntervalSince(first) / span) }
+        func mid(_ stage: SomaSleepStage) -> CGFloat { lane * (CGFloat(stage.rawValue) + 0.5) }
 
-    private func endChip(symbol: String, time: String) -> some View {
-        let metrics = theme.metrics
-        return HStack(spacing: metrics.hypnogramEndPadding / 2) {
-            Image(systemName: symbol)
-                .imageScale(.small)
-            Text(verbatim: time)
+        // The joins first, so the blocks sit on top of them. Each runs from
+        // the middle of one block to the middle of the next and fades from
+        // the first stage's colour into the second's.
+        for (previous, next) in zip(runs, runs.dropFirst()) where previous.stage != next.stage {
+            guard next.start.timeIntervalSince(previous.end) < 120 else { continue }
+            let stepX = min(max(x(next.start), connector / 2), size.width - connector / 2)
+            let from = CGPoint(x: stepX, y: mid(previous.stage))
+            let to = CGPoint(x: stepX, y: mid(next.stage))
+            var step = Path()
+            step.move(to: from)
+            step.addLine(to: to)
+            let colors = [shades[previous.stage, default: pen.inkSecondary], shades[next.stage, default: pen.inkSecondary]]
+            context.stroke(step, with: .linearGradient(Gradient(colors: colors), startPoint: from, endPoint: to),
+                           lineWidth: connector)
         }
-        .somaFont(theme.typography.captionValue)
-        .foregroundStyle(theme.colors.inkPrimary.color)
-        .padding(.horizontal, metrics.hypnogramEndPadding)
-        .padding(.vertical, metrics.hypnogramEndPadding / 2)
-        .background(
-            RoundedRectangle(cornerRadius: metrics.hypnogramBlockRadius, style: .continuous)
-                .fill(theme.colors.surfaceRecessed.color)
-        )
-        .fixedSize()
+        for run in runs {
+            let x0 = x(run.start)
+            let width = max(x(run.end) - x0, connector * 2)
+            let rect = CGRect(x: x0, y: mid(run.stage) - block / 2, width: width, height: block)
+            context.fill(Path(roundedRect: rect, cornerRadius: min(radius, width / 2, block / 2), style: .continuous),
+                         with: .color(shades[run.stage, default: pen.inkSecondary]))
+        }
     }
 
     private var summary: String {

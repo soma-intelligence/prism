@@ -6,44 +6,27 @@
 import SwiftUI
 import SomaUI
 
-/// How are you? The four statuses, one chosen, applied with Update.
+/// How are you? The four statuses, one chosen.
 ///
-/// The Activity Status sheet, over Pulse. The choice is held until Update, so a
-/// stray tap changes nothing.
+/// the earlier app's Activity Status sheet (20b.11), drawn as a Soma sheet over Pulse. A
+/// tap applies the status at once, with a tick and a haptic, the way a
+/// Settings list picks a value; the big Update button under it read as a
+/// form (owner, 2026-10-24).
 struct ActivityStatusPage: View {
-    @Environment(\.somaTheme) private var theme
-    @Environment(\.dismiss) private var dismiss
-
     @State private var store = ActivityStatusStore.shared
-    @State private var selected: ActivityStatus?
 
     var body: some View {
-        let chosen = selected ?? store.current
+        let chosen = store.current
 
         ListScaffold(eyebrow: "Activity status", title: "How are you?") {
-
             SomaBrowseGroup(ActivityStatus.allCases) { status in
-                Button { selected = status } label: {
+                Button { store.set(status) } label: {
                     ActivityStatusLine(status: status, text: status.summary, isChosen: status == chosen)
                 }
                 .buttonStyle(.plain)
                 .accessibilityAddTraits(status == chosen ? .isSelected : [])
             }
-
-
-            Button {
-                store.set(chosen)
-                dismiss()
-            } label: {
-                Text("Update")
-                    .somaFont(theme.typography.body)
-                    .foregroundStyle(theme.colors.onAccent.color)
-                    .frame(maxWidth: .infinity, minHeight: theme.metrics.minimumTapTarget)
-                    .background(Capsule().fill(theme.colors.accent.color))
-                    .contentShape(.capsule)
-            }
-            .buttonStyle(.somaGlassPress)
-            .disabled(chosen == store.current)
+            .sensoryFeedback(.selection, trigger: chosen)
         }
     }
 }
@@ -72,12 +55,13 @@ struct ActivityStatusLine: View {
     @Environment(\.somaTheme) private var theme
 
     var body: some View {
-        HStack(alignment: .top, spacing: theme.metrics.browseRowSpacing) {
+        // The glyph centred on the row, the way every other glyph row in
+        // Soma sets it; pinned to the top it floated above the title.
+        HStack(alignment: .center, spacing: theme.metrics.browseRowSpacing) {
             Image(systemName: status.symbol)
-                .font(.system(size: theme.metrics.browseGlyphSize))
+                .font(.system(size: theme.metrics.browseGlyphSize, weight: .light))
                 .foregroundStyle(theme.colors.inkPrimary.color)
                 .frame(width: theme.metrics.browseGlyphColumn)
-                .padding(.top, theme.metrics.scoreLabelSpacing)
             SettingsLine(status.title, detail: text) {
                 if isChosen {
                     Image(systemName: "checkmark")

@@ -99,7 +99,7 @@ struct MuscleWorkPage: View {
         }
         .navigationTitle("Muscle work")
         .task { history = await health.fitnessHistory(days: Self.days) }
-        .refreshable { history = await health.fitnessHistory(days: Self.days) }
+        .somaRefreshable { history = await health.fitnessHistory(days: Self.days) }
     }
 
     private var figureTitle: String {
@@ -165,10 +165,9 @@ struct MuscleWorkPage: View {
         let column = theme.metrics.metricColumnWidth
 
         return SomaCard {
-            VStack(alignment: .leading, spacing: theme.metrics.cardHeaderSpacing * 2) {
+            VStack(alignment: .leading, spacing: theme.metrics.spaceS) {
                 Text("By muscle group")
                     .somaFont(type.eyebrow)
-                    .textCase(.uppercase)
                     .foregroundStyle(colors.inkSecondary.color)
                 Grid(alignment: .leading, horizontalSpacing: theme.metrics.metricColumnSpacing, verticalSpacing: theme.metrics.bodyRowSpacing) {
                     GridRow {

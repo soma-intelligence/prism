@@ -35,7 +35,6 @@ struct TrackPracticeView: View {
 
     var body: some View {
         let metrics = theme.metrics
-        let colors = theme.colors
         let since = Calendar.current.date(byAdding: .day, value: -30, to: .now) ?? .now
         let count = log.practices(practice, since: since).count
 
@@ -52,15 +51,6 @@ struct TrackPracticeView: View {
             }
             .padding(.top, metrics.leadSpacing)
 
-            HStack(spacing: metrics.aspectDotSpacing * 2) {
-                ForEach(0..<Self.wanted, id: \.self) { index in
-                    Circle()
-                        .fill(index < count ? SomaTrackTone.sage.color : colors.surface.color)
-                        .frame(width: metrics.aspectDotSize * 1.6, height: metrics.aspectDotSize * 1.6)
-                }
-            }
-            .accessibilityHidden(true)
-
             TrackNote(lead: countLine(count))
         } footer: {
             SomaActionButton("Log \(SomaArcDial<EmptyView>.number(minutes)) \(minutes == 1 ? "minute" : "minutes")") {
@@ -70,7 +60,12 @@ struct TrackPracticeView: View {
                     journal.toggle(tag.id, on: now)
                 }
                 if practice == .meditation {
-                    Task { await TrackHealthWriter.saveMindful(minutes: minutes, endingAt: now) }
+                    Task {
+                        let reached = await TrackHealthWriter.saveMindful(minutes: minutes, endingAt: now)
+                        Confirmations.shared.logged(practice.title, reachedHealth: reached)
+                    }
+                } else {
+                    Confirmations.shared.done("\(practice.title) logged")
                 }
                 dismiss()
             }

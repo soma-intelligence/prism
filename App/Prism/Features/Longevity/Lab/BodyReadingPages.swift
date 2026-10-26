@@ -5,6 +5,7 @@
 
 import SwiftUI
 import SomaUI
+import HealthExportCore
 
 // MARK: - Weight
 
@@ -41,6 +42,7 @@ struct WeightPage: View {
             ) {
                 if month.count >= 2 { LabLineChart(points: month, band: band) }
             }
+            coaching(MetricCoaching.weight, latest?.value, usual: band)
             LabRowGroup(heading: "By period", rows: [(7, "7 days"), (30, "30 days"), (84, "12 weeks")].map { days, title in
                 LabRow(title, detail: LabMath.change(weights, days: days, now: now, calendar: .current)
                     .flatMap { LabMath.signed($0, decimals: 1) }.map { "\($0) kg" } ?? "-")
@@ -53,9 +55,9 @@ struct WeightPage: View {
                        detail: "Same scale, same time: the line stays honest.", actionTitle: "Log weight",
                        aspect: .body) { isLogging = true }
         }
-        .navigationTitle("Weight")
+        .labPageTitle(Text("Weight"))
         .task { await load() }
-        .refreshable { await load() }
+        .somaRefreshable { await load() }
         .sheet(isPresented: $isLogging, onDismiss: { Task { await load() } }) {
             LabLogSheet(kind: .weight, start: latest?.value)
         }
@@ -109,6 +111,7 @@ struct BloodPressurePage: View {
             ) {
                 if !ten.isEmpty { LabPressureChart(readings: ten) }
             }
+            coaching(MetricProfile.systolic, last?.systolic, secondary: last?.diastolic)
             if let last {
                 LabBandCard(title: "Against your usual", eyebrow: "Last ten readings", aspect: .heart, items: [
                     usualItem("Systolic", last.systolic, ten.map(\.systolic), lo: 90, hi: 160),
@@ -128,9 +131,9 @@ struct BloodPressurePage: View {
                        detail: "Seated, arm at heart height, after five quiet minutes.", actionTitle: "Log reading",
                        aspect: .heart) { isLogging = true }
         }
-        .navigationTitle("Blood Pressure")
+        .labPageTitle(Text("Blood Pressure"))
         .task { await load() }
-        .refreshable { await load() }
+        .somaRefreshable { await load() }
         .sheet(isPresented: $isLogging, onDismiss: { Task { await load() } }) {
             LabLogSheet(kind: .pressure, start: last?.systolic, second: last?.diastolic)
         }
@@ -196,6 +199,10 @@ struct LeanMassPage: View {
             ) {
                 if lean.count >= 2 { LabLineChart(points: lean) }
             }
+            coaching(MetricCoaching.leanMass, latest?.value, usual: LabMath.usualBand(lean.suffix(10).map(\.value)))
+            SomaChartCard(eyebrow: "By region", value: nil, unit: "kg lean", note: "Your first visit to the pod draws this.") {
+                BodySilhouette()
+            }
             if !lean.isEmpty {
                 LabRowGroup(heading: "Reading by reading", rows: lean.suffix(5).reversed().map { point in
                     LabRow(point.date.labDay, detail: "\(LabMath.format(point.value, decimals: 1) ?? "-") kg")
@@ -205,9 +212,9 @@ struct LeanMassPage: View {
                        detail: "Written to Health, where the scale’s own readings land too.", actionTitle: "Log lean mass",
                        aspect: .body) { isLogging = true }
         }
-        .navigationTitle("Lean Body Mass")
+        .labPageTitle(Text("Lean Body Mass"))
         .task { await load() }
-        .refreshable { await load() }
+        .somaRefreshable { await load() }
         .sheet(isPresented: $isLogging, onDismiss: { Task { await load() } }) {
             LabLogSheet(kind: .leanMass, start: latest?.value)
         }
@@ -225,14 +232,45 @@ struct LeanMassPage: View {
 
 /// Blood glucose from Health: fasting in the morning, how far the day rose
 /// above where it started, HbA1c from the blood panel, and the day's line.
+///
+/// When more than 70 % of the fortnight's readings sit in a monitor's trace
+/// the page is `GlucosePage` instead, under the same title: a finger stick's
+/// fasting value says little next to a monitor's day.
 struct BloodGlucosePage: View {
+    /// Open the monitor's page whatever the readings, as `LabRoute.cgm` does:
+    /// without a monitor it says what fills it.
+    var opensMonitor = false
+
     @Environment(HealthDashboard.self) private var health
 
+    @State private var samples: [HealthReading] = []
     @State private var readings: [LabPoint] = []
+    @State private var isLoaded = false
     @State private var panels = BloodPanelStore.shared
     @State private var isLogging = false
 
+    private var showsMonitor: Bool {
+        opensMonitor || GlucoseSummary.isContinuous(samples.sorted { $0.start < $1.start })
+    }
+
     var body: some View {
+        Group {
+            if showsMonitor {
+                GlucosePage(samples: samples, isLoaded: isLoaded)
+            } else {
+                fingerSticks
+            }
+        }
+        .labPageTitle(Text(showsMonitor ? "Glucose" : "Blood Glucose"))
+        .task { await load() }
+        .somaRefreshable { await load() }
+        .sheet(isPresented: $isLogging, onDismiss: { Task { await load() } }) {
+            LabLogSheet(kind: .glucose, start: readings.last?.value)
+        }
+    }
+
+    @ViewBuilder
+    private var fingerSticks: some View {
         let calendar = Calendar.current
         let fasting = GlucoseDays.fasting(readings, calendar: calendar)
         let today = readings.filter { calendar.isDateInToday($0.date) }
@@ -259,6 +297,7 @@ struct BloodGlucosePage: View {
             ) {
                 if chartPoints.count >= 2 { LabLineChart(points: chartPoints, band: 70...99, aspect: .gut) }
             }
+            coaching(MetricCoaching.glucose, fasting.last?.value, usual: usualFasting)
             if !fasting.isEmpty {
                 LabBandCard(title: "Against your usual", eyebrow: "Last 14 days", aspect: .gut, items: [
                     LabBandItem(id: "fasting", title: "Fasting glucose",
@@ -280,12 +319,6 @@ struct BloodGlucosePage: View {
                        detail: "Fasting, first thing, reads cleanest.", actionTitle: "Log glucose",
                        aspect: .gut) { isLogging = true }
         }
-        .navigationTitle("Blood Glucose")
-        .task { await load() }
-        .refreshable { await load() }
-        .sheet(isPresented: $isLogging, onDismiss: { Task { await load() } }) {
-            LabLogSheet(kind: .glucose, start: readings.last?.value)
-        }
     }
 
     private func position(_ v: Double) -> Double { min(max((v - 50) / 150, 0), 1) }
@@ -306,8 +339,26 @@ struct BloodGlucosePage: View {
     }
 
     private func load() async {
-        guard let source = await health.prepare([LabMetric.glucose]) else { return }
-        readings = await LabHealth.points(LabMetric.glucose, days: 14, now: .now, calendar: .current, in: source)
+        defer { isLoaded = true }
+        show(await health.glucoseFortnight())
+    }
+
+    /// The raw readings for the monitor's page, and the points the finger
+    /// stick page plots, read off them the way `LabHealth.points` reads.
+    private func show(_ found: [HealthReading]) {
+        samples = found
+        readings = found.map { LabPoint(date: $0.end, value: $0.value) }.sorted { $0.date < $1.date }
+    }
+}
+
+/// The Coaching card for a reading page, on the person's age and sex.
+@MainActor @ViewBuilder
+private func coaching(_ identifier: String, _ value: Double?, secondary: Double? = nil,
+                      usual: ClosedRange<Double>? = nil) -> some View {
+    let person = MetricCoaching.Person.current()
+    if let advice = MetricCoaching.advice(for: identifier, value: value, secondary: secondary, usual: usual,
+                                          age: person.age, sex: person.sex) {
+        MetricCoachingCard(advice: advice)
     }
 }
 
@@ -347,7 +398,7 @@ struct LabLogCard: View {
             actionTitle: LabHealthWriter.canWrite ? actionTitle : nil,
             action: LabHealthWriter.canWrite ? action : nil
         ) {
-            SomaOrb(aspect: aspect, scale: .mini)
+            SomaObjectIcon(aspect: aspect, size: .row)
         }
     }
 }
@@ -434,9 +485,9 @@ struct LabLogSheet: View {
     }
 
     private func valueBlock(title: String?, value: Binding<Double>, range: ClosedRange<Double>) -> some View {
-        VStack(spacing: 6) {
+        VStack(spacing: theme.metrics.spaceS) {
             if let title { LabEyebrow(title) }
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
+            HStack(alignment: .firstTextBaseline, spacing: theme.metrics.spaceS) {
                 Text(LabMath.format(value.wrappedValue, decimals: kind.step < 1 ? 1 : 0) ?? "-")
                     .somaFont(theme.typography.metric)
                     .foregroundStyle(theme.colors.inkPrimary.color)

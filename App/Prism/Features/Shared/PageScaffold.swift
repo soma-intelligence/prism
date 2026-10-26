@@ -39,7 +39,6 @@ struct PageScaffold<Content: View>: View {
                 VStack(alignment: .leading, spacing: theme.metrics.cardHeaderSpacing) {
                     Text(eyebrow)
                         .somaFont(theme.typography.eyebrow)
-                        .textCase(.uppercase)
                         .foregroundStyle(theme.colors.inkSecondary.color)
 
                     Text(title)
@@ -59,6 +58,7 @@ struct PageScaffold<Content: View>: View {
             .frame(maxWidth: .infinity)
         }
         .background(theme.colors.canvas.color.ignoresSafeArea())
+        .softScrollEdges()
     }
 }
 
@@ -95,7 +95,6 @@ struct ListScaffold<Content: View>: View {
                 VStack(alignment: .leading, spacing: theme.metrics.cardHeaderSpacing) {
                     Text(eyebrow)
                         .somaFont(theme.typography.eyebrow)
-                        .textCase(.uppercase)
                         .foregroundStyle(theme.colors.inkSecondary.color)
 
                     Text(title)
@@ -107,10 +106,10 @@ struct ListScaffold<Content: View>: View {
             }
             .padding(theme.metrics.pagePadding)
             // The navigation bar already reserves the sheet's top safe area.
-            .frame(maxWidth: theme.metrics.pageMaxWidth, alignment: .leading)
-            .frame(maxWidth: .infinity)
+            .somaReadableWidth()
         }
         .background(theme.colors.canvas.color.ignoresSafeArea())
+        .softScrollEdges()
     }
 }
 
@@ -128,7 +127,6 @@ struct MetricCard: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text(eyebrow)
                     .somaFont(theme.typography.eyebrow)
-                    .textCase(.uppercase)
                     .foregroundStyle(theme.colors.inkSecondary.color)
 
                 HStack(alignment: .firstTextBaseline, spacing: 4) {

@@ -226,7 +226,7 @@ enum HealthSeedCatalog {
         "IrregularHeartRhythmEvent": .init(1, 1, perDay: 1, chance: 0.04),
         "LowCardioFitnessEvent": .init(1, 1, perDay: 1, chance: 0.03),
         "AppleWalkingSteadinessEvent": .init(1, 1, perDay: 1, chance: 0.03),
-        "EnvironmentalAudioExposureEvent": .init(1, 1, perDay: 1, chance: 0.08),
+        "AudioExposureEvent": .init(1, 1, perDay: 1, chance: 0.08),
         "HeadphoneAudioExposureEvent": .init(1, 1, perDay: 1, chance: 0.05),
         "MenstrualFlow": .init(1, 1, perDay: 1, chance: 0.18),
         "CervicalMucusQuality": .init(1, 1, perDay: 1, chance: 0.2),
@@ -250,7 +250,7 @@ enum HealthSeedCatalog {
         "Contraceptive": 1,                      // unspecified
         "LowCardioFitnessEvent": 1,              // low fitness
         "AppleWalkingSteadinessEvent": 1,        // initial low
-        "EnvironmentalAudioExposureEvent": 1,    // momentary limit
+        "AudioExposureEvent": 1,                 // momentary limit
         "HeadphoneAudioExposureEvent": 1,        // seven day limit
     ])
 

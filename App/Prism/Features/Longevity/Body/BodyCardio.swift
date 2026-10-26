@@ -126,7 +126,7 @@ struct BodyCardio: Equatable {
     static let runTypes: Set<Int> = [37, 52]
 
     static func latestRun(in workouts: [HealthReading]) -> HealthReading? {
-        workouts.filter { runTypes.contains(Int($0.value)) }.max { $0.start < $1.start }
+        workouts.filter { runTypes.contains($0.code) }.max { $0.start < $1.start }
     }
 
     static func minutes(_ value: Double) -> String { String(Int(value.rounded())) }
@@ -232,7 +232,7 @@ struct BodyCardio: Equatable {
         }
 
         return Run(
-            title: Int(workout.value) == 37 ? "Run" : "Walk",
+            title: workout.code == 37 ? "Run" : "Walk",
             distance: kilometres.flatMap { BodyMath.format($0, decimals: 1, locale: locale) },
             duration: BodyMath.clock(seconds),
             note: sentences.joined(separator: " "),

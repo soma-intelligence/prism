@@ -5,21 +5,14 @@
 
 import SwiftUI
 
-/// An aspect's orb: the website hero's weather wrapped on a lit sphere, with
-/// the next move written on it.
+/// An aspect's orb: a body of the aspect's colour lit from within, with the
+/// next move written on it.
 ///
-/// The hero orb breathes: about seven slow breaths a minute, growing a little
-/// over a percent and its halo brightening at the top of each, while the
-/// weather drifts at a third of its aspect's speed with the fine eddies
-/// smoothed away and the sphere turns once in four minutes. A change of
-/// aspect sends it to the new palette the way the website's hero travels from
-/// organ to organ, the colours blending in OKLab. With Reduce Motion on it
-/// holds still at the middle of a breath and changes palette at once. A mini
-/// orb, the one that leads a row, is always still.
-///
-/// Only the shader redraws each frame, at the display's own rate: the shadow
-/// and the label sit outside the clock, the palette is resolved once per
-/// change rather than per frame, and a frame is a pure function of the time.
+/// The hero orb moves: the weather flows at its aspect's own speed while the
+/// sphere turns slowly, and a change of aspect sends it to the new palette the
+/// way the website's hero travels from organ to organ, the colours blending in
+/// OKLab. With Reduce Motion on it holds still on its last frame and changes
+/// palette at once. A mini orb, the one that leads a row, is always still.
 public struct SomaOrb: View {
     /// How big the orb is drawn, which also decides whether it moves.
     public enum Scale: Sendable {
@@ -44,6 +37,13 @@ public struct SomaOrb: View {
     /// The instant the orb first appeared: the weather's clock counts from it,
     /// so its time stays small enough for the shader's floats.
     @State private var epoch = Date()
+    /// Bumped once a journey ends, so the body is read again and the timeline
+    /// drops back to its slow rate.
+    @State private var settledCount = 0
+    /// False while the orb is off screen: on a hidden tab, under a pushed
+    /// page, or scrolled out of sight.
+    @State private var isOnScreen = true
+    private var power = SomaPowerState.shared
 
     public init(aspect: SomaAspect, label: LocalizedStringResource? = nil, scale: Scale = .hero) {
         self.aspect = aspect
@@ -55,15 +55,24 @@ public struct SomaOrb: View {
         Group {
             switch scale {
             case .hero:
-                hero
+                // Thirty frames a second for the slow weather, the display's
+                // full rate while the palette travels: at thirty the blend
+                // from one aspect to the next visibly stepped.
+                // Only the shader is redrawn each frame. The shadow and the
+                // label sit outside the timeline: rebuilt with it, the label
+                // resolved its localized string thirty times a second.
+                heroFrame {
+                    TimelineView(.animation(minimumInterval: isTravelling ? nil : 1.0 / 30.0, paused: isPaused)) { context in
+                        heroCanvas(at: context.date)
+                    }
+                }
+                .somaOnScreen($isOnScreen)
             case .mini:
                 SomaOrbCanvas(
                     frame: SomaOrbFrame(palette: palette.orb, isDark: isDark),
                     diameter: theme.metrics.miniOrbDiameter,
                     time: 0,
                     turn: 0,
-                    calm: theme.motion.orbCalm,
-                    breath: 0,
                     halo: halo
                 )
                 .accessibilityHidden(true)
@@ -83,18 +92,27 @@ public struct SomaOrb: View {
             travel = SomaOrbTravel(
                 start: now,
                 from: travel?.frame(at: now, target: oldFrame) ?? oldFrame,
-                fromSpeed: travel?.speed(at: now, target: oldPalette.speed * theme.motion.orbFlowRate)
-                    ?? oldPalette.speed * theme.motion.orbFlowRate,
-                startTime: travel?.time(at: now, targetSpeed: oldPalette.speed * theme.motion.orbFlowRate)
-                    ?? now.timeIntervalSince(epoch) * oldPalette.speed * theme.motion.orbFlowRate,
+                fromSpeed: travel?.speed(at: now, target: oldPalette.speed) ?? oldPalette.speed,
+                startTime: travel?.time(at: now, targetSpeed: oldPalette.speed)
+                    ?? now.timeIntervalSince(epoch) * oldPalette.speed,
                 duration: theme.motion.orbBlendDuration
             )
+        }
+        .task(id: travel?.start) {
+            guard let travel else { return }
+            try? await Task.sleep(for: .seconds(travel.duration + 0.3))
+            settledCount &+= 1
         }
     }
 
     private var palette: SomaAspectLook { theme.aspects[aspect] }
 
-    @Environment(\.somaPartIsShown) private var partIsShown
+    /// True for the length of a journey between two palettes, plus a beat.
+    private var isTravelling: Bool {
+        _ = settledCount
+        guard let travel else { return false }
+        return Date().timeIntervalSince(travel.start) < travel.duration + 0.2
+    }
 
     private var isDark: Bool { colorScheme == .dark }
 
@@ -102,49 +120,41 @@ public struct SomaOrb: View {
         isDark ? theme.aspects.shading.haloDark : theme.aspects.shading.haloLight
     }
 
-    /// Held still with Reduce Motion on, while the app is not on screen and
-    /// while its part of the tab is kept aside, where the frames would go to
-    /// nobody.
+    /// Held on its last frame with Reduce Motion on, in Low Power Mode, and
+    /// while the app or the orb is not on screen, where the frames would go
+    /// to nobody.
     private var isPaused: Bool {
-        reduceMotion || scenePhase != .active || !partIsShown
+        reduceMotion || scenePhase != .active || !isOnScreen || power.isLowPower
     }
 
-    /// The weather's pace for the aspect showing, slowed to a drift.
-    private var flowSpeed: Double { palette.orb.speed * theme.motion.orbFlowRate }
+    /// The moving sphere for one instant: the only part of the hero orb the
+    /// timeline redraws.
+    private func heroCanvas(at date: Date) -> some View {
+        let motion = theme.motion
+        let target = SomaOrbFrame(palette: palette.orb, isDark: isDark)
+        let frame = travel?.frame(at: date, target: target) ?? target
+        let time = travel?.time(at: date, targetSpeed: palette.orb.speed)
+            ?? date.timeIntervalSince(epoch) * palette.orb.speed
+        let turn = 2 * Double.pi
+            * date.timeIntervalSince(epoch).truncatingRemainder(dividingBy: motion.orbTurnDuration)
+            / motion.orbTurnDuration
 
-    private var hero: some View {
+        return SomaOrbCanvas(frame: frame, diameter: theme.metrics.orbDiameter, time: time, turn: turn, halo: halo)
+    }
+
+    /// The still parts of the hero orb around its moving sphere: the contact
+    /// shadow under it and the label on it.
+    private func heroFrame<Sphere: View>(@ViewBuilder sphere: () -> Sphere) -> some View {
         let diameter = theme.metrics.orbDiameter
         let shading = theme.aspects.shading
         let motion = theme.motion
         let labelFont = theme.typography.orbLabel
         let onOrb = theme.colors.onOrb.color
-        // Resolved here, once per change of aspect or appearance, and only
-        // read by the frames below.
-        let target = SomaOrbFrame(palette: palette.orb, isDark: isDark)
-        let still = reduceMotion
 
         return ZStack {
-            if !isDark {
-                // The shadow the orb sets down on the cream ground, the way a
-                // planet sits on white. The dark ground needs none.
-                Ellipse()
-                    .fill(.black.opacity(shading.contactShadowOpacity))
-                    .frame(width: diameter * 0.72, height: diameter * 0.09)
-                    .blur(radius: diameter * 0.045)
-                    .offset(y: diameter * 0.56)
-            }
-
-            SomaOrbClock(
-                target: target,
-                travel: travel,
-                epoch: epoch,
-                speed: flowSpeed,
-                diameter: diameter,
-                halo: halo,
-                motion: motion,
-                isStill: still,
-                isPaused: isPaused
-            )
+            // No contact shadow: the orb is a body of light, not a planet
+            // set down on the page.
+            sphere()
 
             if let label {
                 Text(label)
@@ -158,46 +168,9 @@ public struct SomaOrb: View {
             }
         }
         .frame(width: diameter, height: diameter)
-        .animation(reduceMotion ? nil : .easeInOut(duration: motion.orbBlendDuration / 2), value: label?.key)
-    }
-}
-
-/// The part of the hero orb that redraws every frame: the shader and its
-/// breath, and nothing else.
-private struct SomaOrbClock: View {
-    let target: SomaOrbFrame
-    let travel: SomaOrbTravel?
-    let epoch: Date
-    let speed: Double
-    let diameter: CGFloat
-    let halo: Double
-    let motion: SomaMotion
-    let isStill: Bool
-    let isPaused: Bool
-
-    var body: some View {
-        // Full rate only while it travels to a new look; at rest it is capped.
-        TimelineView(.animation(minimumInterval: travel == nil ? motion.orbRestFrameInterval : nil, paused: isPaused)) { context in
-            let date = context.date
-            let elapsed = date.timeIntervalSince(epoch)
-            let frame = travel?.frame(at: date, target: target) ?? target
-            let time = travel?.time(at: date, targetSpeed: speed) ?? elapsed * speed
-            let turn = 2 * Double.pi
-                * elapsed.truncatingRemainder(dividingBy: motion.orbTurnDuration)
-                / motion.orbTurnDuration
-            let breath = isStill ? 0 : SomaOrbIdle.breath(at: elapsed, period: motion.orbBreathPeriod)
-
-            SomaOrbCanvas(
-                frame: frame,
-                diameter: diameter,
-                time: time,
-                turn: isStill ? 0 : turn,
-                calm: motion.orbCalm,
-                breath: breath * motion.orbHaloBreath,
-                halo: halo
-            )
-            .scaleEffect(1 + motion.orbBreathDepth * breath)
-        }
+        // The word changes on the standard curve, not over half the colour's
+        // blend: a 1.6 second cross fade left two words legible at once.
+        .animation(reduceMotion ? nil : motion.standard, value: label?.key)
     }
 }
 
@@ -208,10 +181,6 @@ struct SomaOrbCanvas: View {
     let diameter: CGFloat
     let time: Double
     let turn: Double
-    /// How smooth the weather is, 0 to 1 (`SomaMotion.orbCalm`).
-    let calm: Double
-    /// The breath's lift on the halo, about -0.2 to 0.2.
-    let breath: Double
     let halo: Double
 
     @Environment(\.somaTheme) private var theme
@@ -229,7 +198,7 @@ struct SomaOrbCanvas: View {
                         ShaderLibrary.bundle(.module).somaOrb(
                             .float2(side, side),
                             .float(diameter / 2),
-                            .float4(time, turn, calm, breath),
+                            .float4(time, turn, 0, 0),
                             .float4(frame.proportion, frame.softness, frame.distortion, frame.swirl),
                             .float4(frame.shapeScale, frame.rotation * .pi / 180, frame.zoom, shading.detail),
                             .float4(shading.light, shading.rim, shading.depth, halo),

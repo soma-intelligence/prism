@@ -59,6 +59,7 @@ struct HomeCheckInSheet: View {
             guard let id, tags.contains(title), offered.contains(id), !journal.day(now).tags.contains(id) else { continue }
             journal.toggle(id, on: now)
         }
+        Confirmations.shared.done("Check-in saved")
     }
 }
 
@@ -172,6 +173,7 @@ struct HomeEffortSheet: View {
     private func save(_ workout: PulseWorkout?) {
         guard let workout else { return }
         log.setEffort(HomeEffort(workoutStart: workout.start, minutes: workout.minutes, rating: rating))
+        Confirmations.shared.done("Effort saved")
     }
 }
 
@@ -234,7 +236,7 @@ struct HomeEffortDial: View {
             let share = (angle - startAngle) / sweep
             rating = min(10, max(1, Int((share * 10).rounded(.up))))
         })
-        .padding(theme.metrics.cardSpacing * 2)
+        .padding(theme.metrics.spaceXL)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text("Effort"))
         .accessibilityValue(Text("\(rating), \(HomeEffortMath.word(rating))"))

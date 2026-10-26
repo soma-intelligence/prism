@@ -78,7 +78,8 @@ struct ScoreHistorySheet: View {
     }
 
     var body: some View {
-        let shown = Array(series.suffix(range.rawValue))
+        let series = series
+        let length = range.rawValue
         let month = Array(series.suffix(31).dropLast())
         let usual = ScoringUsual.of(month, spreadFloor: ScoringUsual.Floor.scorePoints)
         let weekMean = ScoreMath.mean(series.suffix(7))
@@ -92,21 +93,27 @@ struct ScoreHistorySheet: View {
                 VStack(alignment: .leading, spacing: 8) {
                     Text(kind == .stress ? "Stress against your usual" : "Daily \(kind.title.lowercased())")
                         .somaFont(theme.typography.eyebrow)
-                        .textCase(.uppercase)
                         .foregroundStyle(theme.colors.inkSecondary.color)
-                    if shown.allSatisfy({ $0 == nil }) {
+                    if series.allSatisfy({ $0 == nil }) {
                         ScoreEmptyPlot(message: "Days draw here once the score has seven nights behind it.")
                     } else if kind == .stress, let center = usual?.center {
                         ScoreFigure(value: today.map { ScoreMath.signed(Double($0) - center) }, unit: "today")
                         Text("Usual \(Int(center.rounded()))")
                             .somaFont(theme.typography.caption)
                             .foregroundStyle(theme.colors.inkSecondary.color)
-                        ScoreStems(deviations: shown.map { $0.map { $0 - center } }, aspect: kind.aspect)
-                        ScoreAxis(labels: axis(shown.count))
+                        ScoreDayPager(days: series.count, length: length) { indices, labels, _ in
+                            VStack(spacing: theme.metrics.spaceS) {
+                                ScoreStems(deviations: ScoreDayPager<EmptyView>.slice(series, indices).map { $0.map { $0 - center } },
+                                           aspect: kind.aspect)
+                                ScoreAxis(labels: labels)
+                            }
+                        }
                     } else {
                         ScoreFigure(value: today.map(String.init), unit: "today")
-                        ScoreDayBars(values: shown, aspect: kind.aspect,
-                                     band: usual.map { $0.low...$0.high }, labels: axis(shown.count))
+                        ScoreDayPager(days: series.count, length: length) { indices, labels, endsToday in
+                            ScoreDayBars(values: ScoreDayPager<EmptyView>.slice(series, indices), aspect: kind.aspect,
+                                         band: usual.map { $0.low...$0.high }, labels: labels, endsToday: endsToday)
+                        }
                     }
                 }
             }
@@ -131,15 +138,6 @@ struct ScoreHistorySheet: View {
         let delta = weekMean - monthAgo
         if abs(delta) < 2 { return "The 7 day average is \(average), about where it was a month ago." }
         return "The 7 day average is \(average), \(delta > 0 ? "up" : "down") from \(Int(monthAgo.rounded())) a month ago."
-    }
-
-    private func axis(_ count: Int) -> [String] {
-        let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
-        let format = Date.FormatStyle().month(.abbreviated).day()
-        let first = calendar.date(byAdding: .day, value: -(count - 1), to: today) ?? today
-        let middle = calendar.date(byAdding: .day, value: -(count - 1) / 2, to: today) ?? today
-        return [first.formatted(format), middle.formatted(format), "Today"]
     }
 
     private var reading: [(title: String, detail: String?, open: () -> Void)] {

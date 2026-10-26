@@ -71,7 +71,7 @@ struct MindInnerMapPage: View {
                                 .foregroundStyle(theme.colors.inkSecondary.color)
                         }
                         Spacer(minLength: 8)
-                        VStack(alignment: .trailing, spacing: 6) {
+                        VStack(alignment: .trailing, spacing: theme.metrics.spaceS) {
                             Text(pull.lifts ? "lifts" : "weighs")
                                 .somaFont(theme.typography.rowValue)
                                 .foregroundStyle(pull.lifts ? theme.colors.inkPrimary.color : theme.colors.danger.color)
@@ -91,7 +91,7 @@ struct MindInnerMapPage: View {
                 actionTitle: "Check in",
                 action: { isLogging = true }
             ) {
-                SomaOrb(aspect: .mind, scale: .mini)
+                SomaObjectIcon(aspect: .mind, size: .row)
             }
         }
         .task { await load() }
@@ -178,9 +178,9 @@ struct MindFeelMeasureChart: View {
             }
         }
         .frame(height: theme.metrics.chartPlotHeight)
-        .overlay(alignment: .bottomLeading) { label("Felt low").padding(4) }
-        .overlay(alignment: .bottomTrailing) { label("Felt great").padding(4) }
-        .overlay(alignment: .topLeading) { label("Body above usual").padding(4) }
+        .overlay(alignment: .bottomLeading) { label("Felt low").padding(theme.metrics.spaceXS) }
+        .overlay(alignment: .bottomTrailing) { label("Felt great").padding(theme.metrics.spaceXS) }
+        .overlay(alignment: .topLeading) { label("Body above usual").padding(theme.metrics.spaceXS) }
         .accessibilityElement()
         .accessibilityLabel("Felt against measured")
         .accessibilityValue("\(points.filter(\.agrees).count) of \(points.count) days agree")

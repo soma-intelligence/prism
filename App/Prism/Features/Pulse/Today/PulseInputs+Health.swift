@@ -27,6 +27,9 @@ extension PulseInputs {
     /// A read that fails is left empty rather than failing the page: each
     /// value it would have fed renders as a dash, and the rest still read.
     static func read(from source: any HealthSampleSource, now: Date, calendar: Calendar) async -> PulseInputs {
+        // Whatever store this is handed, read it through the border that drops
+        // values no arithmetic can use.
+        let source: any HealthSampleSource = source is SanitizedHealthSource ? source : SanitizedHealthSource(base: source)
         let today = calendar.startOfDay(for: now)
         let monthAgo = calendar.date(byAdding: .day, value: -31, to: today) ?? today
         // From six in the evening before, so last night's heart is in.
@@ -79,12 +82,12 @@ extension PulseInputs {
         var age: Int?
         if let birth = HealthMetricCatalog.metric(for: Metric.dateOfBirth),
            let reading = try? await source.latest(birth) {
-            age = Int(reading.value)
+            age = reading.code
         }
 
         let readWorkouts = await workouts
         var workoutSteps: [Date: Double] = [:]
-        for workout in readWorkouts where PulseSignals.describe(activity: Int(workout.value)).1 == .onFoot {
+        for workout in readWorkouts where PulseSignals.describe(activity: workout.code).1 == .onFoot {
             workoutSteps[workout.start] = await total(Metric.steps, from: workout.start, to: workout.end)
         }
 

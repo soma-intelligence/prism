@@ -37,12 +37,15 @@ enum DataExport {
     /// Builds the archive, and uploads it to
     /// `health-uploads/<uid>/exports/<date>.zip` when `upload` is true and
     /// someone is signed in.
-    static func run(upload: Bool = false, health: (any HealthSampleSource)? = nil, now: Date = Date()) async throws -> Result {
+    /// - Parameter scores: the scores on screen, written as the 30 days the
+    ///   account keeps; nil writes an empty table.
+    static func run(upload: Bool = false, health: (any HealthSampleSource)? = nil, scores: SomaScores? = nil,
+                    now: Date = Date()) async throws -> Result {
         let day = CloudSnapshots.dayKey(now, calendar: .current)
         let file = FileManager.default.temporaryDirectory.appending(path: "soma-export-\(day).zip")
         try? FileManager.default.removeItem(at: file)
         let zip = try ZipWriter(url: file, modified: now)
-        try await write(into: zip, health: health ?? HealthDashboard.launchSource(), now: now)
+        try await write(into: zip, health: health ?? HealthDashboard.launchSource(), scores: scores, now: now)
         try zip.finish()
 
         var uploaded: String?
@@ -52,7 +55,7 @@ enum DataExport {
         return Result(file: file, uploadedPath: uploaded)
     }
 
-    static func write(into zip: ZipWriter, health: any HealthSampleSource, now: Date) async throws {
+    static func write(into zip: ZipWriter, health: any HealthSampleSource, scores: SomaScores? = nil, now: Date) async throws {
         let user = AccountSession.shared.state.user?.id ?? "local"
         let calendar = Calendar.current
         let encoder = SupabaseServices.encoder()
@@ -75,8 +78,11 @@ enum DataExport {
             fasts: track.fasts, practices: track.practices, measures: track.measures, wakeRatings: track.wakeRatings
         ), userID: user, calendar: calendar)))
         try zip.add("lab_results.json", data: encoder.encode(CloudSnapshots.labs(BloodPanelStore.shared.panels, calendar: calendar)))
+        try zip.add("scores_daily.json", data: encoder.encode(CloudSnapshots.scores(scores, today: now, userID: user, calendar: calendar)))
         try zip.add("notification_inbox.json", data: encoder.encode(CloudSnapshots.inbox(SomaNotifications.shared.inbox, userID: user)))
-        try zip.add("provider_connections.json", data: encoder.encode(CloudSnapshots.providers(ProviderConnections.shared.states, userID: user)))
+        let providers = ProviderConnections.shared
+        try zip.add("provider_connections.json", data: encoder.encode(CloudSnapshots.providers(
+            providers.states, connectedAt: providers.connectionDates(), userID: user)))
         try zip.add("ask_conversations.json", data: encoder.encode(AskHistoryStore.shared.snapshot().map(AskExportedConversation.init)))
 
         if let anchored = health as? any HealthAnchoredSampleSource, health.isAvailable {
@@ -160,6 +166,7 @@ enum DataExport {
         mind_check_ins.json     energy, mood and focus check-ins
         track_logs.json         drinks, meals, supplements, doses, fasts, practices, measures
         lab_results.json        blood panels and their markers
+        scores_daily.json       your daily sleep, recovery, strain, stress and energy scores, 30 days
         notification_inbox.json what Soma sent you
         provider_connections.json which outside services you linked (never a password or token)
         ask_conversations.json  your conversations with Soma, each with its messages

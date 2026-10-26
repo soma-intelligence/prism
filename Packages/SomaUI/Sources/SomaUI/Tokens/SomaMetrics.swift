@@ -80,8 +80,16 @@ public struct SomaMetrics: Sendable, Equatable {
     /// Widest the bar grows on a roomy screen, where filling the row would
     /// leave the tabs marooned at opposite edges.
     public var barMaxWidthRegular: CGFloat
-    /// Corner radius of a content card.
+    /// Corner radius of anything that sits on the page as a surface: a card,
+    /// a group of rows, a photograph, a tile. One radius, so neighbours line up.
     public var cardCornerRadius: CGFloat
+    /// Corner radius of a control set inside a card: a field, a filled
+    /// button, a segmented track, a tile within a card. Concentric with the
+    /// card at the standard inset: the card's radius minus the space between.
+    public var controlCornerRadius: CGFloat
+    /// Corner radius of a chip, a tag, a thumbnail at a card's padding, or the
+    /// selected piece inside a control. Concentric with the control.
+    public var chipCornerRadius: CGFloat
     /// Inset between a card's edge and its content.
     public var cardPadding: CGFloat
     /// Opacity of the single hairline that separates a card from its ground.
@@ -113,8 +121,6 @@ public struct SomaMetrics: Sendable, Equatable {
     public var browseGlyphSize: CGFloat
     /// Point size of the chevron that says a browse row opens something.
     public var browseChevronSize: CGFloat
-    /// Corner radius of the group a run of browse rows sits in.
-    public var browseGroupCornerRadius: CGFloat
     /// Gap between one browse section and the next.
     public var browseSectionSpacing: CGFloat
     /// Gap between a browse section's heading and its group.
@@ -282,23 +288,24 @@ public struct SomaMetrics: Sendable, Equatable {
         minimumTapTarget: CGFloat = 44,
         selectionFillOpacity: Double = 0.08,
         barMaxWidthRegular: CGFloat = 560,
-        cardCornerRadius: CGFloat = 14,
-        cardPadding: CGFloat = 14,
+        cardCornerRadius: CGFloat = 24,
+        controlCornerRadius: CGFloat = 12,
+        chipCornerRadius: CGFloat = 8,
+        cardPadding: CGFloat = 16,
         hairlineOpacity: Double = 0.10,
         cardMinWidth: CGFloat = 260,
         pagePadding: CGFloat = 16,
         pageMaxWidth: CGFloat = 900,
-        glowRadius: CGFloat = 15,
-        glowOpacityRange: ClosedRange<Double> = 0.3...0.6,
+        glowRadius: CGFloat = 12,
+        glowOpacityRange: ClosedRange<Double> = 0.2...0.4,
         browseRowMinHeight: CGFloat = 44,
         browseRowPadding: CGFloat = 16,
         browseRowSpacing: CGFloat = 12,
-        browseGlyphColumn: CGFloat = 29,
+        browseGlyphColumn: CGFloat = 28,
         browseGlyphSize: CGFloat = 20,
         browseChevronSize: CGFloat = 13,
-        browseGroupCornerRadius: CGFloat = 12,
-        browseSectionSpacing: CGFloat = 20,
-        browseHeadingSpacing: CGFloat = 10,
+        browseSectionSpacing: CGFloat = 24,
+        browseHeadingSpacing: CGFloat = 8,
         browseRowVerticalPadding: CGFloat = 6,
         browseSeparatorOpacity: Double = 0.14,
         browsePressOpacity: Double = 0.07,
@@ -333,7 +340,7 @@ public struct SomaMetrics: Sendable, Equatable {
         cardSpacing: CGFloat = 12,
         cardHeaderSpacing: CGFloat = 4,
         markCaptionSize: CGFloat = 11,
-        moveRowSpacing: CGFloat = 14,
+        moveRowSpacing: CGFloat = 12,
         moveRowGap: CGFloat = 12,
         checkDiameter: CGFloat = 22,
         energyTickCount: Int = 48,
@@ -341,12 +348,12 @@ public struct SomaMetrics: Sendable, Equatable {
         energyTickHeight: CGFloat = 22,
         energyFullOpacity: Double = 0.85,
         timelineTimeGap: CGFloat = 16,
-        timelineTextGap: CGFloat = 11,
+        timelineTextGap: CGFloat = 12,
         timelineDotDiameter: CGFloat = 8,
         timelineNowDotDiameter: CGFloat = 10,
-        timelineRowSpacing: CGFloat = 14,
+        timelineRowSpacing: CGFloat = 12,
         identityDotDiameter: CGFloat = 8,
-        identityDotSpacing: CGFloat = 6,
+        identityDotSpacing: CGFloat = 8,
         aspectChartWidth: CGFloat = 118,
         aspectChartHeight: CGFloat = 54,
         chartBarWidth: CGFloat = 11,
@@ -393,6 +400,8 @@ public struct SomaMetrics: Sendable, Equatable {
         self.selectionFillOpacity = selectionFillOpacity
         self.barMaxWidthRegular = barMaxWidthRegular
         self.cardCornerRadius = cardCornerRadius
+        self.controlCornerRadius = controlCornerRadius
+        self.chipCornerRadius = chipCornerRadius
         self.cardPadding = cardPadding
         self.hairlineOpacity = hairlineOpacity
         self.cardMinWidth = cardMinWidth
@@ -406,7 +415,6 @@ public struct SomaMetrics: Sendable, Equatable {
         self.browseGlyphColumn = browseGlyphColumn
         self.browseGlyphSize = browseGlyphSize
         self.browseChevronSize = browseChevronSize
-        self.browseGroupCornerRadius = browseGroupCornerRadius
         self.browseSectionSpacing = browseSectionSpacing
         self.browseHeadingSpacing = browseHeadingSpacing
         self.browseRowVerticalPadding = browseRowVerticalPadding
@@ -509,22 +517,23 @@ public struct SomaMetrics: Sendable, Equatable {
         minimumTapTarget: 24,
         selectionFillOpacity: 0.10,
         barMaxWidthRegular: 440,
-        cardCornerRadius: 10,
-        cardPadding: 14,
+        cardCornerRadius: 16,
+        controlCornerRadius: 8,
+        chipCornerRadius: 4,
+        cardPadding: 12,
         hairlineOpacity: 0.12,
         cardMinWidth: 230,
         pagePadding: 24,
         pageMaxWidth: 820,
         glowRadius: 10,
-        glowOpacityRange: 0.22...0.42,
+        glowOpacityRange: 0.15...0.3,
         browseRowMinHeight: 28,
         browseRowPadding: 12,
         browseRowSpacing: 8,
-        browseGlyphColumn: 22,
+        browseGlyphColumn: 24,
         browseGlyphSize: 14,
         browseChevronSize: 11,
-        browseGroupCornerRadius: 9,
-        browseSectionSpacing: 20,
+        browseSectionSpacing: 24,
         browseHeadingSpacing: 8,
         browseRowVerticalPadding: 6,
         browseSeparatorOpacity: 0.16,
@@ -546,8 +555,8 @@ public struct SomaMetrics: Sendable, Equatable {
         orbDiameter: 180,
         miniOrbDiameter: 28,
         heroTopPadding: 24,
-        heroSpacing: 14,
-        leadSpacing: 22,
+        heroSpacing: 16,
+        leadSpacing: 24,
         aspectDotSize: 4,
         aspectDotSelectedWidth: 12,
         aspectDotSpacing: 5,
@@ -556,10 +565,10 @@ public struct SomaMetrics: Sendable, Equatable {
         trendMarkWidth: 6,
         trendMarkHeight: 5,
         trendMarkSpacing: 3,
-        cardSpacing: 10,
-        cardHeaderSpacing: 3,
+        cardSpacing: 8,
+        cardHeaderSpacing: 4,
         markCaptionSize: 9,
-        moveRowSpacing: 10,
+        moveRowSpacing: 8,
         moveRowGap: 8,
         checkDiameter: 16,
         energyTickCount: 48,
@@ -567,12 +576,12 @@ public struct SomaMetrics: Sendable, Equatable {
         energyTickHeight: 16,
         energyFullOpacity: 0.85,
         timelineTimeGap: 12,
-        timelineTextGap: 9,
+        timelineTextGap: 8,
         timelineDotDiameter: 6,
         timelineNowDotDiameter: 8,
-        timelineRowSpacing: 10,
+        timelineRowSpacing: 8,
         identityDotDiameter: 6,
-        identityDotSpacing: 5,
+        identityDotSpacing: 4,
         aspectChartWidth: 96,
         aspectChartHeight: 44,
         chartBarWidth: 8,
@@ -592,6 +601,10 @@ public struct SomaMetrics: Sendable, Equatable {
 #else
     public static let standard = touch
 #endif
+
+    /// Corner radius of the group a run of browse rows sits in: the card's,
+    /// so a grouped list and a card beside it share one corner.
+    public var browseGroupCornerRadius: CGFloat { cardCornerRadius }
 
     /// Outer height of the floating bar: what a consumer offsets content by.
     public var barHeight: CGFloat { tabHeight + barPadding * 2 }

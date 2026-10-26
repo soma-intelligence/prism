@@ -120,7 +120,7 @@ enum PulseSignals {
         age: Int?
     ) -> [PulseWorkout] {
         readings.sorted { $0.start < $1.start }.map { reading in
-            let (name, kind) = describe(activity: Int(reading.value))
+            let (name, kind) = describe(activity: reading.code)
             let during = heartRate
                 .filter { $0.start >= reading.start && $0.start <= reading.end }
                 .sorted { $0.start < $1.start }

@@ -3,7 +3,8 @@
 //  Prism
 //
 //  Mind's own record on the phone: the consent, the feelings logged, the
-//  check-ins, the days told in words and the category corrections. One JSON
+//  check-ins, the days told in words, the category corrections and the
+//  questionnaires. One JSON
 //  file in Application Support, beside the Journal's, never sent anywhere.
 //
 
@@ -26,6 +27,11 @@ final class MindStore {
     /// Each day's mood forecast, keyed by the day's `yyyy-MM-dd`, so the
     /// forecast page can say how it has done.
     private(set) var forecasts: [String: Double]
+    /// Questionnaires answered to the end, oldest first.
+    private(set) var assessments: [MindAssessment]
+    /// A questionnaire left half way, by instrument, so the next opening
+    /// picks up at the item it stopped on. Never scored.
+    private(set) var assessmentDrafts: [String: MindAssessment]
 
     private let url: URL?
 
@@ -36,6 +42,8 @@ final class MindStore {
         var notes: [MindDayNote] = []
         var corrections: [String: MindEventCategory] = [:]
         var forecasts: [String: Double]? = [:]
+        var assessments: [MindAssessment]? = []
+        var assessmentDrafts: [String: MindAssessment]? = [:]
     }
 
     /// - Parameter url: nil keeps everything in memory, for previews and tests.
@@ -48,6 +56,8 @@ final class MindStore {
         notes = stored.notes
         corrections = stored.corrections
         forecasts = stored.forecasts ?? [:]
+        assessments = stored.assessments ?? []
+        assessmentDrafts = stored.assessmentDrafts ?? [:]
     }
 
     nonisolated static var defaultURL: URL? {
@@ -143,6 +153,42 @@ final class MindStore {
         return formatter
     }
 
+    // MARK: Questionnaires
+
+    /// Keeps a questionnaire: a whole one joins the history and clears its
+    /// draft, a partial one replaces the draft.
+    func save(_ assessment: MindAssessment) {
+        let key = assessment.instrument.rawValue
+        if assessment.isComplete {
+            assessments.removeAll { $0.id == assessment.id }
+            assessments.append(assessment)
+            assessments.sort { $0.date < $1.date }
+            assessmentDrafts[key] = nil
+        } else {
+            assessmentDrafts[key] = assessment
+        }
+        save()
+    }
+
+    func draft(_ instrument: MindInstrument) -> MindAssessment? {
+        assessmentDrafts[instrument.rawValue]
+    }
+
+    func discardDraft(_ instrument: MindInstrument) {
+        guard assessmentDrafts[instrument.rawValue] != nil else { return }
+        assessmentDrafts[instrument.rawValue] = nil
+        save()
+    }
+
+    /// The last one answered to the end.
+    func latest(_ instrument: MindInstrument) -> MindAssessment? {
+        assessments.last { $0.instrument == instrument }
+    }
+
+    func history(_ instrument: MindInstrument) -> [MindAssessment] {
+        assessments.filter { $0.instrument == instrument }
+    }
+
     /// Erases everything Mind keeps on the phone, the consent included.
     func deleteAll() {
         consent = MindConsent()
@@ -151,6 +197,8 @@ final class MindStore {
         notes = []
         corrections = [:]
         forecasts = [:]
+        assessments = []
+        assessmentDrafts = [:]
         save()
         // Longevity's Mind lens kept the mood strip to open on: it goes too.
         LongevitySnapshotStore.shared.clearMind()
@@ -158,7 +206,8 @@ final class MindStore {
 
     private func save() {
         guard let url else { return }
-        let stored = Stored(consent: consent, moods: moods, checkIns: checkIns, notes: notes, corrections: corrections, forecasts: forecasts)
+        let stored = Stored(consent: consent, moods: moods, checkIns: checkIns, notes: notes, corrections: corrections, forecasts: forecasts,
+                            assessments: assessments, assessmentDrafts: assessmentDrafts)
         do {
             try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
             try JSONEncoder().encode(stored).write(to: url, options: SomaFileStorage.protectedAtomicOptions)

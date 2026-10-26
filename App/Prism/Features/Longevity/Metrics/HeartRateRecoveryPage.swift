@@ -70,7 +70,7 @@ struct HeartRateRecoveryPage: View {
                 })
             MetricTextCard(
                 eyebrow: "Why it matters",
-                lead: "The faster your heart slows after effort, the sooner your nervous system takes the brake back.",
+                lead: "How many beats your heart drops in the minute after effort. A larger drop goes with better cardio fitness.",
                 rest: "A drop of 12 beats or less in a minute is worth a doctor’s look."
                     + (recent.map(\.value).min().map { " Yours has not fallen below \(words.whole($0)) this month." } ?? "")
             )
@@ -84,7 +84,7 @@ struct HeartRateRecoveryPage: View {
         }
         .navigationTitle("Heart rate recovery")
         .task { history = await health.fitnessHistory(days: Self.readDays) }
-        .refreshable { history = await health.fitnessHistory(days: Self.readDays) }
+        .somaRefreshable { history = await health.fitnessHistory(days: Self.readDays) }
     }
 
     /// The last thirty days, today last, each the day's best drop: most

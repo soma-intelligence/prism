@@ -6,8 +6,8 @@
 import SwiftUI
 
 /// The Mind lens's deeper pages: the Mind score, insights, what habits do to
-/// recovery and sleep, meetings, HRV, the inner map, the stress radar and the
-/// mood forecast.
+/// recovery and sleep, meetings, HRV, the inner map, the stress radar, the
+/// mood forecast, the questionnaires and connection.
 ///
 /// Registered on every tab's stack by `journeyDestinations()`, so a link
 /// anywhere in the app can push one of these with `NavigationLink(value:)`
@@ -29,6 +29,10 @@ enum MindRoute: Hashable {
     case stressRadar
     /// Mood forecast: the day ahead.
     case moodForecast
+    /// Questionnaires: PHQ-9 and GAD-7, the latest and the history.
+    case assessments
+    /// Connection: loneliness, purpose and the week's time with people.
+    case connection
 
     @ViewBuilder
     var page: some View {
@@ -41,6 +45,8 @@ enum MindRoute: Hashable {
         case .innerMap: MindInnerMapPage()
         case .stressRadar: MindStressRadarPage()
         case .moodForecast: MindMoodForecastPage()
+        case .assessments: MindAssessmentPage()
+        case .connection: MindConnectionPage()
         }
     }
 }

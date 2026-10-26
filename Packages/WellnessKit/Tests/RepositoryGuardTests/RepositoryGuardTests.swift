@@ -40,14 +40,22 @@ import Testing
     @Test func noLegacyBrandNameAnywhere() {
         // Built from fragments so this file does not contain the words it forbids.
         let forbidden = [["te", "mple"].joined(), ["ga", "ia"].joined()]
+        // Names outside this repository's control that still carry the old
+        // brand, such as a live host name. Each is removed from a line before
+        // the line is checked, so the brand anywhere else still fails.
+        let allowlistURL = Self.root.appendingPathComponent("Tests/Allowlists/legacy-brand.txt")
+        let allowed = (Self.text(of: allowlistURL) ?? "")
+            .split(separator: "\n")
+            .map { $0.trimmingCharacters(in: .whitespaces).lowercased() }
+            .filter { !$0.isEmpty && !$0.hasPrefix("#") }
         var hits: [String] = []
         for file in Self.files(under: Self.root) {
             let path = Self.relativePath(file)
             if forbidden.contains(where: path.lowercased().contains) { hits.append(path) }
             guard let text = Self.text(of: file) else { continue }
-            for (index, line) in text.split(separator: "\n", omittingEmptySubsequences: false).enumerated()
-            where forbidden.contains(where: line.lowercased().contains) {
-                hits.append("\(path):\(index + 1)")
+            for (index, line) in text.split(separator: "\n", omittingEmptySubsequences: false).enumerated() {
+                let checked = allowed.reduce(line.lowercased()) { $0.replacingOccurrences(of: $1, with: "") }
+                if forbidden.contains(where: checked.contains) { hits.append("\(path):\(index + 1)") }
             }
         }
         #expect(hits.isEmpty, "legacy brand name found at: \(hits)")

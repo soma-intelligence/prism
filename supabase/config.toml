@@ -107,3 +107,9 @@ verify_jwt = true
 [functions.delete-account]
 enabled = true
 verify_jwt = true
+
+[functions.ohs]
+enabled = true
+# The return route is opened by the browser after a provider's consent, with
+# no session; every other route checks the caller's JWT itself.
+verify_jwt = false

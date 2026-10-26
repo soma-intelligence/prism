@@ -53,11 +53,12 @@ struct TrackJournalView: View {
                 column
                     .clipped()
             }
+            .softScrollEdges()
                 .background(theme.colors.canvas.color.ignoresSafeArea())
                 .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
                 .task { await load() }
                 .task(id: selected) { await readTotals() }
-                .refreshable {
+                .somaRefreshable {
                     await load()
                     await readTotals()
                 }
@@ -72,32 +73,47 @@ struct TrackJournalView: View {
         let days = loggedDays
         let points = TrackJournal.feelPoints(days: days, body: measured, today: today, calendar: calendar)
 
-        return VStack(alignment: .leading, spacing: metrics.leadSpacing * 0.75) {
+        let spacing = metrics.spaceL
+
+        // The week over everything; under it, what the day holds and how it
+        // went. A phone reads them as one column; where the width holds two,
+        // the log sits beside the feeling and the charts, as an iPad page
+        // would set them.
+        return SomaColumnsLayout(
+            minColumnWidth: metrics.cardColumnMinWidth,
+            spacing: spacing,
+            maxColumns: metrics.cardColumnLimit
+        ) {
             TrackWeekStrip(selected: $selected, today: today, calendar: calendar) { day in
                 !journal.day(day).isEmpty
             }
+            .somaColumnSpan(.full)
 
-            entriesHeader
+            VStack(alignment: .leading, spacing: spacing) {
+                entriesHeader
 
-            TrackAddToday()
+                TrackAddToday()
 
-            tagSections
+                tagSections
 
-            automaticSection
-
-            TrackFeelingRow(feeling: journal.day(selected).feeling) {
-                journal.setFeeling($0, on: selected)
+                automaticSection
             }
 
-            TrackFeelMeasureCard(points: points, highlighted: selected, today: today, calendar: calendar)
+            VStack(alignment: .leading, spacing: spacing) {
+                TrackFeelingRow(feeling: journal.day(selected).feeling) {
+                    journal.setFeeling($0, on: selected)
+                }
 
-            TrackEffectsCard(
-                effects: TrackJournal.effects(
-                    tags: journal.tags, days: days, body: measured, today: today, calendar: calendar
+                TrackFeelMeasureCard(points: points, highlighted: selected, today: today, calendar: calendar)
+
+                TrackEffectsCard(
+                    effects: TrackJournal.effects(
+                        tags: journal.tags, days: days, body: measured, today: today, calendar: calendar
+                    )
                 )
-            )
 
-            copyButton
+                copyButton
+            }
         }
         .padding(.horizontal, metrics.pagePadding)
         .padding(.top, metrics.cardSpacing)
@@ -143,9 +159,11 @@ struct TrackJournalView: View {
                     .foregroundStyle(colors.inkSecondary.color)
             }
             Spacer(minLength: metrics.cardSpacing)
+            // The ring and its number say the same thing: how many of the
+            // day's questions have an answer.
             SomaProgressRing(fraction: Double(answered) / Double(questions)) {
-                Text("\(count)")
-                    .somaFont(type.rowValue)
+                Text("\(answered)/\(questions)")
+                    .somaFont(type.captionValue)
                     .foregroundStyle(colors.inkPrimary.color)
             }
             .accessibilityElement()
@@ -183,7 +201,7 @@ struct TrackJournalView: View {
         let quantities = Dictionary(grouping: TrackJournalQuantity.allCases, by: \.section)
         let sections = TrackTagStyle.Section.allCases.filter { grouped[$0] != nil || quantities[$0] != nil }
 
-        return VStack(alignment: .leading, spacing: metrics.leadSpacing * 0.6) {
+        return VStack(alignment: .leading, spacing: metrics.spaceXL) {
             ForEach(sections) { section in
                 let tags = grouped[section] ?? []
                 let items = (quantities[section] ?? []).map(HabitItem.quantity) + tags.map(HabitItem.tag)
@@ -236,8 +254,8 @@ struct TrackJournalView: View {
     /// the secondary ink.
     private func sectionHeading(_ title: String) -> some View {
         Text(title)
-            .somaFont(theme.typography.caption)
-            .foregroundStyle(theme.colors.inkSecondary.color)
+            .somaFont(theme.typography.cardTitle)
+            .foregroundStyle(theme.colors.inkPrimary.color)
             .accessibilityAddTraits(.isHeader)
     }
 
@@ -263,10 +281,14 @@ struct TrackJournalView: View {
         let slept = measured.nightAsleep[selected]
         let variability = measured.dayVariability[selected]
         let usual = measured.usualVariability
+        // Sleep is read against your own need where Soma knows it, the way
+        // every other page reads it; the fixed seven hours only stand in
+        // until then.
+        let need = health.scores?.sleepNeedHours ?? Goal.sleepHours
 
         return [
-            AutoRow(title: "7 h of sleep", glyph: .sleep, tone: .dusk,
-                    detail: slept.map(TrackJournalFormat.hours), mark: mark(slept, goal: Goal.sleepHours)),
+            AutoRow(title: "Sleep need, \(TrackJournalFormat.hours(need))", glyph: .sleep, tone: .dusk,
+                    detail: slept.map(TrackJournalFormat.hours), mark: mark(slept, goal: need)),
             AutoRow(title: "8,000 steps", glyph: .steps, tone: .moss,
                     detail: totals.steps.map(TrackFormat.whole), mark: mark(totals.steps, goal: Goal.steps)),
             AutoRow(title: "30 min outdoors", glyph: .daylight, tone: .sand,
@@ -468,7 +490,7 @@ private struct TrackWeekStrip: View {
         return Button {
             selected = day
         } label: {
-            VStack(spacing: metrics.scoreLabelSpacing * 2) {
+            VStack(spacing: metrics.spaceXS) {
                 Text(TrackWeek.letter(day, calendar: calendar))
                     .somaFont(type.tabLabel)
                     .foregroundStyle(ink)
@@ -481,11 +503,11 @@ private struct TrackWeekStrip: View {
                     .frame(width: metrics.aspectDotSize, height: metrics.aspectDotSize)
                     .opacity(isSelected || (!isFuture && hasEntries(day)) ? 1 : 0)
             }
-            .padding(.vertical, metrics.cardSpacing * 0.75)
+            .padding(.vertical, metrics.spaceS)
             .frame(maxWidth: .infinity)
             .background {
                 if isSelected {
-                    RoundedRectangle(cornerRadius: metrics.browseGroupCornerRadius, style: .continuous)
+                    RoundedRectangle(cornerRadius: metrics.controlCornerRadius, style: .continuous)
                         .fill(colors.surface.color)
                 }
             }
@@ -514,7 +536,7 @@ private struct TrackFeelingRow: View {
         let colors = theme.colors
 
         SomaCard {
-            VStack(alignment: .leading, spacing: metrics.scoreLabelSpacing * 2) {
+            VStack(alignment: .leading, spacing: metrics.spaceXS) {
                 HStack(alignment: .firstTextBaseline) {
                     TrackEyebrow("How you felt")
                     Spacer(minLength: metrics.cardSpacing)
@@ -554,7 +576,7 @@ private struct TrackFeelMeasureCard: View {
 
         SomaCard {
             VStack(alignment: .leading, spacing: metrics.cardSpacing) {
-                HStack(alignment: .firstTextBaseline, spacing: metrics.scoreLabelSpacing * 3) {
+                HStack(alignment: .firstTextBaseline, spacing: metrics.spaceXS) {
                     TrackEyebrow("Feel and measure")
                     Spacer(minLength: metrics.cardSpacing)
                     Text(enough ? "\(agreed)/\(points.count)" : "-")
@@ -581,7 +603,7 @@ private struct TrackFeelMeasureCard: View {
         let range = max(10, (largest / 5).rounded(.up) * 5)
         let height = metrics.journalTileHeight
 
-        return VStack(spacing: metrics.scoreLabelSpacing * 2) {
+        return VStack(spacing: metrics.spaceXS) {
             GeometryReader { proxy in
                 let slot = proxy.size.width / CGFloat(days.count)
                 let bar = max(2, slot * 0.55)
@@ -703,7 +725,7 @@ private struct TrackEffectsCard: View {
             }
             .layoutPriority(1)
             Spacer(minLength: metrics.scoreLabelSpacing)
-            VStack(alignment: .trailing, spacing: metrics.scoreLabelSpacing * 2) {
+            VStack(alignment: .trailing, spacing: metrics.spaceXS) {
                 Text(effect.valueText)
                     .somaFont(type.rowValue)
                     .foregroundStyle(tone)

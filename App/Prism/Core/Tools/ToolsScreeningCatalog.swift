@@ -55,11 +55,12 @@ extension SomaTools {
                 eligibility: .female,
                 startAge: 21,
                 stopAge: 65,
-                // The shorter of the two accepted cadences. Storing the five year
-                // HPV cadence by default would call a three year cytology user up
-                // to date when they are not. `nextDueOverride` carries the other.
+                // Cytology every three years from 21 to 29, then HPV testing
+                // every five years from 30 to 65. Someone who stays on cytology
+                // after 30 sets the three year date as `nextDueOverride`.
                 intervalMonths: 36,
-                evidence: "Cytology every three years, or HPV testing every five. Set a revised interval on your record if you are on the five-year schedule.",
+                ageIntervals: [ScreeningAgeBand(fromAge: 30, intervalMonths: 60)],
+                evidence: "Cytology every three years from 21, then HPV testing every five from 30. Set a revised date on your record if you stay on cytology.",
                 citation: "USPSTF 2018 grade A"),
 
             ScreeningItem(
@@ -227,9 +228,11 @@ extension SomaTools {
                 tier: .discuss,
                 icon: "mouth",
                 startAge: 18,
-                intervalMonths: 12,
-                evidence: "No federal screening recommendation exists. Professional consensus is roughly annual.",
-                citation: "professional consensus"),
+                // ADA: a checkup and cleaning about every six months, the
+                // cadence the mouth page counts (`OralSummary.visitMonths`).
+                intervalMonths: 6,
+                evidence: "No federal screening recommendation exists. The American Dental Association suggests a checkup about every six months.",
+                citation: "ADA, professional consensus"),
 
             ScreeningItem(
                 id: "vision",

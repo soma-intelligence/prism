@@ -74,7 +74,7 @@ struct CardioLoadPage: View {
         }
         .navigationTitle("Cardio load")
         .task { await load() }
-        .refreshable { await load() }
+        .somaRefreshable { await load() }
         .sheet(isPresented: $isExplaining) {
             CardioLoadExplainer(model: model)
         }
@@ -85,10 +85,9 @@ struct CardioLoadPage: View {
         let counts = Dictionary(grouping: recent, by: { $0 }).mapValues(\.count)
         let total = max(1, recent.count)
         return SomaCard {
-            VStack(alignment: .leading, spacing: theme.metrics.cardHeaderSpacing * 2) {
+            VStack(alignment: .leading, spacing: theme.metrics.spaceS) {
                 Text("\(Self.statusDays) days by status")
                     .somaFont(theme.typography.eyebrow)
-                    .textCase(.uppercase)
                     .foregroundStyle(theme.colors.inkSecondary.color)
                 MetricDayStrip(tones: recent.isEmpty ? Array(repeating: .empty, count: Self.statusDays) : recent.map(Self.tone))
                 VStack(spacing: theme.metrics.bodyRowSpacing) {

@@ -66,38 +66,167 @@ public enum SomaCueTone: Sendable, Equatable {
 
 // MARK: - Sparkline
 
-/// A small line of recent values, drawn the way a metric's page draws its
-/// chart (``SomaMetricChart``): the usual band as a quiet ground of ink, the
-/// line bent through the known values in the metric's hue softened toward
-/// grey, a fill that fades to nothing at the foot, and the latest value as a
-/// dot in the full hue. Days without a reading are skipped, never drawn as
-/// zero.
-///
-/// New values morph the line and the band into place on the theme's chart
-/// spring rather than redrawing them; under Reduce Motion they swap.
+/// A small line of recent values, as Apple Health draws a trend at
+/// the end of a row: a smooth line in the metric's hue and a solid dot on the
+/// last value, under it a soft fade. The usual band only sets the scale, so
+/// the line sits where it would against it; nothing is drawn behind the line
+/// (owner, 2026-10-24: no background on the small charts). The usual band, when there is
+/// one, sits behind it as a faint neutral strip: the status word already
+/// says where the reading sits, so the band never needs a colour of its own
+/// (a green block read as a widget, owner 2026-10-23). Gaps are skipped, not
+/// drawn as zero.
 public struct SomaSparkline: View {
     private let values: [Double?]
     private let tint: Color?
     private let band: ClosedRange<Double>?
     private let filled: Bool
+    private let eased: Bool
 
     @Environment(\.somaTheme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    /// - Parameter filled: the soft fill under the line; false draws the
-    ///   line alone.
-    public init(_ values: [Double?], tint: Color? = nil, band: ClosedRange<Double>? = nil, filled: Bool = true) {
+    /// - Parameters:
+    ///   - filled: a fade under the line; off by default.
+    ///   - eased: the tile's treatment: the days averaged down to a few
+    ///     points (``SomaMetrics/sparkEasedPoints``) and softened, so a
+    ///     month reads as its shape rather than its daily noise, and a faint
+    ///     halo round the last value. Off by default.
+    public init(_ values: [Double?], tint: Color? = nil, band: ClosedRange<Double>? = nil, filled: Bool = false, eased: Bool = false) {
         self.values = values
         self.tint = tint
         self.band = band
         self.filled = filled
+        self.eased = eased
     }
 
     public var body: some View {
-        let shape = SomaSparkShape.make(values, band: band, samples: theme.metrics.sparkSamples)
-        SomaSparkPlot(shape: shape, tint: tint, filled: filled)
-            .animation(reduceMotion ? nil : theme.motion.chartMorph, value: shape)
-            .accessibilityHidden(true)
+        let color = tint ?? theme.colors.inkPrimary.color
+        let metrics = theme.metrics
+        let surface = theme.colors.surface.color
+        let dot = metrics.chartPointDiameter + 1
+        let inset = dot / 2 + 2
+        // Days without a reading are skipped, not drawn as a break: a trend
+        // this small reads as one continuous line, and a week with two
+        // readings would otherwise be two stray strokes.
+        let known: [Double] = values.compactMap { $0 }
+        let values = eased ? Self.eased(known, points: metrics.sparkEasedPoints) : known
+        let band = band
+        let eased = eased
+        let halo = metrics.chartRingDiameter + 4
+
+        Canvas { context, size in
+            let known = values + (band.map { [$0.lowerBound, $0.upperBound] } ?? [])
+            guard let low = known.min(), let high = known.max(), !values.isEmpty else { return }
+            // One reading: a dot at the end of a hairline, so the row still
+            // says where it sits rather than leaving a hole.
+            if values.count == 1 {
+                let span = high - low == 0 ? 1 : high - low
+                let plot = CGRect(origin: .zero, size: size).insetBy(dx: inset, dy: inset)
+                let y = plot.maxY - plot.height * CGFloat((values[0] - low) / span)
+                var rule = Path()
+                rule.move(to: CGPoint(x: plot.minX, y: y))
+                rule.addLine(to: CGPoint(x: plot.maxX, y: y))
+                context.stroke(rule, with: .color(color.opacity(0.35)), style: StrokeStyle(lineWidth: 1, dash: [2, 3]))
+                context.fill(Path(ellipseIn: CGRect(x: plot.maxX - dot / 2, y: y - dot / 2, width: dot, height: dot)), with: .color(color))
+                return
+            }
+            let span = high - low == 0 ? 1 : high - low
+            let plot = CGRect(origin: .zero, size: size).insetBy(dx: inset, dy: inset)
+            func y(_ value: Double) -> CGFloat { plot.maxY - plot.height * CGFloat((value - low) / span) }
+            let points = values.enumerated().map { index, value in
+                CGPoint(x: plot.minX + plot.width * CGFloat(index) / CGFloat(values.count - 1), y: y(value))
+            }
+
+            // The usual band behind the line, the reference design's way: a soft slab of the
+            // line's own colour, so a value outside it shows at a glance.
+            if let band {
+                let top = y(band.upperBound), bottom = y(band.lowerBound)
+                let slab = CGRect(x: plot.minX, y: top, width: plot.width, height: max(1, bottom - top))
+                context.fill(Path(roundedRect: slab, cornerRadius: 2), with: .color(color.opacity(metrics.chartBandOpacity)))
+            }
+
+            let line = Self.smooth(points)
+            if filled, let first = points.first, let last = points.last {
+                var area = line
+                area.addLine(to: CGPoint(x: last.x, y: size.height))
+                area.addLine(to: CGPoint(x: first.x, y: size.height))
+                area.closeSubpath()
+                // Eased, the fade starts at the line's own peak rather than the
+                // plot's top, so a flat month still shows its wash.
+                let top = eased ? points.map(\.y).min() ?? plot.minY : plot.minY
+                let opacity = eased ? metrics.chartFillOpacity : 0.2
+                context.fill(area, with: .linearGradient(
+                    Gradient(colors: [color.opacity(opacity), color.opacity(0)]),
+                    startPoint: CGPoint(x: 0, y: top), endPoint: CGPoint(x: 0, y: size.height)))
+            }
+            context.stroke(line, with: .color(color),
+                           style: StrokeStyle(lineWidth: metrics.chartStroke, lineCap: .round, lineJoin: .round))
+
+            if let last = points.last, eased {
+                context.fill(Path(ellipseIn: CGRect(x: last.x - halo / 2, y: last.y - halo / 2, width: halo, height: halo)),
+                             with: .color(color.opacity(metrics.chartHaloOpacity)))
+                context.fill(Path(ellipseIn: CGRect(x: last.x - dot / 2, y: last.y - dot / 2, width: dot, height: dot)),
+                             with: .color(color))
+            } else if let last = points.last {
+                let halo = dot + 3
+                context.fill(Path(ellipseIn: CGRect(x: last.x - halo / 2, y: last.y - halo / 2, width: halo, height: halo)),
+                             with: .color(surface))
+                context.fill(Path(ellipseIn: CGRect(x: last.x - dot / 2, y: last.y - dot / 2, width: dot, height: dot)),
+                             with: .color(color))
+            }
+        }
+        .accessibilityHidden(true)
+    }
+
+    /// The readings averaged into at most `points` buckets, then each inner
+    /// point weighed with its neighbours (one, two, one), so day to day
+    /// noise drops out and the month's shape stays. The ends are kept as
+    /// read: the dot on the last value is the value the tile prints.
+    static func eased(_ values: [Double], points: Int) -> [Double] {
+        guard let latest = values.last else { return [] }
+        var series = values
+        if values.count > points, points > 1 {
+            let size = Double(values.count) / Double(points)
+            series = (0..<points).map { index in
+                let lower = Int(Double(index) * size)
+                let upper = index == points - 1 ? values.count : max(lower + 1, Int(Double(index + 1) * size))
+                let bucket = values[lower..<upper]
+                return bucket.reduce(0, +) / Double(bucket.count)
+            }
+        }
+        guard series.count > 3 else { return series }
+        var softened = series
+        for index in 1..<(series.count - 1) {
+            softened[index] = (series[index - 1] + 2 * series[index] + series[index + 1]) / 4
+        }
+        softened[softened.count - 1] = latest
+        return softened
+    }
+
+    /// A Catmull-Rom curve through the points, drawn as cubic Béziers, so a
+    /// week of readings reads as one gesture rather than a zigzag. Its
+    /// handles are clamped to the neighbours' heights, so the curve never
+    /// overshoots a value it passes through.
+    static func smooth(_ points: [CGPoint]) -> Path {
+        var path = Path()
+        guard let first = points.first else { return path }
+        path.move(to: first)
+        guard points.count > 2 else {
+            points.dropFirst().forEach { path.addLine(to: $0) }
+            return path
+        }
+        for index in 0..<(points.count - 1) {
+            let p0 = points[max(index - 1, 0)]
+            let p1 = points[index]
+            let p2 = points[index + 1]
+            let p3 = points[min(index + 2, points.count - 1)]
+            let low = min(p1.y, p2.y)
+            let high = max(p1.y, p2.y)
+            let c1 = CGPoint(x: p1.x + (p2.x - p0.x) / 6, y: min(max(p1.y + (p2.y - p0.y) / 6, low), high))
+            let c2 = CGPoint(x: p2.x - (p3.x - p1.x) / 6, y: min(max(p2.y - (p3.y - p1.y) / 6, low), high))
+            path.addCurve(to: p2, control1: c1, control2: c2)
+        }
+        return path
     }
 }
 
@@ -243,6 +372,57 @@ private struct SomaSparkPath: Shape {
         }
         return path
     }
+
+    /// The readings averaged into at most `points` buckets, then each inner
+    /// point weighed with its neighbours (one, two, one), so day to day
+    /// noise drops out and the month's shape stays. The ends are kept as
+    /// read: the dot on the last value is the value the tile prints.
+    static func eased(_ values: [Double], points: Int) -> [Double] {
+        guard let latest = values.last else { return [] }
+        var series = values
+        if values.count > points, points > 1 {
+            let size = Double(values.count) / Double(points)
+            series = (0..<points).map { index in
+                let lower = Int(Double(index) * size)
+                let upper = index == points - 1 ? values.count : max(lower + 1, Int(Double(index + 1) * size))
+                let bucket = values[lower..<upper]
+                return bucket.reduce(0, +) / Double(bucket.count)
+            }
+        }
+        guard series.count > 3 else { return series }
+        var softened = series
+        for index in 1..<(series.count - 1) {
+            softened[index] = (series[index - 1] + 2 * series[index] + series[index + 1]) / 4
+        }
+        softened[softened.count - 1] = latest
+        return softened
+    }
+
+    /// A Catmull-Rom curve through the points, drawn as cubic Béziers, so a
+    /// week of readings reads as one gesture rather than a zigzag. Its
+    /// handles are clamped to the neighbours' heights, so the curve never
+    /// overshoots a value it passes through.
+    static func smooth(_ points: [CGPoint]) -> Path {
+        var path = Path()
+        guard let first = points.first else { return path }
+        path.move(to: first)
+        guard points.count > 2 else {
+            points.dropFirst().forEach { path.addLine(to: $0) }
+            return path
+        }
+        for index in 0..<(points.count - 1) {
+            let p0 = points[max(index - 1, 0)]
+            let p1 = points[index]
+            let p2 = points[index + 1]
+            let p3 = points[min(index + 2, points.count - 1)]
+            let low = min(p1.y, p2.y)
+            let high = max(p1.y, p2.y)
+            let c1 = CGPoint(x: p1.x + (p2.x - p0.x) / 6, y: min(max(p1.y + (p2.y - p0.y) / 6, low), high))
+            let c2 = CGPoint(x: p2.x - (p3.x - p1.x) / 6, y: min(max(p2.y - (p3.y - p1.y) / 6, low), high))
+            path.addCurve(to: p2, control1: c1, control2: c2)
+        }
+        return path
+    }
 }
 
 // MARK: - Rows and tiles
@@ -258,11 +438,23 @@ public struct SomaTrendRow: View {
     private let values: [Double?]
     private let band: ClosedRange<Double>?
     private let hue: SomaHealthHue?
+    private let chart: SomaTrendTile.Chart
+    private let symbol: String?
+    private let prominent: Bool
+    private let opens: Bool
 
     @Environment(\.somaTheme) private var theme
 
-    /// - Parameter cue: a few words on what the value means ("3 days
-    ///   rising"), set under the value. Never a sentence.
+    /// - Parameters:
+    ///   - cue: a few words on what the value means ("3 days rising"), set
+    ///     under the value. Never a sentence.
+    ///   - chart: a line for a level, bars for a count that adds up over
+    ///     the day, steps (owner, 2026-10-24).
+    ///   - symbol: a glyph beside the title, used by the prominent layout.
+    ///   - prominent: the reference design's layout: a quiet title with its glyph, the
+    ///     value large, and the status under it with its mark (owner,
+    ///     2026-10-25, the Sleep page).
+    ///   - opens: draws the arrow that says the row opens something.
     public init(
         _ title: LocalizedStringResource,
         value: String?,
@@ -270,8 +462,16 @@ public struct SomaTrendRow: View {
         cue: LocalizedStringResource? = nil,
         values: [Double?],
         band: ClosedRange<Double>? = nil,
-        hue: SomaHealthHue? = nil
+        hue: SomaHealthHue? = nil,
+        chart: SomaTrendTile.Chart = .line,
+        symbol: String? = nil,
+        prominent: Bool = false,
+        opens: Bool = false
     ) {
+        self.chart = chart
+        self.symbol = symbol
+        self.prominent = prominent
+        self.opens = opens
         self.title = title
         self.value = value
         self.status = status
@@ -285,19 +485,102 @@ public struct SomaTrendRow: View {
         let colors = theme.colors
         let metrics = theme.metrics
 
-        HStack(spacing: metrics.cardSpacing) {
-            VStack(alignment: .leading, spacing: metrics.cardHeaderSpacing) {
+        HStack(alignment: .center, spacing: metrics.cardSpacing) {
+            if prominent { prominentText } else { plainText }
+            Spacer(minLength: metrics.spaceS)
+            // The trend takes a real share of the row, about a third of a
+            // phone's width, tall enough for the line to show its shape.
+            Group {
+                switch chart {
+                case .line: SomaSparkline(values, tint: sparkTint, band: band, filled: !prominent || band == nil)
+                case .bars: SomaSparkBars(values, tint: sparkTint)
+                }
+            }
+            .frame(width: metrics.chartSparkHeight * 3.4, height: metrics.chartSparkHeight * 1.45)
+        }
+        .overlay(alignment: .topTrailing) {
+            if opens {
+                Image(systemName: "arrow.right")
+                    .font(.system(size: metrics.browseChevronSize, weight: .medium))
+                    .foregroundStyle(colors.inkSecondary.color)
+                    .offset(y: -metrics.spaceS)
+            }
+        }
+        .padding(.horizontal, metrics.cardPadding)
+        .padding(.vertical, metrics.spaceM)
+        // Every row one height, cue or not, so a list of them reads as one
+        // even column of cards.
+        .frame(maxWidth: .infinity, minHeight: metrics.trendRowMinHeight, alignment: .leading)
+        .somaLitSurface()
+        .accessibilityElement(children: .combine)
+    }
+
+    /// the reference design's card: the title quiet with its glyph, the value large, the
+    /// status under it behind its mark.
+    private var prominentText: some View {
+        let colors = theme.colors
+        let metrics = theme.metrics
+        return VStack(alignment: .leading, spacing: metrics.cardHeaderSpacing) {
+            HStack(spacing: metrics.spaceS) {
+                if let symbol {
+                    Image(systemName: symbol).imageScale(.small)
+                }
+                Text(title).lineLimit(1)
+            }
+            .somaFont(theme.typography.callout)
+            .foregroundStyle(colors.inkSecondary.color)
+            Text(value ?? "-")
+                .somaFont(theme.typography.metric)
+                .foregroundStyle(value == nil ? colors.inkSecondary.color : colors.inkPrimary.color)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            if let word = status.word {
+                HStack(spacing: metrics.spaceS) {
+                    Image(systemName: statusMark)
+                        .imageScale(.small)
+                    Text(word).lineLimit(1)
+                }
+                .somaFont(theme.typography.callout)
+                .foregroundStyle(status.color(colors))
+            }
+        }
+    }
+
+    private var statusMark: String {
+        switch status {
+        case .above: "arrow.up.circle.fill"
+        case .below: "arrow.down.circle.fill"
+        case .alert: "exclamationmark.circle.fill"
+        default: "checkmark.circle.fill"
+        }
+    }
+
+    private var plainText: some View {
+        let colors = theme.colors
+        let metrics = theme.metrics
+        return VStack(alignment: .leading, spacing: metrics.cardHeaderSpacing) {
                 Text(title)
                     .somaFont(theme.typography.cardTitle)
                     .foregroundStyle(colors.inkPrimary.color)
-                HStack(spacing: 6) {
-                    if let word = status.word {
-                        Text(word).foregroundStyle(status.color(colors))
-                        Text(verbatim: "·").foregroundStyle(colors.inkSecondary.color)
+                // The word and the value on one line where they fit, one
+                // under the other where they do not: a row in one column of
+                // an unfolded foldable cut both to "Above nor...".
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: theme.metrics.spaceS) {
+                        if let word = status.word {
+                            Text(word).foregroundStyle(status.color(colors))
+                            Text(verbatim: "·").foregroundStyle(colors.inkSecondary.color)
+                        }
+                        Text(value ?? "-")
+                            .foregroundStyle(colors.inkPrimary.color)
                     }
-                    Text(value ?? "-")
-                        .foregroundStyle(colors.inkPrimary.color)
-                        .somaRollingNumber(value)
+                    VStack(alignment: .leading, spacing: metrics.cardHeaderSpacing) {
+                        if let word = status.word {
+                            Text(word).foregroundStyle(status.color(colors))
+                        }
+                        Text(value ?? "-")
+                            .foregroundStyle(colors.inkPrimary.color)
+                    }
                 }
                 .somaFont(theme.typography.caption)
                 .lineLimit(1)
@@ -308,18 +591,6 @@ public struct SomaTrendRow: View {
                         .lineLimit(1)
                 }
             }
-            Spacer(minLength: 0)
-            SomaSparkline(values, tint: sparkTint, band: band)
-                .frame(width: metrics.chartSparkHeight * 2.4, height: metrics.chartSparkHeight)
-        }
-        .padding(.horizontal, metrics.cardPadding)
-        .padding(.vertical, metrics.cardPadding * 0.8)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: metrics.cardCornerRadius, style: .continuous)
-                .fill(colors.surface.color)
-        )
-        .accessibilityElement(children: .combine)
     }
 
     /// The metric's hue when it has one: a trend is never drawn in ink
@@ -333,14 +604,25 @@ public struct SomaTrendRow: View {
     }
 }
 
-/// A reading as a card, set the way a metric's page sets its head: the
-/// name with where it sits on one line, then the value large with what it
-/// means under it, and beside them the last thirty days as a clean line
-/// over the usual band, the band's edges named on the trailing side.
+/// A reading as a tile for a two column grid, as Apple Fitness sets
+/// one: a quiet title, the value large with its unit small beside it, one
+/// status line, and the month at the foot.
 ///
-/// Every part keeps its place whether it has something to say or not, so
-/// cards in a column share one height.
+/// Every tile is one height and its chart sits on one baseline, so a grid of
+/// them reads as rows rather than a staircase. The value never wraps: it
+/// scales down before it would. The tile carries one tint, and the tint
+/// means something: the status colour when the reading is judged against a
+/// band, else the aspect's identity hue, never a colour per metric.
 public struct SomaTrendTile: View {
+    /// How the month is drawn.
+    public enum Chart: Sendable {
+        /// An eased line with a fade under it: a reading taken as a level,
+        /// a heart rate, a speed.
+        case line
+        /// One bar a day: a count that adds up over the day, steps.
+        case bars
+    }
+
     private let title: LocalizedStringResource
     private let value: String?
     private let unit: String?
@@ -348,12 +630,17 @@ public struct SomaTrendTile: View {
     private let cue: LocalizedStringResource?
     private let values: [Double?]
     private let band: ClosedRange<Double>?
-    private let hue: SomaHealthHue?
+    private let aspect: SomaAspect?
+    private let chart: Chart
 
     @Environment(\.somaTheme) private var theme
 
-    /// - Parameter cue: a few words on what the value means ("Highest in 30
-    ///   days"), set under the value. Never a sentence.
+    /// - Parameters:
+    ///   - cue: a few words on what the value means ("Highest in 30 days"),
+    ///     set after the status word where the tile is wide enough, and
+    ///     always read aloud. Never a sentence.
+    ///   - aspect: whose identity hue the tile wears when its status is not
+    ///     a judgement (a direction, or no status yet). Ink without one.
     public init(
         _ title: LocalizedStringResource,
         value: String?,
@@ -362,7 +649,8 @@ public struct SomaTrendTile: View {
         cue: LocalizedStringResource? = nil,
         values: [Double?],
         band: ClosedRange<Double>? = nil,
-        hue: SomaHealthHue? = nil
+        aspect: SomaAspect? = nil,
+        chart: Chart = .line
     ) {
         self.title = title
         self.value = value
@@ -371,78 +659,153 @@ public struct SomaTrendTile: View {
         self.cue = cue
         self.values = values
         self.band = band
-        self.hue = hue
+        self.aspect = aspect
+        self.chart = chart
     }
 
     public var body: some View {
         let colors = theme.colors
         let metrics = theme.metrics
-        let type = theme.typography
+        let tint = tint
 
-        VStack(alignment: .leading, spacing: metrics.trendTileSpacing) {
-            HStack(alignment: .firstTextBaseline, spacing: metrics.cardSpacing) {
-                Text(title)
-                    .somaFont(type.caption)
-                    .foregroundStyle(colors.inkSecondary.color)
-                    .lineLimit(1)
-                Spacer(minLength: 0)
-                if let word = status.word {
-                    HStack(spacing: 5) {
-                        Circle()
-                            .fill(status.color(colors))
-                            .frame(width: metrics.chartPointDiameter, height: metrics.chartPointDiameter)
-                        Text(word)
-                            .somaFont(type.caption)
-                            .foregroundStyle(status.color(colors))
-                            .lineLimit(1)
-                    }
+        VStack(alignment: .leading, spacing: metrics.cardHeaderSpacing) {
+            Text(title)
+                .somaFont(theme.typography.eyebrow)
+                .foregroundStyle(colors.inkSecondary.color)
+                .lineLimit(1)
+            HStack(alignment: .firstTextBaseline, spacing: metrics.spaceXS) {
+                Text(value ?? "-")
+                    .somaFont(theme.typography.metricCompact)
+                    .foregroundStyle(colors.inkPrimary.color)
+                    .layoutPriority(1)
+                if let unit, value != nil {
+                    Text(unit)
+                        .somaFont(theme.typography.caption)
+                        .foregroundStyle(colors.inkSecondary.color)
                 }
             }
-
-            HStack(alignment: .center, spacing: metrics.cardSpacing) {
-                VStack(alignment: .leading, spacing: metrics.cardHeaderSpacing) {
-                    HStack(alignment: .firstTextBaseline, spacing: 3) {
-                        Text(value ?? "-")
-                            .somaFont(type.metricCompact)
-                            .foregroundStyle(value == nil ? colors.inkSecondary.color : colors.inkPrimary.color)
-                            .somaRollingNumber(value, holdsWidth: unit != nil)
-                        if let unit, value != nil {
-                            Text(unit)
-                                .somaFont(type.caption)
-                                .foregroundStyle(colors.inkSecondary.color)
-                        }
-                    }
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-                    // The line is held without a cue too, so every card
-                    // keeps one height.
-                    Group {
-                        if let cue {
-                            Text(cue)
-                        } else {
-                            Text(verbatim: " ").accessibilityHidden(true)
-                        }
-                    }
-                    .somaFont(type.caption)
-                    .foregroundStyle(colors.inkSecondary.color)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+            .lineLimit(1)
+            .minimumScaleFactor(0.6)
+            statusLine(dot: tint)
+            Spacer(minLength: metrics.spaceS)
+            Group {
+                switch chart {
+                case .line:
+                    SomaSparkline(values, tint: tint, band: band, filled: true, eased: true)
+                case .bars:
+                    SomaSparkBars(values, tint: tint)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-                SomaTrendTileChart(values: values, band: band, value: value,
-                                   tint: hue?.color ?? (status.isNone ? nil : status.color(colors)))
-                    .frame(maxWidth: .infinity)
-                    .frame(height: metrics.trendTileChartHeight)
             }
+            .frame(height: metrics.trendTileChartHeight)
         }
         .padding(metrics.cardPadding)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: metrics.trendTileMinHeight, alignment: .topLeading)
         .background(
             RoundedRectangle(cornerRadius: metrics.cardCornerRadius, style: .continuous)
                 .fill(colors.surface.color)
         )
-        .accessibilityElement(children: .combine)
+        .overlay(
+            RoundedRectangle(cornerRadius: metrics.cardCornerRadius, style: .continuous)
+                .strokeBorder(colors.inkPrimary.color.opacity(metrics.hairlineOpacity), lineWidth: 0.5)
+        )
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(title))
+        .accessibilityValue(Text(verbatim: spokenValue))
+    }
+
+    /// One line, always held so tiles side by side keep their chart on one
+    /// baseline: the dot and the status word, then the cue where it fits.
+    @ViewBuilder
+    private func statusLine(dot: Color) -> some View {
+        let colors = theme.colors
+        let word = status.word
+        let mark = HStack(spacing: theme.metrics.spaceXS) {
+            Circle()
+                .fill(dot)
+                .frame(width: theme.metrics.chartPointDiameter, height: theme.metrics.chartPointDiameter)
+            if let word {
+                Text(word).foregroundStyle(status.color(colors))
+            } else if let cue {
+                Text(cue).foregroundStyle(colors.inkSecondary.color)
+            }
+        }
+        Group {
+            if word == nil && cue == nil {
+                Text(verbatim: " ").accessibilityHidden(true)
+            } else if let cue, word != nil {
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: theme.metrics.spaceXS) {
+                        mark
+                        Text(verbatim: "·").foregroundStyle(colors.inkSecondary.color)
+                        Text(cue).foregroundStyle(colors.inkSecondary.color)
+                    }
+                    mark
+                }
+            } else {
+                mark
+            }
+        }
+        .somaFont(theme.typography.caption)
+        .lineLimit(1)
+    }
+
+    /// The tile's one colour: where the reading sits when it is judged
+    /// against a band, else the aspect's hue.
+    private var tint: Color {
+        let colors = theme.colors
+        let neutral = aspect.map { theme.aspects[$0].identity.color } ?? colors.inkPrimary.color
+        switch status {
+        case .normal, .above, .below, .alert: return status.color(colors)
+        case .worded(_, let tone) where tone != .neutral: return tone.color(colors)
+        default: return neutral
+        }
+    }
+
+    /// What VoiceOver reads after the title: the value and its unit, the
+    /// status and the cue, the cue included even where the line had no room.
+    private var spokenValue: String {
+        let reading = value.map { value in unit.map { "\(value) \($0)" } ?? value } ?? String(localized: "No reading")
+        let parts = [reading, status.word.map { String(localized: $0) }, cue.map { String(localized: $0) }]
+        return parts.compactMap { $0 }.joined(separator: ", ")
+    }
+}
+
+/// A month of daily counts as thin bars, oldest first: the past days soft in
+/// the tile's tint, the latest one full, as Apple Health marks the day it is
+/// about. Bars stand on zero, since a count is read from nothing; a day with
+/// no reading leaves its slot empty.
+struct SomaSparkBars: View {
+    private let values: [Double?]
+    private let tint: Color
+
+    @Environment(\.somaTheme) private var theme
+
+    init(_ values: [Double?], tint: Color) {
+        self.values = values
+        self.tint = tint
+    }
+
+    var body: some View {
+        let metrics = theme.metrics
+        // The month the tile is about, even when a sparse reading was handed
+        // a year of days.
+        let days = Array(values.suffix(30))
+        let latest = days.lastIndex { $0 != nil }
+
+        Canvas { context, size in
+            guard let high = days.compactMap({ $0 }).max(), high > 0, !days.isEmpty else { return }
+            let gap = metrics.sparkBarGap
+            let width = max(1, (size.width - gap * CGFloat(days.count - 1)) / CGFloat(days.count))
+            let radius = min(metrics.chartThinBarRadius, width / 2)
+            for (index, value) in days.enumerated() {
+                guard let value, value > 0 else { continue }
+                let height = max(radius * 2, size.height * CGFloat(value / high))
+                let bar = CGRect(x: CGFloat(index) * (width + gap), y: size.height - height, width: width, height: height)
+                let shade = index == latest ? tint : tint.opacity(metrics.chartContextBarOpacity)
+                context.fill(Path(roundedRect: bar, cornerRadius: radius), with: .color(shade))
+            }
+        }
+        .accessibilityHidden(true)
     }
 }
 
@@ -579,8 +942,8 @@ public struct SomaRangeChart: View {
                         Text("Avg. \(format(average))")
                             .somaFont(theme.typography.caption)
                             .foregroundStyle(colors.inkPrimary.color)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
+                            .padding(.horizontal, theme.metrics.spaceS)
+                            .padding(.vertical, theme.metrics.spaceXS)
                             .background(Capsule().fill(line.opacity(0.35)))
                     }
             }
@@ -629,8 +992,11 @@ public struct SomaRangeChart: View {
             SomaTrendRow("Body fat", value: "28.8 %", status: .above, cue: "4 days rising", values: wavy.reversed(), band: 56...60)
             SomaTrendRow("Lean mass", value: "55.7 kg", status: .trend("Increasing"), values: wavy)
             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                SomaTrendTile("VO2 max", value: "40.1", status: .normal, values: wavy, hue: .activity)
+                SomaTrendTile("VO2 max", value: "43.4", unit: "ml/kg/min", status: .trend("Increasing"), values: wavy, aspect: .body)
                 SomaTrendTile("Heart rate recovery", value: "48", unit: "bpm", status: .above, cue: "Highest in 30 days", values: wavy, band: 57...61)
+                SomaTrendTile("Resting heart rate", value: "66", unit: "bpm", status: .normal, cue: "Highest in 30 days", values: wavy, band: 54...62)
+                SomaTrendTile("Steps", value: "4,296", unit: "steps", status: .trend("Stabilizing"), values: wavy.map { $0.map { $0 * 120 } },
+                              aspect: .body, chart: .bars)
             }
             SomaRangeChart(
                 (0..<30).map { SomaChartPoint(date: Date(timeIntervalSince1970: 1_790_000_000 + Double($0) * 86_400), value: 17 + sin(Double($0)) * 0.8) },
@@ -639,7 +1005,7 @@ public struct SomaRangeChart: View {
             )
             .frame(height: 220)
         }
-        .padding(16)
+        .padding(SomaMetrics.standard.spaceL)
     }
     }
 }

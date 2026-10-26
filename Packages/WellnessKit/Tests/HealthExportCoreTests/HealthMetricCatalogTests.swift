@@ -70,6 +70,24 @@ struct HealthMetricCatalogTests {
         }
     }
 
+    @Test("The symptoms a cycle log writes are asked for on demand, never at launch")
+    func cycleSymptomsAreOnDemand() {
+        let onDemand = Set(HealthMetricCatalog.onDemand.map(\.identifier))
+        for name in ["AbdominalCramps", "HotFlashes", "NightSweats", "SleepChanges",
+                     "MoodChanges", "Headache", "Bloating"] {
+            #expect(onDemand.contains("HKCategoryTypeIdentifier" + name), "\(name) would be requested at launch")
+        }
+    }
+
+    @Test("Reproductive health types of iOS 18 and 27 are in the catalog, on demand")
+    func newerReproductiveTypesAreCatalogued() {
+        for name in ["BleedingAfterMenopause", "BleedingAfterPregnancy", "BleedingDuringPregnancy", "MenopausalState"] {
+            let metric = HealthMetricCatalog.metric(for: "HKCategoryTypeIdentifier" + name)
+            #expect(metric?.kind == .category, "\(name) is missing")
+            #expect(metric?.sensitivity == .sensitive, "\(name) would be requested at launch")
+        }
+    }
+
     @Test("A correlation is never offered to a read request")
     func correlationsAreNotReadAuthorizable() {
         // Asking HealthKit to read a correlation raises NSInvalidArgumentException

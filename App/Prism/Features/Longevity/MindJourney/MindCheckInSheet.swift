@@ -98,7 +98,7 @@ struct MindStepRow: View {
                     .foregroundStyle(colors.inkSecondary.color)
             }
             Spacer(minLength: 8)
-            HStack(alignment: .bottom, spacing: 6) {
+            HStack(alignment: .bottom, spacing: theme.metrics.spaceS) {
                 ForEach(0..<MindCheckIn.steps, id: \.self) { step in
                     Button {
                         value = value == step ? nil : step

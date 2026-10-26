@@ -55,7 +55,7 @@ struct BodyBrowserView: View {
                             spacing: metrics.cardSpacing
                         ) {
                             ForEach(BodyCatalog.categories) { category in
-                                NavigationLink(value: VaultRoute.category(category)) {
+                                VaultLink(route: .category(category)) {
                                     SomaCategoryTile(
                                         symbol: category.lineSymbol,
                                         title: category.displayTitle,
@@ -79,6 +79,7 @@ struct BodyBrowserView: View {
             .frame(maxWidth: metrics.pageMaxWidth, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
+        .softScrollEdges()
         .background(theme.colors.canvas.color.ignoresSafeArea())
         .navigationTitle("Vault")
 #if os(iOS)
@@ -110,7 +111,7 @@ struct BodyBrowserView: View {
         section(title) {
             SomaBrowseGroup(scores, hasGlyphs: false) { score in
                 let summary = health.scores.map { VaultScoreSummary.make(score, days: score.days($0)) }
-                NavigationLink(value: VaultRoute.score(score)) {
+                VaultLink(route: .score(score)) {
                     SomaReadingRow(
                         title: score.title,
                         caption: summary?.caption,
@@ -144,7 +145,7 @@ struct BodyBrowserView: View {
             if !matchedCategories.isEmpty {
                 section("Categories") {
                     SomaBrowseGroup(matchedCategories, hasGlyphs: false) { category in
-                        NavigationLink(value: VaultRoute.category(category)) {
+                        VaultLink(route: .category(category)) {
                             SomaBrowseRow(title: category.displayTitle,
                                           detail: VaultWords.measures(category.types.count))
                                 .contentShape(.rect)
@@ -157,7 +158,7 @@ struct BodyBrowserView: View {
             if !matchedTypes.isEmpty {
                 section("Measures") {
                     SomaBrowseGroup(matchedTypes, hasGlyphs: false) { type in
-                        NavigationLink(value: VaultRoute.dataType(type)) {
+                        VaultLink(route: .dataType(type)) {
                             SomaBrowseRow(
                                 title: MetricPageWords.title(identifier: type.metric.identifier, fallback: type.title),
                                 detail: health.rowValue(for: type.metric)
@@ -202,6 +203,42 @@ private struct VaultHead: View {
         }
         .padding(.top, metrics.scoreHeroTopPadding)
         .accessibilityElement(children: .combine)
+    }
+}
+
+extension EnvironmentValues {
+    /// Set by a host that keeps the Vault beside the page it opens (the
+    /// settings sheet on a roomy screen, Apple Health's Browse on an iPad):
+    /// a row then shows its page in that pane instead of pushing it.
+    @Entry var vaultPane: Binding<VaultRoute?>?
+}
+
+/// A row of the Vault: pushed on the stack on a phone, shown in the pane
+/// beside the list where the host keeps one, with the row it shows marked by
+/// a tonal step.
+private struct VaultLink<Label: View>: View {
+    let route: VaultRoute
+    @ViewBuilder let label: Label
+
+    @Environment(\.vaultPane) private var pane
+    @Environment(\.somaTheme) private var theme
+
+    var body: some View {
+        if let pane {
+            let isShown = pane.wrappedValue == route
+            Button { pane.wrappedValue = route } label: {
+                label.contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            .background(isShown ? theme.colors.inkPrimary.color.opacity(theme.metrics.selectionFillOpacity) : .clear)
+            .accessibilityAddTraits(isShown ? .isSelected : [])
+        } else {
+            NavigationLink(value: route) {
+                label.contentShape(.rect)
+            }
+            .zoomSource(route)
+            .buttonStyle(.plain)
+        }
     }
 }
 

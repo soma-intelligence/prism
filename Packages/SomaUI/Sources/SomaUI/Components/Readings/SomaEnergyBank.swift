@@ -42,6 +42,358 @@ enum SomaBankSigned {
     }
 }
 
+// MARK: - Battery
+
+/// The bank now: the level large and light, and under it a slim battery on
+/// its side, a hairline rim with one solid fill in the ramp's colour for that
+/// level. No gradient, glow or bolt: the colour and the number carry it. It
+/// replaced a fat glowing battery with the number inside (owner, 2026-10-24).
+///
+/// With no level the battery is empty and the number is a dash: an empty
+/// charge at zero would say the bank is flat, which is a reading.
+public struct SomaBankBattery: View {
+    private let level: Int?
+
+    @Environment(\.somaTheme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var hasAppeared = false
+
+    /// - Parameter level: 0 to 100, or nil when there is none yet.
+    public init(level: Int?) {
+        self.level = level
+    }
+
+    public var body: some View {
+        let metrics = theme.metrics
+        let colors = theme.colors
+        let type = theme.typography
+        let share = level.map { min(1, max(0, Double($0) / 100)) }
+        let tint = SomaEnergyRamp.standard.value(at: share ?? 0).color
+        let width = metrics.bankBatteryWidth
+        let height: CGFloat = 30
+        let inset: CGFloat = 3
+        let shape = RoundedRectangle(cornerRadius: 9, style: .continuous)
+        let shown = (hasAppeared || reduceMotion) ? (share ?? 0) : 0
+
+        VStack(spacing: metrics.cardSpacing) {
+            HStack(alignment: .firstTextBaseline, spacing: 2) {
+                Text(verbatim: level.map(String.init) ?? "-")
+                    .somaFont(type.bankFigure)
+                    .contentTransition(.numericText())
+                if level != nil {
+                    Text(verbatim: "%")
+                        .somaFont(type.bankFigureUnit)
+                        .foregroundStyle(colors.inkSecondary.color)
+                }
+                VStack(spacing: 2) {
+                    HStack(alignment: .firstTextBaseline, spacing: 1) {
+                        SomaNumber(level.map(String.init), type.bankFigure)
+                            .contentTransition(.numericText())
+                        if level != nil {
+                            Text(verbatim: "%")
+                                .somaFont(type.bankFigureUnit)
+                        }
+                    }
+                }
+                .frame(width: width, height: height)
+                Capsule()
+                    .fill(colors.inkPrimary.color.opacity(metrics.hairlineOpacity * 2))
+                    .frame(width: 3, height: height * 0.36)
+            }
+        }
+        .onAppear {
+            guard !hasAppeared else { return }
+            if reduceMotion { hasAppeared = true } else {
+                withAnimation(theme.motion.reveal) { hasAppeared = true }
+            }
+        }
+        .animation(reduceMotion ? nil : theme.motion.standard, value: level)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("Energy bank"))
+        .accessibilityValue(Text(level.map { "\($0) percent" } ?? "No level yet"))
+    }
+}
+
+// MARK: - Charged and drained
+
+/// One of the two tiles under the battery: a signed level, green when it
+/// added to the bank and red when it took from it.
+public struct SomaBankDelta: View {
+    private let value: Int?
+    private let title: LocalizedStringResource
+
+    @Environment(\.somaTheme) private var theme
+
+    public init(value: Int?, title: LocalizedStringResource) {
+        self.value = value
+        self.title = title
+    }
+
+    public var body: some View {
+        let colors = theme.colors
+        let metrics = theme.metrics
+        let tone: Color = switch value {
+        case .some(let v) where v > 0: colors.statusNormal.color
+        case .some(let v) where v < 0: colors.statusAlert.color
+        default: colors.inkSecondary.color
+        }
+
+        VStack(spacing: 4) {
+            Text(verbatim: value == nil ? "-" : SomaBankSigned.text(value) + "%")
+                .somaFont(theme.typography.bankDelta)
+                .foregroundStyle(tone)
+            Text(title)
+                .somaFont(theme.typography.caption)
+                .foregroundStyle(colors.inkSecondary.color)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, metrics.cardPadding)
+        .background(
+            RoundedRectangle(cornerRadius: metrics.cardCornerRadius, style: .continuous)
+                .fill(colors.surface.color)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: metrics.cardCornerRadius, style: .continuous)
+                .strokeBorder(colors.inkPrimary.color.opacity(metrics.hairlineOpacity), lineWidth: 0.5)
+        )
+        .accessibilityElement(children: .combine)
+    }
+}
+
+// MARK: - The day
+
+/// The bank through the day: one smooth curve coloured by its own level, a
+/// soft fill of the same colours under it, the night shaded, each workout
+/// and the peak window as a band with its glyph above, and a dot at now.
+///
+/// Positions are shares of the plotted span, 0 at its leading edge and 1 at
+/// its trailing one, so the page decides where the day starts. With fewer
+/// than two points the plot keeps its grid and draws no curve.
+public struct SomaBankDayChart: View {
+    /// One reading of the bank.
+    public struct Point: Sendable, Equatable {
+        public let x: Double
+        /// 0 to 100.
+        public let level: Double
+
+        public init(x: Double, level: Double) {
+            self.x = x
+            self.level = level
+        }
+    }
+
+    /// A span shaded behind the curve.
+    public struct Band: Sendable, Equatable, Identifiable {
+        public var id: String { "\(mark)\(start)" }
+        public let mark: SomaBankMark
+        public let start: Double
+        public let end: Double
+        public let symbol: String
+
+        public init(mark: SomaBankMark, start: Double, end: Double, symbol: String) {
+            self.mark = mark
+            self.start = start
+            self.end = end
+            self.symbol = symbol
+        }
+    }
+
+    /// A label on the time axis.
+    public struct Tick: Sendable, Equatable, Identifiable {
+        public var id: Double { x }
+        public let x: Double
+        public let label: String
+
+        public init(x: Double, label: String) {
+            self.x = x
+            self.label = label
+        }
+    }
+
+    private let points: [Point]
+    private let bands: [Band]
+    private let now: Double?
+    private let ticks: [Tick]
+
+    @Environment(\.somaTheme) private var theme
+
+    public init(points: [Point], bands: [Band], now: Double?, ticks: [Tick]) {
+        self.points = points.sorted { $0.x < $1.x }
+        self.bands = bands
+        self.now = now
+        self.ticks = ticks
+    }
+
+    private static let levels: [Double] = [0, 25, 50, 75, 100]
+
+    public var body: some View {
+        let metrics = theme.metrics
+        let type = theme.typography
+        let colors = theme.colors
+        let gutter = metrics.bankChartGutter
+
+        VStack(spacing: theme.metrics.spaceS) {
+            GeometryReader { proxy in
+                let width = proxy.size.width - gutter
+                ForEach(bands) { band in
+                    Image(systemName: band.symbol)
+                        .somaFont(type.caption)
+                        .foregroundStyle(band.mark.tint(theme))
+                        .position(x: width * CGFloat((band.start + band.end) / 2), y: proxy.size.height / 2)
+                }
+            }
+            .frame(height: metrics.bankChartGlyphRow)
+
+            GeometryReader { proxy in
+                let width = proxy.size.width - gutter
+                let height = proxy.size.height
+                ZStack(alignment: .topLeading) {
+                    plot
+                    ForEach(Self.levels.filter { $0.truncatingRemainder(dividingBy: 50) == 0 }, id: \.self) { level in
+                        Text(verbatim: "\(Int(level))")
+                            .somaFont(type.captionValue)
+                            .foregroundStyle(colors.inkSecondary.color)
+                            .position(x: width + gutter / 2 + 2, y: height * CGFloat(1 - level / 100))
+                    }
+                }
+            }
+            .frame(height: metrics.bankChartHeight)
+
+            GeometryReader { proxy in
+                let width = proxy.size.width - gutter
+                ForEach(ticks) { tick in
+                    Text(verbatim: tick.label)
+                        .somaFont(type.captionValue)
+                        .foregroundStyle(colors.inkSecondary.color)
+                        .fixedSize()
+                        .position(x: min(width - 14, max(16, width * CGFloat(tick.x))), y: proxy.size.height / 2)
+                }
+            }
+            .frame(height: metrics.bankChartGlyphRow)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("Energy through the day"))
+        .accessibilityValue(Text(points.last.map { "\(Int($0.level.rounded())) now" } ?? "No curve yet"))
+    }
+
+    private var plot: some View {
+        let metrics = theme.metrics
+        let colors = theme.colors
+        let ramp = Gradient(stops: SomaEnergyRamp.standard.gradientStops)
+        let gutter = metrics.bankChartGutter
+        let lastTint = SomaEnergyRamp.standard.value(at: (points.last?.level ?? 0) / 100).color
+        let theme = theme
+
+        return Canvas { context, size in
+            let plot = CGRect(x: 0, y: 0, width: size.width - gutter, height: size.height)
+            func x(_ share: Double) -> CGFloat { plot.minX + plot.width * CGFloat(min(1, max(0, share))) }
+            func y(_ level: Double) -> CGFloat { plot.maxY - plot.height * CGFloat(min(100, max(0, level)) / 100) }
+            let top = CGPoint(x: 0, y: plot.minY)
+            let bottom = CGPoint(x: 0, y: plot.maxY)
+
+            for band in bands {
+                let tint = band.mark.tint(theme)
+                let rect = CGRect(x: x(band.start), y: plot.minY,
+                                  width: max(3, x(band.end) - x(band.start)), height: plot.height)
+                context.fill(Path(rect), with: .color(tint.opacity(metrics.bankChartBandOpacity)))
+                context.fill(Path(CGRect(x: rect.minX, y: rect.minY, width: rect.width, height: metrics.bankChartBandCap)),
+                             with: .color(tint))
+            }
+
+            for level in Self.levels {
+                var line = Path()
+                line.move(to: CGPoint(x: plot.minX, y: y(level)))
+                line.addLine(to: CGPoint(x: plot.maxX, y: y(level)))
+                context.stroke(line, with: .color(colors.inkPrimary.color.opacity(metrics.hairlineOpacity * (level == 0 ? 1.6 : 1))),
+                               style: StrokeStyle(lineWidth: 0.5, dash: level == 0 ? [] : [2, 3]))
+            }
+
+            if let now {
+                var line = Path()
+                line.move(to: CGPoint(x: x(now), y: plot.minY))
+                line.addLine(to: CGPoint(x: x(now), y: plot.maxY))
+                context.stroke(line, with: .color(colors.inkSecondary.color.opacity(0.6)),
+                               style: StrokeStyle(lineWidth: 1, dash: [2, 3]))
+            }
+
+            let screen = points.map { CGPoint(x: x($0.x), y: y($0.level)) }
+            guard screen.count >= 2, let first = screen.first, let last = screen.last else { return }
+            let curve = Self.smooth(screen)
+            var area = curve
+            area.addLine(to: CGPoint(x: last.x, y: plot.maxY))
+            area.addLine(to: CGPoint(x: first.x, y: plot.maxY))
+            area.closeSubpath()
+
+            context.drawLayer { layer in
+                layer.opacity = metrics.bankChartFillOpacity
+                layer.fill(area, with: .linearGradient(ramp, startPoint: bottom, endPoint: top))
+                layer.blendMode = .destinationOut
+                let crest = screen.map(\.y).min() ?? plot.minY
+                layer.fill(area, with: .linearGradient(
+                    Gradient(colors: [colors.inkPrimary.color.opacity(0), colors.inkPrimary.color.opacity(0.92)]),
+                    startPoint: CGPoint(x: 0, y: crest), endPoint: bottom))
+            }
+
+            context.stroke(curve, with: .linearGradient(ramp, startPoint: bottom, endPoint: top),
+                           style: StrokeStyle(lineWidth: metrics.bankChartLine, lineCap: .round, lineJoin: .round))
+
+            let dot = metrics.bankChartNowDot
+            context.fill(Path(ellipseIn: CGRect(x: last.x - dot, y: last.y - dot, width: dot * 2, height: dot * 2)),
+                         with: .color(lastTint.opacity(0.22)))
+            context.fill(Path(ellipseIn: CGRect(x: last.x - dot / 2, y: last.y - dot / 2, width: dot, height: dot)),
+                         with: .color(lastTint))
+            context.stroke(Path(ellipseIn: CGRect(x: last.x - dot / 2, y: last.y - dot / 2, width: dot, height: dot)),
+                           with: .color(colors.surface.color), lineWidth: 2)
+        }
+    }
+
+    /// A monotone cubic through the points: smooth, and never overshooting a
+    /// reading, so the curve does not invent a peak the bank never reached.
+    static func smooth(_ p: [CGPoint]) -> Path {
+        var path = Path()
+        guard let first = p.first else { return path }
+        path.move(to: first)
+        let n = p.count
+        guard n > 2 else {
+            if n == 2 { path.addLine(to: p[1]) }
+            return path
+        }
+        var d = [CGFloat](repeating: 0, count: n - 1)
+        for i in 0..<(n - 1) {
+            let dx = p[i + 1].x - p[i].x
+            d[i] = dx == 0 ? 0 : (p[i + 1].y - p[i].y) / dx
+        }
+        var m = [CGFloat](repeating: 0, count: n)
+        m[0] = d[0]
+        m[n - 1] = d[n - 2]
+        for i in 1..<(n - 1) {
+            m[i] = d[i - 1] * d[i] <= 0 ? 0 : (d[i - 1] + d[i]) / 2
+        }
+        for i in 0..<(n - 1) {
+            guard d[i] != 0 else {
+                m[i] = 0
+                m[i + 1] = 0
+                continue
+            }
+            let a = m[i] / d[i]
+            let b = m[i + 1] / d[i]
+            let s = a * a + b * b
+            if s > 9 {
+                let t = 3 / s.squareRoot()
+                m[i] = t * a * d[i]
+                m[i + 1] = t * b * d[i]
+            }
+        }
+        for i in 0..<(n - 1) {
+            let dx = (p[i + 1].x - p[i].x) / 3
+            path.addCurve(to: p[i + 1],
+                          control1: CGPoint(x: p[i].x + dx, y: p[i].y + m[i] * dx),
+                          control2: CGPoint(x: p[i + 1].x - dx, y: p[i + 1].y - m[i + 1] * dx))
+        }
+        return path
+    }
+}
+
 // MARK: - What moved it
 
 /// One event that charged or drained the bank: its glyph on a disc of its
@@ -81,14 +433,12 @@ public struct SomaBankEntryRow: View {
         }
         let share = points.map { min(1, Double(abs($0)) / Double(scale)) } ?? 0
 
-        HStack(spacing: 12) {
-            ZStack {
-                Circle().fill(tint.opacity(0.16))
-                Image(systemName: symbol)
-                    .somaFont(type.callout)
-                    .foregroundStyle(tint)
-            }
-            .frame(width: metrics.bankEntryGlyph, height: metrics.bankEntryGlyph)
+        HStack(spacing: metrics.spaceM) {
+            // The bare glyph in its column; no tinted disc behind it.
+            Image(systemName: symbol)
+                .somaFont(type.callout)
+                .foregroundStyle(tint)
+                .frame(width: metrics.bankEntryGlyph, height: metrics.bankEntryGlyph)
             VStack(alignment: .leading, spacing: 2) {
                 Text(verbatim: title)
                     .somaFont(type.body)

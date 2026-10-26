@@ -96,7 +96,7 @@ nonisolated enum FitnessZones {
             var workout = FitnessWorkout(
                 start: reading.start,
                 end: reading.end,
-                activity: Int(reading.value),
+                activity: reading.code,
                 distance: distances[reading.start],
                 heartRate: samples.map(\.value)
             )

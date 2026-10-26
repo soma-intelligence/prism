@@ -235,7 +235,8 @@ final class CloudSync {
             try await mirror.mirror(CloudSnapshots.scores(scores, today: Date(), userID: id, calendar: calendar))
         }
         try await mirror.mirror(CloudSnapshots.inbox(SomaNotifications.shared.inbox, userID: id))
-        try await mirror.mirror(CloudSnapshots.providers(ProviderConnections.shared.states, userID: id))
+        let providers = ProviderConnections.shared
+        try await mirror.mirror(CloudSnapshots.providers(providers.states, connectedAt: providers.connectionDates(), userID: id))
     }
 
     /// Ask's conversations, both ways, on their own: the history drawer's

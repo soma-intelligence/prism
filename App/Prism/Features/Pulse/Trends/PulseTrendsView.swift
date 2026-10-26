@@ -30,12 +30,11 @@ struct PulseTrendsView: View {
             if let links {
                 PulseLinksList(links: links, today: today)
             } else {
-                ProgressView()
-                    .frame(maxWidth: .infinity)
+                ReadingRows()
             }
             MindHealthStatus(status: health.status)
         }
-        .refreshable { await load(force: true) }
+        .somaRefreshable { await load(force: true) }
         .task { await load() }
     }
 
@@ -79,7 +78,9 @@ struct PulseLinksList: View {
     @State private var open: CauseLink?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: theme.metrics.cardSpacing) {
+        // Two links side by side where the width holds them; the held names
+        // run under both.
+        SomaCardColumns {
             ForEach(links.shown) { link in
                 Button { open = link } label: {
                     SomaLinkCard(
@@ -104,6 +105,7 @@ struct PulseLinksList: View {
                 SomaLinkPendingRow(title: "Still learning", names: links.pendingNames) { name in
                     open = links.pending.first { $0.plainTitle == name }
                 }
+                .somaColumnSpan(.full)
             }
         }
         .sheet(item: $open) { link in
@@ -118,6 +120,7 @@ struct PulseLinksList: View {
         PulseLinksList(links: CauseLinks.preview, today: CauseLinks.previewToday)
             .padding()
     }
+    .softScrollEdges()
     .background(SomaTheme.standard.colors.canvas.color)
 }
 #endif

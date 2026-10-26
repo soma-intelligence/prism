@@ -13,7 +13,7 @@ public extension SomaMetrics {
     /// The glyph on a category tile.
     var healthTileGlyph: CGFloat { 26 }
     /// The corner of a tile and of a summary card: rounder than a card.
-    var healthCardRadius: CGFloat { 22 }
+    var healthCardRadius: CGFloat { cardCornerRadius }
     /// The seven bars at the end of a summary card.
     var healthBarsWidth: CGFloat { 78 }
     var healthBarsHeight: CGFloat { 50 }

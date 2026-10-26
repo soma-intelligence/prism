@@ -66,7 +66,7 @@ struct MindMoodForecastPage: View {
 
             if let reading {
                 SomaActionCard(eyebrow: "Today", title: reading.lever.title, detail: reading.lever.detail) {
-                    SomaOrb(aspect: reading.lever == .protectSleep ? .sleep : .mind, scale: .mini)
+                    SomaObjectIcon(aspect: reading.lever == .protectSleep ? .sleep : .mind, size: .row)
                 }
             }
         }

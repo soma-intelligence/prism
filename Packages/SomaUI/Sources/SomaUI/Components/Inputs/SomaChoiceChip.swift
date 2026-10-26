@@ -7,13 +7,13 @@ import SwiftUI
 
 /// A capsule a person taps: a tag, a choice, a thing to add.
 ///
-/// The outline style is a tag that can be on or off; on, it takes the raised
-/// surface and a check in the accent. The filled style is one choice among a
-/// few (a portion, a preset, a word); chosen, its label turns to the accent.
-/// A chip with a symbol is an action: "+ Drink". The tinted style is one of
-/// several picks that wear a colour: chosen, it fills with a wash of the
-/// aspect's bright orb colour and its glyph takes the aspect's hue, the way a mood's words take the
-/// colour of the feeling.
+/// Off, a chip is quiet: the outline style is a hairline capsule, the filled
+/// and tinted styles sit on the raised surface. On, every style fills with
+/// ink and its label turns to the ground's colour, the way a selected
+/// segment does in the system: one strong, plain mark of selection, never a
+/// coloured wash. The outline style adds a check when on. A tinted chip keeps
+/// its feeling's colour on its glyph alone. A chip with a symbol is an
+/// action: "+ Drink".
 public struct SomaChoiceChip: View {
     public enum Style: Sendable, Equatable {
         case outline
@@ -41,21 +41,17 @@ public struct SomaChoiceChip: View {
         let metrics = theme.metrics
         let colors = theme.colors
         let glyph = isOn && style == .outline ? "checkmark" : symbol
-        let ink: Color = switch style {
-        case .outline: isOn ? colors.inkPrimary.color : colors.inkSecondary.color
-        case .filled: isOn ? colors.accent.color : colors.inkPrimary.color
-        case .tinted: colors.inkPrimary.color
-        }
+        let ink: Color = isOn ? colors.onAccent.color : colors.inkPrimary.color
         let glyphInk: Color = switch style {
-        case .tinted(let aspect): isOn ? theme.aspects[aspect].identity.color : colors.inkSecondary.color
-        default: isOn ? colors.accent.color : colors.inkPrimary.color
+        case .tinted(let aspect): isOn ? SomaMoodScale.glow(aspect, theme: theme) : colors.inkSecondary.color
+        default: isOn ? colors.onAccent.color : colors.inkSecondary.color
         }
 
         Button(action: action) {
-            HStack(spacing: metrics.scoreLabelSpacing * 3) {
+            HStack(spacing: metrics.spaceXS) {
                 if let glyph {
                     Image(systemName: glyph)
-                        .font(.system(size: metrics.browseChevronSize, weight: .semibold))
+                        .font(.system(size: metrics.browseChevronSize, weight: .medium))
                         .foregroundStyle(glyphInk)
                 }
                 Text(title)
@@ -64,20 +60,12 @@ public struct SomaChoiceChip: View {
                     .lineLimit(1)
                     .fixedSize()
             }
-            .padding(.horizontal, metrics.cardPadding * 0.875)
+            .padding(.horizontal, metrics.spaceM + metrics.spaceXS)
             .frame(minHeight: metrics.minimumTapTarget * 0.84)
             .background(Capsule().fill(fill))
             .overlay {
-                switch style {
-                case .outline:
-                    Capsule().strokeBorder(
-                        colors.inkPrimary.color.opacity(isOn ? metrics.hairlineOpacity : metrics.browseSeparatorOpacity),
-                        lineWidth: 1
-                    )
-                case .tinted(let aspect) where isOn:
-                    Capsule().strokeBorder(SomaMoodScale.glow(aspect, theme: theme).opacity(metrics.chipTintRimOpacity), lineWidth: 1)
-                default:
-                    EmptyView()
+                if style == .outline && !isOn {
+                    Capsule().strokeBorder(colors.inkPrimary.color.opacity(metrics.inputTickFaint), lineWidth: metrics.inputHairline)
                 }
             }
             .contentShape(.capsule)
@@ -88,13 +76,8 @@ public struct SomaChoiceChip: View {
 
     private var fill: Color {
         let colors = theme.colors
-        let metrics = theme.metrics
-        switch style {
-        case .outline: return isOn ? colors.surface.color : .clear
-        case .filled: return isOn ? colors.surfaceRecessed.color : colors.surface.color
-        case .tinted(let aspect):
-            return isOn ? SomaMoodScale.glow(aspect, theme: theme).opacity(metrics.chipTintOpacity) : colors.surface.color
-        }
+        if isOn { return colors.inkPrimary.color }
+        return style == .outline ? .clear : colors.surface.color
     }
 }
 

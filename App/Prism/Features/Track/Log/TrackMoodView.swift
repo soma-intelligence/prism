@@ -90,7 +90,10 @@ struct TrackMoodView: View {
         log.addMood(entry)
         if scope == .today { journal.setFeeling(valence, on: now) }
         let mood = TrackHealthWriter.Mood(valence: Double(valence - 3) / 3, isDaily: entry.isDaily, words: entry.words, contexts: entry.contexts)
-        Task { await TrackHealthWriter.saveMood(mood, at: now) }
+        Task {
+            let reached = await TrackHealthWriter.saveMood(mood, at: now)
+            Confirmations.shared.logged("Mood", reachedHealth: reached)
+        }
         dismiss()
     }
 }
@@ -112,7 +115,7 @@ struct TrackMoodForm: View {
     private typealias Lists = TrackMoodView
 
     var body: some View {
-        VStack(spacing: theme.metrics.leadSpacing * 0.75) {
+        VStack(spacing: theme.metrics.spaceL) {
             feeling
 
             if valence != nil {
@@ -213,7 +216,7 @@ struct TrackMoodForm: View {
                         .foregroundStyle(colors.inkSecondary.color)
                 }
             }
-            TrackFlowLayout(spacing: metrics.cardSpacing * 0.75) {
+            TrackFlowLayout(spacing: metrics.spaceS) {
                 chips()
             }
         }

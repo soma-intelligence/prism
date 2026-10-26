@@ -102,7 +102,8 @@ enum MetricDetailMath {
         var isReference: Bool
 
         func range(at index: Int) -> ClosedRange<Double>? {
-            guard lower.indices.contains(index), upper.indices.contains(index) else { return nil }
+            guard lower.indices.contains(index), upper.indices.contains(index),
+                  lower[index].isFinite, upper[index].isFinite else { return nil }
             return min(lower[index], upper[index])...max(lower[index], upper[index])
         }
     }

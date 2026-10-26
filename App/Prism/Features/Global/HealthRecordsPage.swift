@@ -14,9 +14,17 @@ import SomaUI
 /// `health-records` access. So the page lists the kinds a clinic sends and says
 /// plainly that none can be read yet, instead of showing counts it does not
 /// have. Blood panels typed in by hand live in Longevity > Body, and the last
-/// one is offered here.
+/// one is offered here, and the record the person keeps themselves (the
+/// medical record) leads the page.
 struct HealthRecordsPage: View {
     @Environment(\.somaTheme) private var theme
+
+    /// Reading `HKClinicalRecord` waits on Apple's clinical records
+    /// entitlement, which this build does not carry: asking for those types
+    /// without it fails the whole Health request. Off until the build is
+    /// signed for it; the reading then joins `HealthAccess`'s one request,
+    /// never a request of its own.
+    static let readsClinicalRecords = false
 
     private let kinds: [RecordKind] = [
         RecordKind(id: "labs", title: String(localized: "Lab results"), symbol: "testtube.2"),
@@ -31,6 +39,16 @@ struct HealthRecordsPage: View {
     var body: some View {
         ListScaffold(eyebrow: "Through Apple Health", title: "Your clinic\u{2019}s records, by kind.") {
 
+            SettingsSection("Kept by you") {
+                SomaBrowseGroup([SettingsItem(id: "record")]) { _ in
+                    NavigationLink(value: GlobalRoute.medicalRecord) {
+                        SomaBrowseRow(symbol: "heart.text.clipboard", title: String(localized: "Medical record"),
+                                      detail: recordDetail)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
             SomaBrowseGroup(kinds) { kind in
                 SomaBrowseRow(symbol: kind.symbol, title: kind.title, detail: "-", opensSomething: false)
             }
@@ -44,6 +62,17 @@ struct HealthRecordsPage: View {
         }
         .navigationTitle("Health records")
         .toolbarTitleDisplayMode(.inline)
+    }
+
+    /// What the medical record holds, in a few words.
+    private var recordDetail: String {
+        let record = MedicalRecordStore.shared.record
+        if let next = record.upcoming().first {
+            return String(localized: "Next visit \(MedicalRecordPage.day(next.date))")
+        }
+        let count = record.conditions.count + record.allergies.count + record.vaccinations.count
+            + record.familyHistory.count + record.careTeam.count + record.appointments.count
+        return count == 0 ? String(localized: "Empty") : String(localized: "\(count) entries")
     }
 
     /// The last blood panel typed into Soma, which is on this device already.

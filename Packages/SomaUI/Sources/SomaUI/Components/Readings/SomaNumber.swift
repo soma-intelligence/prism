@@ -1,0 +1,84 @@
+//
+//  SomaNumber.swift
+//  SomaUI
+//
+
+import SwiftUI
+
+/// A number set in one of the theme's roles, or the drawn dash that stands in
+/// for it when nothing was measured.
+///
+/// A missing value is never a zero, and never a hyphen either: a font sets a
+/// hyphen thin and low, beside figures it reads as a typo. The dash is a short
+/// rule in the secondary ink, as wide as two figures and centred on the line,
+/// so a column of values keeps its rhythm when one of them is absent.
+public struct SomaNumber: View {
+    private let value: String?
+    private let spec: SomaFontSpec
+
+    public init(_ value: String?, _ spec: SomaFontSpec) {
+        self.value = value
+        self.spec = spec
+    }
+
+    public var body: some View {
+        if let value {
+            Text(value).somaFont(spec)
+        } else {
+            SomaMissingValue(spec)
+        }
+    }
+}
+
+/// The drawn dash for a value that was not measured, sized from the role the
+/// value would have been set in.
+public struct SomaMissingValue: View {
+    private let spec: SomaFontSpec
+
+    @Environment(\.somaTheme) private var theme
+
+    /// The rule's thickness against the role's size: a twelfth, the weight of
+    /// a figure's stem in a regular cut.
+    private static let thicknessRatio: CGFloat = 1.0 / 12.0
+    /// How far the rule stops short of the two figures' edges, against the
+    /// role's size, so it reads as a mark and not as an underline.
+    private static let insetRatio: CGFloat = 0.12
+
+    public init(_ spec: SomaFontSpec) {
+        self.spec = spec
+    }
+
+    public var body: some View {
+        // Two hidden figures give the dash the line's height, its baseline and
+        // a pair of figures' width, so it sits exactly where the number would
+        // and aligns on a baseline beside a unit.
+        Text(verbatim: "00")
+            .somaFont(spec)
+            .hidden()
+            .overlay {
+                Capsule()
+                    .fill(theme.colors.inkSecondary.color)
+                    .frame(height: max(theme.metrics.glyphStroke, spec.size * Self.thicknessRatio))
+                    .padding(.horizontal, spec.size * Self.insetRatio)
+            }
+            .accessibilityElement()
+            .accessibilityLabel(Text("Not measured"))
+    }
+}
+
+#Preview("Number") {
+    let type = SomaTheme.standard.typography
+    ZStack {
+        SomaPreviewBackdrop()
+        VStack(spacing: 24) {
+            HStack(spacing: 32) {
+                SomaNumber("78", type.metric)
+                SomaNumber(nil, type.metric)
+            }
+            HStack(spacing: 32) {
+                SomaNumber("8 412", type.rowValue)
+                SomaNumber(nil, type.rowValue)
+            }
+        }
+    }
+}

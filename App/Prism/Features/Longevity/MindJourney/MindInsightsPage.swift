@@ -60,7 +60,7 @@ struct MindInsightsPage: View {
             }
         }
         .task { await load() }
-        .refreshable { await load() }
+        .somaRefreshable { await load() }
     }
 
     private func load() async {

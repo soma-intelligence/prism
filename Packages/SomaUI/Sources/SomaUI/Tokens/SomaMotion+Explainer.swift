@@ -10,5 +10,8 @@ import SwiftUI
 /// stored field to the theme. Reduce Motion skips it and the drawing sits at
 /// its value from the first frame.
 public extension SomaMotion {
-    var explainerDraw: Animation { .smooth(duration: 0.9).delay(0.12) }
+    /// The shared reveal, held back a beat so the sheet has landed before the
+    /// drawing starts. It was a 0.9 second ease once, which left the ring
+    /// still filling after the reader had moved on to the words.
+    var explainerDraw: Animation { reveal.delay(0.1) }
 }

@@ -125,6 +125,7 @@ struct HomeEditTodaySheet: View {
                         .foregroundStyle(theme.colors.inkPrimary.color)
                 }
             }
+            .softScrollEdges()
             .scrollContentBackground(.hidden)
             .background(theme.colors.canvas.color.ignoresSafeArea())
 #if os(iOS)

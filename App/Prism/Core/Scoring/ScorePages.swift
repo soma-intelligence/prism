@@ -27,6 +27,10 @@ nonisolated enum ScorePages {
         /// "6 below yesterday", "Target 42 to 58 today".
         var change: String?
         var changeTrend: Trend?
+        /// Where today's value should land on the same scale: strain's target
+        /// for the day, or the person's usual band for the other scores.
+        /// Drawn on the gauge as a thin arc.
+        var range: ClosedRange<Double>? = nil
         var headline: String
         /// The first sentence of the reason, in the primary ink.
         var reason: String
@@ -77,6 +81,9 @@ nonisolated enum ScorePages {
         let series = scores?.recoverySeries ?? []
         let yesterday = ScoreMath.previous(series)
         var lead = Lead(value: value, headline: "", reason: "")
+        // The usual band, the same one the Today dial draws, so the
+        // gauge and the dial agree on where the score should sit.
+        lead.range = InsightEngine.interpret(scores?.detail.recovery ?? [], policy: .score).band
         if let value {
             lead.word = recoveryWord(value)
             if let yesterday {
@@ -85,10 +92,19 @@ nonisolated enum ScorePages {
                     : "\(Int(abs(delta).rounded())) \(delta > 0 ? "above" : "below") yesterday"
                 lead.changeTrend = abs(delta) < 1 ? nil : (delta > 0 ? .up : .down)
             }
+            // A high score that fell a long way overnight, or sits on a
+            // resting heart rate above usual, is still a green light, but not
+            // the unqualified one: the reason under it names those signals,
+            // and a headline that ignored them read as a contradiction.
+            let rhr = scores?.recoveryTerms.first { $0.kind == .rhr }
+            let fell = yesterday.map { Double(value) - $0 <= -10 } ?? false
+            let restingUp = rhr.flatMap { term in term.value.flatMap { v in term.baseline.map { v - $0 >= 2 } } } ?? false
             switch ScoreMath.Band(value) {
-            case .high: lead.headline = "Ready for a hard day."
-            case .middle: lead.headline = "Enough for an easy day, not a hard one."
-            case .low: lead.headline = "A day to go gently."
+            case .high where fell: lead.headline = "High recovery, lower than yesterday."
+            case .high where restingUp: lead.headline = "High recovery, resting heart rate above usual."
+            case .high: lead.headline = "High recovery. A hard session fits today."
+            case .middle: lead.headline = "Moderate recovery. Keep training moderate."
+            case .low: lead.headline = "Low recovery. Keep today easy."
             }
         } else {
             lead.headline = "Recovery needs seven nights."
@@ -145,13 +161,13 @@ nonisolated enum ScorePages {
         case .middle?:
             note = "Enough for an easy session today."
             move = Move(eyebrow: "Today", title: "A 30 minute walk after dinner",
-                        detail: "Easy, in zone 2: it builds without taking.", remindAt: 19.5)
+                        detail: "Easy pace, in heart rate zone 2.", remindAt: 19.5)
         case .low?:
             note = "Keep today light and sleep early."
             move = Move(eyebrow: "Tonight", title: "An early night",
-                        detail: "Sleep gives back more than a rest day does.", remindAt: 21.5)
+                        detail: "Recovery is low: an extra hour of sleep helps most tonight.", remindAt: 21.5)
         case nil:
-            note = "The tank fills once the score appears."
+            note = "Recovery appears after seven nights with your watch."
             move = nil
         }
 
@@ -219,6 +235,7 @@ nonisolated enum ScorePages {
         var lead = Lead(value: value, headline: "", reason: "")
         lead.word = value.map(strainWord)
         lead.change = target.map { "Target \($0.lowerBound) to \($0.upperBound) today" }
+        lead.range = target.map { Double($0.lowerBound)...Double($0.upperBound) }
         if let value {
             if let target {
                 if value < target.lowerBound {
@@ -233,7 +250,7 @@ nonisolated enum ScorePages {
                 }
                 if let recovery = scores?.recovery { lead.aside = "Recovery is \(recovery), which sets the band." }
             } else {
-                lead.headline = value < 34 ? "A light day so far." : value < 67 ? "A moderate day so far." : "A hard day."
+                lead.headline = value < 34 ? "A light load so far." : value < 67 ? "A moderate load so far." : "A high load today."
                 lead.reason = "The target band appears once recovery has seven nights."
             }
         } else {
@@ -264,7 +281,7 @@ nonisolated enum ScorePages {
         // band, 0.8 to 1.3 times the chronic 28 day week.
         let trimp = scores?.detail.trimp ?? []
         func weekLoad(endingAt end: Int) -> Double? {
-            guard end >= 7 else { return nil }
+            guard end >= 7, end <= trimp.count else { return nil }
             let week = trimp[(end - 7)..<end].compactMap { $0 }
             return week.count >= 4 ? week.reduce(0, +) / Double(week.count) * 7 : nil
         }
@@ -299,7 +316,7 @@ nonisolated enum ScorePages {
         let today = calendar.startOfDay(for: inputs?.now ?? Date())
         let latestWorkout = inputs?.workouts.last { $0.start >= today }
         let workout = latestWorkout.map {
-            "\(FitnessActivities.name(Int($0.value))) at \(ScoreMath.clock($0.start, calendar: calendar))"
+            "\(FitnessActivities.name($0.code)) at \(ScoreMath.clock($0.start, calendar: calendar))"
         }
         let workoutDetail = latestWorkout.map { ScoreMath.duration(hours: $0.end.timeIntervalSince($0.start) / 3600) }
 
@@ -355,6 +372,9 @@ nonisolated enum ScorePages {
         let history = scores?.detail.stress ?? []
         let usualStress = ScoreMath.median(history.suffix(30).dropLast())
         var lead = Lead(value: value, headline: "", reason: "")
+        // The usual band, the same one the Today dial draws, so the
+        // gauge and the dial agree on where the score should sit.
+        lead.range = InsightEngine.interpret(scores?.detail.stress ?? [], policy: .score).band
         lead.word = value.map(stressWord)
         if let value, let usualStress {
             let delta = Int((Double(value) - usualStress).rounded())
@@ -394,13 +414,13 @@ nonisolated enum ScorePages {
 
         if let value {
             if peaks.count >= 2 {
-                lead.headline = "\(peaks.count) stress peaks carried the day."
+                lead.headline = "\(peaks.count) rises in pulse at rest today."
             } else if ScoreMath.Band(value) == .high {
-                lead.headline = "A loaded day for your system."
+                lead.headline = "Stress above your usual today."
             } else if ScoreMath.Band(value) == .low {
-                lead.headline = "A calm day so far."
+                lead.headline = "Stress under your usual so far."
             } else {
-                lead.headline = "A moderate day, nothing out of the ordinary."
+                lead.headline = "Stress in your usual range."
             }
             var reason: [String] = []
             if let hrv = hrvTerm?.value, let base = hrvTerm?.baseline {
@@ -474,6 +494,9 @@ nonisolated enum ScorePages {
         let detail = scores?.detail ?? SomaScores.Detail()
         let series = scores?.sleepSeries ?? []
         var lead = Lead(value: value, headline: "", reason: "")
+        // The usual band, the same one the Today dial draws, so the
+        // gauge and the dial agree on where the score should sit.
+        lead.range = InsightEngine.interpret(scores?.detail.sleep ?? [], policy: .score).band
         lead.word = value.map(sleepWord)
         if let value, let lastWeek = ScoreMath.mean(series.dropLast().suffix(7)) {
             let delta = Int((Double(value) - lastWeek).rounded())
@@ -488,13 +511,13 @@ nonisolated enum ScorePages {
         if value != nil {
             if let firstDeep = deepRuns.first, let longest = deepRuns.max(by: { $0.end.timeIntervalSince($0.start) < $1.end.timeIntervalSince($1.start) }),
                longest == firstDeep {
-                lead.headline = "Deep sleep came first, and it held."
+                lead.headline = "Most of your deep sleep came early."
             } else if (asleepHours ?? 0) < (scores?.sleepNeedHours ?? 8) - 1 {
-                lead.headline = "A short night against your need."
+                lead.headline = "Under your sleep need."
             } else if wakes.count >= 4 {
-                lead.headline = "Enough hours, broken up."
+                lead.headline = "Enough hours, woken \(wakes.count) times."
             } else {
-                lead.headline = "A steady night."
+                lead.headline = "Close to your need, few wakings."
             }
             var reason: [String] = []
             if let asleepHours { reason.append("\(ScoreMath.hoursMinutes(asleepHours)) asleep against your \(ScoreMath.hoursMinutes(scores?.sleepNeedHours ?? 8)) need") }
@@ -544,7 +567,7 @@ nonisolated enum ScorePages {
         let bed = ScoreMath.median(detail.bedHour.suffix(14))
         let move = bed.map { bed in
             Move(eyebrow: "Tonight", title: "Lights out by \(ScoreMath.clock(bed - 0.25))",
-                 detail: "A steady bedtime keeps your first deep sleep long.", remindAt: bed - 0.75)
+                 detail: "Your bedtime last night against your usual one.", remindAt: bed - 0.75)
         }
 
         return Sleep(
@@ -588,10 +611,10 @@ nonisolated enum ScorePages {
         let before = detail.sleepDebtHours.dropLast(3).last ?? nil
         let headline: String
         switch debt {
-        case ..<0.25: headline = "No debt to speak of."
-        case ..<2: headline = "Small."
-        case ..<5: headline = "Worth paying back."
-        default: headline = "Large, and worth a few early nights."
+        case ..<0.25: headline = "Under 15 minutes behind."
+        case ..<2: headline = "Under 2 hours behind."
+        case ..<5: headline = "2 to 5 hours behind."
+        default: headline = "Over 5 hours behind."
         }
         var reason = "You need about \(need) a night."
         if let before {
@@ -772,9 +795,9 @@ nonisolated enum ScorePages {
         lead.word = now.map(energyWord)
         if let now {
             switch ScoreMath.Band(now) {
-            case .high: lead.headline = "Plenty left for the evening."
-            case .middle: lead.headline = "Enough left for a quiet evening."
-            case .low: lead.headline = "Running low. Protect tonight’s sleep."
+            case .high: lead.headline = "High for this time of day."
+            case .middle: lead.headline = "Moderate for this time of day."
+            case .low: lead.headline = "Low. An early night refills it."
             }
             var reason: [String] = []
             if let charged { reason.append("Sleep put \(charged) back overnight") }

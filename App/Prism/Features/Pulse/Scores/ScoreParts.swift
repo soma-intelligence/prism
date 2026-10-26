@@ -23,7 +23,6 @@ struct ScorePageScaffold<Content: View>: View {
     let content: Content
 
     @Environment(\.somaTheme) private var theme
-    @AppStorage("scores.guideSeen") private var guideSeen = false
     @State private var showsGuide = false
 
     init(aspect: SomaAspect, title: LocalizedStringResource, @ViewBuilder content: () -> Content) {
@@ -44,8 +43,9 @@ struct ScorePageScaffold<Content: View>: View {
             .frame(maxWidth: metrics.pageMaxWidth, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
-        .aspectWash(aspect)
+        .background(theme.colors.canvas.color.ignoresSafeArea())
         .navigationTitle(Text(title))
+        .softScrollEdges()
 #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
 #endif
@@ -58,18 +58,179 @@ struct ScorePageScaffold<Content: View>: View {
                 }
             }
         }
+        // The guide opens when asked for, never on its own: a page that
+        // covers itself on the first visit has not been read yet.
         .sheet(isPresented: $showsGuide) {
             ScoreGuideSheet(eyebrow: String(localized: title), aspect: aspect)
-        }
-        .task {
-            guard !guideSeen else { return }
-            guideSeen = true
-            showsGuide = true
         }
     }
 }
 
-// MARK: - Arc
+// MARK: - Gauge
+
+/// Today's score on a three quarter arc: a thin line in the aspect's
+/// colour over a faint track, ticks where one band of the score meets the
+/// next, the number and its word in the middle, the change under them, and
+/// the ends of the scale at the feet of the arc.
+struct ScoreGauge: View {
+    let aspect: SomaAspect
+    let lead: ScorePages.Lead
+
+    @Environment(\.somaTheme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// False until the gauge first appears, so the fill sweeps in.
+    @State private var hasAppeared = false
+
+    /// The arc runs from 135 degrees to 405, a gap at the bottom.
+    private static let start = 135.0
+    private static let sweep = 270.0
+    /// Where one band meets the next, on the scale of 100 the bands are cut
+    /// on: the same edges as ``ScoreMath/Band``.
+    private static let bandEdges = [34.0, 67.0]
+
+    var body: some View {
+        let metrics = theme.metrics
+        let type = theme.typography
+        let colors = theme.colors
+        let hue = theme.aspects[aspect].identity.color
+        let share = lead.value.map { min(1, max(0, Double($0) / Double(lead.scale))) } ?? 0
+        let width = metrics.scoreGaugeWidth
+        let stroke = metrics.scoreGaugeStroke
+        let rangeInset = metrics.scoreDialRangeStroke + metrics.scoreDialRangeGap * 1.5
+
+        VStack(spacing: 0) {
+            ZStack {
+                ScoreArc(start: Self.start, sweep: Self.sweep)
+                    .stroke(colors.inkPrimary.color.opacity(metrics.hairlineOpacity * 1.5),
+                            style: StrokeStyle(lineWidth: stroke, lineCap: .round))
+                if lead.value != nil {
+                    ScoreArc(start: Self.start, sweep: Self.sweep * share)
+                        .stroke(hue, style: StrokeStyle(lineWidth: stroke, lineCap: .round))
+                }
+                GeometryReader { proxy in
+                    let center = CGPoint(x: proxy.size.width / 2, y: proxy.size.height / 2)
+                    let radius = (min(proxy.size.width, proxy.size.height) - stroke) / 2
+                    let tick = metrics.scoreGaugeTickLength
+                    ForEach(Self.bandEdges, id: \.self) { edge in
+                        let angle = Angle.degrees(Self.start + Self.sweep * edge / 100).radians
+                        Path { path in
+                            path.move(to: CGPoint(x: center.x + (radius - tick / 2) * cos(angle),
+                                                  y: center.y + (radius - tick / 2) * sin(angle)))
+                            path.addLine(to: CGPoint(x: center.x + (radius + tick / 2) * cos(angle),
+                                                     y: center.y + (radius + tick / 2) * sin(angle)))
+                        }
+                        .stroke(colors.inkSecondary.color,
+                                style: StrokeStyle(lineWidth: metrics.scoreGaugeTickWidth, lineCap: .round))
+                    }
+                    if lead.value != nil {
+                        let angle = Angle.degrees(Self.start + Self.sweep * share).radians
+                        Circle()
+                            .fill(hue)
+                            .overlay(Circle().strokeBorder(colors.canvas.color, lineWidth: 2))
+                            .frame(width: metrics.scoreGaugeKnob, height: metrics.scoreGaugeKnob)
+                            .position(x: center.x + radius * cos(angle), y: center.y + radius * sin(angle))
+                    }
+                }
+                .padding(rangeInset + stroke / 2)
+
+                // A watch bezel: a fine short tick at every two points of
+                // the score, and the existing tick every ten over them.
+                ScoreTicks(start: Self.start, sweep: Self.sweep, count: 50, skipEvery: 5, length: 2.5)
+                    .stroke(colors.inkSecondary.color.opacity(0.3), lineWidth: 0.5)
+                    .padding(rangeInset + stroke + metrics.spaceS)
+                ScoreTicks(start: Self.start, sweep: Self.sweep, count: 10)
+                    .stroke(colors.inkSecondary.color.opacity(0.5), lineWidth: 1)
+                    .padding(rangeInset + stroke + metrics.spaceS)
+
+                VStack(spacing: metrics.spaceXS) {
+                    Text(lead.value.map { "\($0)" } ?? "-")
+                        .somaFont(type.scoreGaugeFigure)
+                        .foregroundStyle(colors.inkPrimary.color)
+                    if let word = lead.word {
+                        Text(word)
+                            .somaFont(type.callout)
+                            .foregroundStyle(colors.inkPrimary.color)
+                    }
+                    if let change = lead.change {
+                        Text(change)
+                            .somaFont(type.caption)
+                            .foregroundStyle(colors.inkSecondary.color)
+                    }
+                }
+                .padding(.top, metrics.spaceM)
+            }
+            .frame(width: width, height: width)
+            .padding(.bottom, -width * 0.12)
+
+            HStack {
+                Text(verbatim: "0")
+                Spacer()
+                Text(verbatim: "\(lead.scale)")
+            }
+            .somaFont(type.captionValue)
+            .foregroundStyle(colors.inkSecondary.color)
+            .frame(width: width * 0.86)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, metrics.heroTopPadding)
+        .onAppear {
+            guard !hasAppeared else { return }
+            if reduceMotion {
+                hasAppeared = true
+            } else {
+                withAnimation(theme.motion.reveal) { hasAppeared = true }
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(lead.word ?? "No score yet"))
+        .accessibilityValue(accessibilityValue)
+    }
+
+    /// The display role at the gauge's size: one large light number, set at
+    /// its own size rather than scaled up, so it stays sharp.
+    private var numberFont: SomaFontSpec {
+        var spec = theme.typography.display
+        spec.size *= theme.metrics.scoreGaugeNumberScale
+        spec.tracking = -1.5
+        spec.weight = .light
+        spec.digits = .tabular
+        return spec
+    }
+
+    private var accessibilityValue: Text {
+        guard let value = lead.value else { return Text("Not measured") }
+        var read = Text("\(value) of \(lead.scale)")
+        if let change = lead.change { read = Text("\(read), \(change)") }
+        return read
+    }
+}
+
+/// Short ticks along an arc, one every `1 / count` of it, the first, middle
+/// and last a little longer. With `skipEvery`, every nth tick is left out,
+/// for a set of fine ticks drawn between coarser ones; `length` then sets
+/// them all one size.
+struct ScoreTicks: Shape {
+    var start: Double
+    var sweep: Double
+    var count: Int
+    var skipEvery: Int? = nil
+    var length: CGFloat? = nil
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let center = CGPoint(x: rect.midX, y: rect.midY)
+        let outer = min(rect.width, rect.height) / 2
+        for index in 0...count {
+            if let skipEvery, index % skipEvery == 0 { continue }
+            let angle = Angle.degrees(start + sweep * Double(index) / Double(count)).radians
+            let major = index == 0 || index == count || index * 2 == count
+            let inner = outer - (length ?? (major ? 7 : 4))
+            path.move(to: CGPoint(x: center.x + outer * cos(angle), y: center.y + outer * sin(angle)))
+            path.addLine(to: CGPoint(x: center.x + inner * cos(angle), y: center.y + inner * sin(angle)))
+        }
+        return path
+    }
+}
 
 /// An arc of a circle inset by nothing, from `start` degrees clockwise.
 struct ScoreArc: Shape {
@@ -135,7 +296,7 @@ struct ScoreFigure: View {
     @Environment(\.somaTheme) private var theme
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 6) {
+        HStack(alignment: .firstTextBaseline, spacing: theme.metrics.spaceS) {
             Text(value ?? "-")
                 .somaFont(theme.typography.display)
                 .foregroundStyle(theme.colors.inkPrimary.color)
@@ -291,7 +452,7 @@ struct ScoreTrendCard: View {
                     Text("The table fills in after two weeks of this score.")
                         .somaFont(type.caption)
                         .foregroundStyle(colors.inkSecondary.color)
-                        .padding(.top, 10)
+                        .padding(.top, theme.metrics.spaceM)
                 } else {
                     HStack {
                         Text("Period").frame(maxWidth: .infinity, alignment: .leading)
@@ -300,7 +461,7 @@ struct ScoreTrendCard: View {
                     }
                     .somaFont(type.caption)
                     .foregroundStyle(colors.inkSecondary.color)
-                    .padding(.top, 12)
+                    .padding(.top, theme.metrics.spaceM)
                     ScoreRows(rows) { row in
                         HStack {
                             Text(row.period)
@@ -325,85 +486,6 @@ struct ScoreTrendCard: View {
     }
 }
 
-// MARK: - The tank
-
-/// A level in a rounded tank, the band edges dashed across it.
-struct ScoreTank: View {
-    let level: Int?
-    let word: String?
-    let aspect: SomaAspect
-
-    @Environment(\.somaTheme) private var theme
-
-    var body: some View {
-        let metrics = theme.metrics
-        let colors = theme.colors
-        let type = theme.typography
-        let look = theme.aspects[aspect]
-        let share = level.map { min(1, max(0, Double($0) / 100)) } ?? 0
-        let shape = RoundedRectangle(cornerRadius: metrics.scoreTankCornerRadius, style: .continuous)
-
-        HStack(alignment: .center, spacing: 12) {
-            ZStack(alignment: .bottom) {
-                shape.fill(colors.surfaceRecessed.color)
-                GeometryReader { proxy in
-                    let height = proxy.size.height * share
-                    ScoreWave()
-                        .fill(LinearGradient(colors: [look.identity.color, look.orb.stops.first?.color ?? look.identity.color],
-                                             startPoint: .top, endPoint: .bottom))
-                        .frame(height: height + 8)
-                        .frame(maxHeight: .infinity, alignment: .bottom)
-                    ForEach([0.34, 0.67], id: \.self) { edge in
-                        Path { path in
-                            let y = proxy.size.height * (1 - edge)
-                            path.move(to: CGPoint(x: 0, y: y))
-                            path.addLine(to: CGPoint(x: proxy.size.width, y: y))
-                        }
-                        .stroke(colors.inkPrimary.color.opacity(0.3), style: StrokeStyle(lineWidth: 1, dash: [3, 4]))
-                    }
-                }
-                .clipShape(shape)
-                shape.strokeBorder(look.identity.color.opacity(0.6), lineWidth: 1.5)
-            }
-            .frame(width: metrics.scoreTankWidth, height: metrics.scoreTankHeight)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(level.map { "\($0)" } ?? "-")
-                    .somaFont(type.metric)
-                    .foregroundStyle(colors.inkPrimary.color)
-                if let word {
-                    Text(word)
-                        .somaFont(type.caption)
-                        .foregroundStyle(colors.inkSecondary.color)
-                }
-            }
-        }
-        .frame(maxWidth: .infinity)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text("Level"))
-        .accessibilityValue(Text(level.map { "\($0) of 100" } ?? "Not measured"))
-    }
-}
-
-/// A still wave across the top of a fill.
-struct ScoreWave: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        let amplitude: CGFloat = 4
-        path.move(to: CGPoint(x: rect.minX, y: rect.minY + amplitude))
-        let steps = 24
-        for step in 0...steps {
-            let x = rect.minX + rect.width * CGFloat(step) / CGFloat(steps)
-            let y = rect.minY + amplitude + amplitude * sin(CGFloat(step) / CGFloat(steps) * .pi * 3)
-            path.addLine(to: CGPoint(x: x, y: y))
-        }
-        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
-        path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
-        path.closeSubpath()
-        return path
-    }
-}
-
 // MARK: - Stats
 
 /// Three numbers under a hairline, the way the Today page sets its scores.
@@ -420,7 +502,7 @@ struct ScoreStats: View {
                 .frame(height: 1 / displayScale)
             SomaStatRow(stats)
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, theme.metrics.spaceXS)
     }
 }
 
@@ -473,7 +555,7 @@ struct ScoreMoveCard: View {
                 }
             }
         ) {
-            SomaOrb(aspect: aspect, scale: .mini)
+            SomaObjectIcon(aspect: aspect, size: .row)
         }
     }
 }
@@ -537,6 +619,42 @@ struct ScoreFootnote: View {
             .somaFont(theme.typography.caption)
             .foregroundStyle(theme.colors.inkSecondary.color)
             .fixedSize(horizontal: false, vertical: true)
+            .somaColumnSpan(.full)
+    }
+}
+
+/// A titled block on a score page: the title, an optional caption on the
+/// trailing edge, and what it introduces.
+struct ScoreSection<Content: View>: View {
+    let title: LocalizedStringResource
+    var caption: String?
+    let content: Content
+
+    @Environment(\.somaTheme) private var theme
+
+    init(title: LocalizedStringResource, caption: String? = nil, @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.caption = caption
+        self.content = content()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: theme.metrics.cardSpacing) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(title)
+                    .somaFont(theme.typography.title)
+                    .foregroundStyle(theme.colors.inkPrimary.color)
+                    .accessibilityAddTraits(.isHeader)
+                Spacer()
+                if let caption {
+                    Text(caption)
+                        .somaFont(theme.typography.caption)
+                        .foregroundStyle(theme.colors.inkSecondary.color)
+                }
+            }
+            content
+        }
+        .padding(.top, theme.metrics.cardSpacing)
     }
 }
 
@@ -551,7 +669,7 @@ struct ScoreSectionTitle: View {
             .somaFont(theme.typography.cardTitle)
             .foregroundStyle(theme.colors.inkPrimary.color)
             .accessibilityAddTraits(.isHeader)
-            .padding(.top, 8)
+            .padding(.top, theme.metrics.spaceS)
     }
 }
 
@@ -585,7 +703,7 @@ struct ScoreBandBar: View {
             GeometryReader { proxy in
                 let width = proxy.size.width
                 ZStack(alignment: .leading) {
-                    HStack(spacing: 3) {
+                    HStack(spacing: theme.metrics.spaceXS) {
                         ForEach(Array(bands.enumerated()), id: \.offset) { index, _ in
                             Capsule()
                                 .fill(hue.opacity(0.35 + 0.55 * Double(index) / Double(max(1, bands.count - 1))))
@@ -664,14 +782,13 @@ struct ScoreSheet<Content: View>: View {
                     VStack(alignment: .leading, spacing: metrics.cardHeaderSpacing) {
                         Text(eyebrow)
                             .somaFont(type.eyebrow)
-                            .textCase(.uppercase)
                             .foregroundStyle(colors.inkSecondary.color)
                         Text(title)
                             .somaFont(type.title)
                             .foregroundStyle(colors.inkPrimary.color)
                             .accessibilityAddTraits(.isHeader)
                     }
-                    .padding(.bottom, 4)
+                    .padding(.bottom, theme.metrics.spaceXS)
                     content
                 }
                 .padding(.horizontal, metrics.pagePadding)
@@ -679,6 +796,7 @@ struct ScoreSheet<Content: View>: View {
                 .frame(maxWidth: metrics.pageMaxWidth, alignment: .leading)
                 .frame(maxWidth: .infinity)
             }
+            .softScrollEdges()
             .background(theme.colors.canvas.color.ignoresSafeArea())
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
@@ -726,6 +844,7 @@ struct ScorePageLinks: View {
             NavigationLink(value: row.route) {
                 SomaBrowseRow(title: row.title, detail: row.detail)
             }
+            .zoomSource(row.route)
             .buttonStyle(.plain)
         }
     }

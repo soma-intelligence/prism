@@ -150,8 +150,10 @@ public struct SomaLinkComparison: View {
                             for tick in scale?.ticks ?? [] {
                                 pen.vertical(context, x: x(tick), height: height)
                             }
-                            Self.drawRow(context, values: high, centre: row / 2, row: row, color: highColor, x: x, metrics: metrics)
-                            Self.drawRow(context, values: low, centre: row * 1.5 + band, row: row, color: lowColor, x: x, metrics: metrics)
+                            Self.drawRow(context, values: high, centre: row / 2, row: row, color: highColor,
+                                         surface: colors.surface.color, x: x, metrics: metrics)
+                            Self.drawRow(context, values: low, centre: row * 1.5 + band, row: row, color: lowColor,
+                                         surface: colors.surface.color, x: x, metrics: metrics)
 
                             guard let highMean, let lowMean else { return }
                             // The bracket: a dashed drop from each mean to the
@@ -163,11 +165,11 @@ public struct SomaLinkComparison: View {
                             drops.addLine(to: CGPoint(x: x(highMean), y: middle))
                             drops.move(to: CGPoint(x: x(lowMean), y: row + band + row * 0.1))
                             drops.addLine(to: CGPoint(x: x(lowMean), y: middle))
-                            context.stroke(drops, with: .color(ink.opacity(0.5)), style: StrokeStyle(lineWidth: 1, dash: [2, 2]))
+                            context.stroke(drops, with: .color(ink.opacity(0.3)), style: StrokeStyle(lineWidth: 0.75, dash: [2, 3]))
                             var rule = Path()
                             rule.move(to: CGPoint(x: x(lowMean), y: middle))
                             rule.addLine(to: CGPoint(x: x(highMean), y: middle))
-                            context.stroke(rule, with: .color(ink), style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
+                            context.stroke(rule, with: .color(ink.opacity(0.6)), style: StrokeStyle(lineWidth: 1, lineCap: .round))
                         }
 
                         if let highMean, let lowMean {
@@ -225,38 +227,39 @@ public struct SomaLinkComparison: View {
         centre: CGFloat,
         row: CGFloat,
         color: Color,
+        surface: Color,
         x: (Double) -> CGFloat,
         metrics: SomaMetrics
     ) {
         guard !values.isEmpty else { return }
         let sorted = values.sorted()
-
         // The whole range, a hairline through the row.
         var range = Path()
         range.move(to: CGPoint(x: x(sorted[0]), y: centre))
         range.addLine(to: CGPoint(x: x(sorted[sorted.count - 1]), y: centre))
-        context.stroke(range, with: .color(color.opacity(0.45)), lineWidth: 1)
-
-        // The middle half of the days.
+        context.stroke(range, with: .color(color.opacity(0.35)), lineWidth: 0.75)
+        // The middle half of the days, a thin capsule on the range.
         let first = x(quantile(sorted, 0.25))
         let third = x(quantile(sorted, 0.75))
-        let box = CGRect(x: first, y: centre - row * 0.3, width: max(third - first, 1), height: row * 0.6)
-        context.fill(Path(roundedRect: box, cornerRadius: row * 0.12), with: .color(color.opacity(metrics.linkDetailBoxOpacity)))
-
-        // Each day, spread over a few lanes so close days stay apart; the
-        // lanes follow the sorted order, so the same days land the same way.
-        let dot = metrics.linkDetailDot
-        let lanes: [CGFloat] = [0, -0.22, 0.22, -0.11, 0.11]
+        let box = CGRect(x: first, y: centre - 3, width: max(third - first, 6), height: 6)
+        context.fill(Path(roundedRect: box, cornerRadius: 3), with: .color(color.opacity(0.22)))
+        // Each day, spread over a few close lanes so near days stay apart;
+        // the lanes follow the sorted order, so the same days land the same
+        // way.
+        let dot = metrics.linkDetailDot * 0.7
+        let lanes: [CGFloat] = [0, -0.16, 0.16, -0.08, 0.08]
         for (index, value) in sorted.enumerated() {
             let y = centre + row * lanes[index % lanes.count]
             let rect = CGRect(x: x(value) - dot / 2, y: y - dot / 2, width: dot, height: dot)
-            context.fill(Path(ellipseIn: rect), with: .color(color.opacity(metrics.linkDetailDotOpacity)))
+            context.fill(Path(ellipseIn: rect), with: .color(color.opacity(0.4)))
         }
-
+        // The mean, a solid dot with a halo of the card's surface.
         if let mean = mean(values) {
-            let width = metrics.linkDetailMeanWidth
-            let mark = CGRect(x: x(mean) - width / 2, y: centre - row * 0.4, width: width, height: row * 0.8)
-            context.fill(Path(roundedRect: mark, cornerRadius: width / 2), with: .color(color))
+            let size = metrics.linkDetailDot + 3
+            let halo = CGRect(x: x(mean) - size / 2 - 2, y: centre - size / 2 - 2, width: size + 4, height: size + 4)
+            context.fill(Path(ellipseIn: halo), with: .color(surface))
+            let mark = CGRect(x: x(mean) - size / 2, y: centre - size / 2, width: size, height: size)
+            context.fill(Path(ellipseIn: mark), with: .color(color))
         }
     }
 }
@@ -289,8 +292,9 @@ public struct SomaLinkDay: Identifiable, Sendable, Hashable {
     }
 }
 
-/// The outcome over the last weeks as a line in its aspect's colour, with the
-/// driver's days lit behind it, so the person sees when the link happened.
+/// The outcome over the last weeks as a quiet line in its aspect's colour,
+/// with the driver's days as solid dots on it, so the person sees when the
+/// link happened without stripes behind the plot.
 public struct SomaLinkTimeline: View {
     private let days: [SomaLinkDay]
     private let aspect: SomaAspect
@@ -320,29 +324,24 @@ public struct SomaLinkTimeline: View {
         let lineColor = theme.aspects[aspect].identity.color
         let litColor = tone.color(colors)
         let days = days
-        let highlight = metrics.linkDetailHighlightOpacity
 
         VStack(alignment: .leading, spacing: metrics.linkCardSpacing) {
             SomaPlot(scale: SomaPlotScale(values: days.compactMap(\.value)), xLabels: xLabels) { context, space, pen in
                 let count = days.count
-                let pitch = space.pitch(count)
-                for (index, day) in days.enumerated() where day.side == .high {
-                    let x = space.x(index, of: count)
-                    let width = max(2, pitch * 0.7)
-                    let rect = CGRect(x: x - width / 2, y: 0, width: width, height: space.size.height)
-                    context.fill(Path(roundedRect: rect, cornerRadius: width / 2), with: .color(litColor.opacity(highlight)))
-                }
                 let points: [CGPoint?] = days.enumerated().map { index, day in
                     day.value.map { CGPoint(x: space.x(index, of: count), y: space.y($0)) }
                 }
-                pen.line(context, points, color: lineColor)
-                for (index, day) in days.enumerated() {
+                pen.line(context, points, color: lineColor.opacity(0.55))
+                // The driver's days as solid dots on the line, with a halo of
+                // the card's surface: the line says how the outcome went,
+                // the dots say when the driver happened. No stripes behind.
+                let size = pen.point + 1
+                for (index, day) in days.enumerated() where day.side == .high {
                     guard let point = points[index] else { continue }
-                    switch day.side {
-                    case .high: pen.dot(context, at: point, color: litColor, filled: true)
-                    case .low: pen.dot(context, at: point, color: pen.inkSecondary)
-                    case .none: break
-                    }
+                    let halo = CGRect(x: point.x - size / 2 - 1.5, y: point.y - size / 2 - 1.5, width: size + 3, height: size + 3)
+                    context.fill(Path(ellipseIn: halo), with: .color(pen.surface))
+                    let dot = CGRect(x: point.x - size / 2, y: point.y - size / 2, width: size, height: size)
+                    context.fill(Path(ellipseIn: dot), with: .color(litColor))
                 }
             }
 
@@ -412,7 +411,6 @@ public struct SomaLinkFacts: View {
                 VStack(alignment: .leading, spacing: metrics.scoreLabelSpacing) {
                     Text(verbatim: fact.label)
                         .somaFont(type.eyebrow)
-                        .textCase(.uppercase)
                         .foregroundStyle(colors.inkSecondary.color)
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)

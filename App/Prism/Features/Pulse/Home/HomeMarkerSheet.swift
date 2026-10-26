@@ -167,7 +167,7 @@ struct HomeMarkerSheet: View {
                     axis: axis,
                     decimals: marker.decimals
                 )
-                .padding(.top, 8)
+                .padding(.top, theme.metrics.spaceS)
             }
 
             trendCard(series)

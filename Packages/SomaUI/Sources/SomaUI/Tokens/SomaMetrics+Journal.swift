@@ -6,24 +6,21 @@
 import CoreGraphics
 
 /// The proportions of a journal: the quick add tiles, the habit rows with
-/// their glyph discs and trailing marks, the progress ring and the feeling
+/// their glyphs and trailing marks, the progress ring and the feeling
 /// scale.
 ///
 /// Computed so they add no stored field to the theme.
 public extension SomaMetrics {
     /// A quick add tile: its height, its corners, and its glyph.
     var journalTileHeight: CGFloat { 74 }
-    var journalTileCornerRadius: CGFloat { 18 }
+    var journalTileCornerRadius: CGFloat { cardCornerRadius }
     var journalTileGlyph: CGFloat { 22 }
-    /// The hue's wash behind a tile, and the rim around it.
-    var journalTileWashOpacity: Double { 0.2 }
-    var journalTileRimOpacity: Double { 0.35 }
-    /// Gap between a tile's disc and its label, and between tiles.
-    var journalTileLabelSpacing: CGFloat { 7 }
-    var journalTileSpacing: CGFloat { 10 }
-    /// A habit row's glyph disc, and the glyph inside it.
+    /// Gap between a tile's glyph and its label, and between tiles.
+    var journalTileLabelSpacing: CGFloat { spaceS }
+    var journalTileSpacing: CGFloat { cardSpacing }
+    /// A habit row's glyph column, and the glyph centred in it.
     var journalRowDisc: CGFloat { 28 }
-    var journalRowGlyph: CGFloat { 14 }
+    var journalRowGlyph: CGFloat { browseGlyphSize }
     /// A habit row's height: a little taller than a browse row, so the disc
     /// breathes.
     var journalRowMinHeight: CGFloat { 54 }
@@ -34,7 +31,7 @@ public extension SomaMetrics {
     /// The header's progress ring.
     var journalRingDiameter: CGFloat { 46 }
     var journalRingLine: CGFloat { 5 }
-    /// A tinted disc's fill under its glyph.
+    /// The hue's faint track under a goal's arc.
     var journalDiscOpacity: Double { 0.18 }
     /// A feeling stop: its height, and how far a chosen one grows.
     var journalFeelStopHeight: CGFloat { 30 }
@@ -66,7 +63,14 @@ public extension SomaMetrics {
     var journalChoiceNoOpacity: Double { 0.75 }
     /// The habit cards: each its own card, a short gap between them.
     var journalCardSpacing: CGFloat { 8 }
-    var journalCardCornerRadius: CGFloat { 14 }
+    var journalCardCornerRadius: CGFloat { cardCornerRadius }
     /// The gap between a section's small heading and its first card.
     var journalSectionHeadingSpacing: CGFloat { 8 }
+}
+
+/// Sizes other components still read, kept from the parallel design lines.
+public extension SomaMetrics {
+    /// The hue's wash behind a tile, and the rim around it.
+    var journalTileWashOpacity: Double { 0.2 }
+    var journalTileRimOpacity: Double { 0.35 }
 }

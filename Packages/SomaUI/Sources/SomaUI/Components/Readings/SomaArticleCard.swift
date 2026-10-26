@@ -95,7 +95,6 @@ public struct SomaArticleCard<CoverStyle: ViewModifier>: View {
                     ToneDot(tone: tone)
                     Text("\(topic) · \(caption)")
                         .somaFont(type.eyebrow)
-                        .textCase(.uppercase)
                         .foregroundStyle(colors.inkSecondary.color)
                 }
             }

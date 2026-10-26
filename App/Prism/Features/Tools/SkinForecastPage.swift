@@ -9,8 +9,9 @@ import SomaUI
 /// Skin Forecast: one index for what today's UV, air, heat and wind ask of the
 /// skin, and the conditions behind it against their comfortable range.
 ///
-/// The skin index engine. Every input is weather, which the app
-/// cannot read yet, so the page holds its shape with dashes and says so.
+/// the earlier app's skin index engine, unchanged. Every input is the weather where the
+/// person is (``ToolWeather``); until a place is known the page holds its
+/// shape with dashes and says so.
 struct SkinForecastPage: View {
     @Environment(HealthDashboard.self) private var health
     @Environment(\.somaTheme) private var theme
@@ -37,7 +38,7 @@ struct SkinForecastPage: View {
                          rest: "A wellness estimate from local weather and air in \(weather.place).")
             } else {
                 ToolHero(headline: "The forecast needs the weather where you are.",
-                         lead: "UV, air quality, temperature and wind make the index, and Soma cannot read the weather yet.",
+                         lead: "UV, air quality, temperature and wind make the index, read for the place the Environment lens knows.",
                          rest: "Each condition below waits as a dash until it can.")
             }
 

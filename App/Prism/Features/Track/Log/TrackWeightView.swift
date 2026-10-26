@@ -51,8 +51,9 @@ struct TrackWeightView: View {
                 isSaving = true
                 log.addMeasure(.weight, value: value, at: .now)
                 Task {
-                    await TrackHealthWriter.save([.bodyMass(kilograms: value)], at: .now)
+                    let reached = await TrackHealthWriter.save([.bodyMass(kilograms: value)], at: .now)
                     dismiss()
+                    Confirmations.shared.logged("Weight", reachedHealth: reached)
                 }
             }
             .disabled(shown == nil || isSaving)

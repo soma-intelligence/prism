@@ -16,9 +16,9 @@ public extension SomaMetrics {
     /// Room between the glyph circle and the words beside it.
     var timelineGlyphGap: CGFloat { 12 }
     /// Vertical room above and below one event in the short list.
-    var timelineListRowPadding: CGFloat { 11 }
+    var timelineListRowPadding: CGFloat { spaceM }
     /// Room between two stats on an event's one line of numbers.
-    var timelineStatSpacing: CGFloat { 10 }
+    var timelineStatSpacing: CGFloat { spaceS }
     /// The pill under the short list that opens the full day.
     var timelinePillHeight: CGFloat { 40 }
 
@@ -36,8 +36,8 @@ public extension SomaMetrics {
     var timelineNowRowHeight: CGFloat { 28 }
     var timelineNowLineWidth: CGFloat { 1.5 }
     /// Vertical room around an event card on the full day.
-    var timelineCardSpacing: CGFloat { 5 }
+    var timelineCardSpacing: CGFloat { spaceXS }
     /// Inside an event card on the full day.
     var timelineCardPadding: CGFloat { 12 }
-    var timelineCardCornerRadius: CGFloat { 18 }
+    var timelineCardCornerRadius: CGFloat { cardCornerRadius }
 }

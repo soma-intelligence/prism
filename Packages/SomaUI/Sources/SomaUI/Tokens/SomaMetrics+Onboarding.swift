@@ -30,7 +30,7 @@ public extension SomaMetrics {
     /// The orb parked in the corner, beside the progress bar.
     var onboardingOrbCornerScale: CGFloat { 0.17 }
     /// Gap between the orb and the title under it.
-    var onboardingOrbGap: CGFloat { 18 }
+    var onboardingOrbGap: CGFloat { spaceL }
     /// Gap between a screen's title and its content.
     var onboardingTitleGap: CGFloat { 20 }
 }

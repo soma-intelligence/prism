@@ -66,10 +66,14 @@ struct VaultAllDataPage: View {
                 }
 
                 if records.isEmpty && isFinished {
-                    Text("No readings yet")
-                        .somaFont(theme.typography.body)
-                        .foregroundStyle(theme.colors.inkSecondary.color)
-                        .frame(maxWidth: .infinity)
+                    StateNote(
+                        symbol: "tray",
+                        title: "No records yet",
+                        message: "Apple Health holds no \(type.title) records. They appear here as soon as a device or an app writes one."
+                    )
+                } else if records.isEmpty {
+                    // The first page: the list's own shape, not a spinner.
+                    ReadingRows(count: 6)
                 } else if isLoading {
                     ProgressView()
                         .frame(maxWidth: .infinity)

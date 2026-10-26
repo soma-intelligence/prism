@@ -29,6 +29,7 @@ struct PulseLinkDetailSheet: View {
                 PulseLinkDetailContent(detail: detail)
                     .padding(theme.metrics.pagePadding)
             }
+            .softScrollEdges()
             .background(theme.colors.canvas.color.ignoresSafeArea())
 #if !os(macOS)
             .navigationBarTitleDisplayMode(.inline)

@@ -29,10 +29,12 @@ public struct SomaGlassPressStyle: ButtonStyle {
         configuration.label
             .scaleEffect(scales && configuration.isPressed ? theme.motion.pressScale : 1)
             .opacity(configuration.isPressed ? theme.motion.pressOpacity : 1)
-            .animation(
-                .easeOut(duration: theme.motion.pressDuration),
-                value: configuration.isPressed
-            )
+            // A spring, so a finger that lifts before the press has landed
+            // turns the scale round where it is instead of snapping back.
+            .animation(theme.motion.press, value: configuration.isPressed)
+            // A light tap as the finger lands, none as it lifts: the press is
+            // the moment the control answers.
+            .sensoryFeedback(.impact(weight: .light, intensity: 0.7), trigger: configuration.isPressed) { _, pressed in pressed }
     }
 }
 

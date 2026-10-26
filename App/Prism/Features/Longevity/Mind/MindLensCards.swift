@@ -39,6 +39,9 @@ struct MindSection<Content: View, Route: Hashable>: View {
                     }
                     .contentShape(.rect)
                 }
+                // No zoom source here: the zoom clips its source to its
+                // bounds, which cut the title's first letter (owner,
+                // 2026-10-25). The page opens with the standard push.
                 .buttonStyle(.plain)
             } else {
                 heading
@@ -79,7 +82,7 @@ struct MindMindfulCard: View {
         let chosen = week.first { $0.id == selection } ?? week.last
 
         SomaCard {
-            HStack(alignment: .center, spacing: metrics.cardSpacing * 1.5) {
+            HStack(alignment: .center, spacing: metrics.spaceL) {
                 ring(chosen)
                 bars(selected: chosen?.id)
             }
@@ -111,7 +114,7 @@ struct MindMindfulCard: View {
                 Text(bar?.minutes.map(MindLensFormat.whole) ?? "-")
                     .somaFont(theme.typography.metric)
                     .foregroundStyle(colors.inkPrimary.color)
-                    .somaRollingNumber(bar?.minutes.map(MindLensFormat.whole))
+                    .contentTransition(.numericText())
                 Text(bar?.isToday == false ? bar.map { $0.day.formatted(.dateTime.weekday(.abbreviated)) } ?? "" : "of \(MindLensFormat.whole(goal))")
                     .somaFont(theme.typography.captionValue)
                     .foregroundStyle(colors.inkSecondary.color)
@@ -180,54 +183,82 @@ struct MindBreatheCard: View {
     let action: () -> Void
 
     @Environment(\.somaTheme) private var theme
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.somaPartIsShown) private var partIsShown
 
     var body: some View {
         let metrics = theme.metrics
         let colors = theme.colors
-        let hue = SomaHealthHue.mind
+        let side = metrics.miniOrbDiameter * 1.4
 
         Button(action: action) {
-            HStack(spacing: metrics.cardSpacing) {
-                TimelineView(.animation(paused: reduceMotion || !partIsShown)) { context in
-                    let scale = reduceMotion ? 1 : MindBreatheSheet.breath(at: context.date.timeIntervalSinceReferenceDate).scale
-                    ZStack {
-                        Circle()
-                            .fill(RadialGradient(colors: [hue.end.color.opacity(0.45), .clear],
-                                                 center: .center, startRadius: 0, endRadius: metrics.miniOrbDiameter * 0.9))
-                            .scaleEffect(scale * 1.15)
-                        SomaOrb(aspect: .mind, scale: .mini)
-                            .scaleEffect(scale)
-                    }
-                }
-                .frame(width: metrics.miniOrbDiameter * 1.5, height: metrics.miniOrbDiameter * 1.5)
-                .accessibilityHidden(true)
+            HStack(spacing: metrics.cardSpacing + 4) {
+                // One thin ring that breathes with the pace the sheet uses,
+                // over a still ring at rest size: the card shows the breath,
+                // it does not decorate it.
+                MindBreathRing(aspect: .mind)
+                    .frame(width: side, height: side)
 
                 VStack(alignment: .leading, spacing: metrics.cardHeaderSpacing) {
                     Text("Breathe")
                         .somaFont(theme.typography.cardTitle)
                         .foregroundStyle(colors.inkPrimary.color)
-                    Text(verbatim: "4 · 6 · 10 min")
-                        .somaFont(theme.typography.captionValue)
+                    Text("In with the ring, out as it falls")
+                        .somaFont(theme.typography.caption)
                         .foregroundStyle(colors.inkSecondary.color)
+                        .lineLimit(2)
                 }
                 Spacer(minLength: 0)
-                Image(systemName: "play.fill")
+                Text("Start")
                     .somaFont(theme.typography.callout)
-                    .foregroundStyle(SomaHealthHue.ink.color)
-                    .frame(width: metrics.minimumTapTarget, height: metrics.minimumTapTarget)
-                    .background(
-                        LinearGradient(colors: [hue.end.color, hue.start.color], startPoint: .top, endPoint: .bottom),
-                        in: .circle
-                    )
+                    .foregroundStyle(colors.onAccent.color)
+                    .padding(.horizontal, metrics.spaceM + 2)
+                    .padding(.vertical, metrics.spaceS)
+                    .background(colors.accent.color, in: .capsule)
             }
             .padding(metrics.cardPadding)
             .background(colors.surface.color, in: .rect(cornerRadius: metrics.cardCornerRadius, style: .continuous))
             .contentShape(.rect)
         }
         .buttonStyle(TilePressStyle())
-        .accessibilityLabel("Breathe, 10 min")
+        .accessibilityLabel("Breathe")
+        .accessibilityHint("Starts a guided breath")
+    }
+}
+
+/// One thin ring that breathes at the pace the Breathe sheet uses, over a
+/// still ring at rest size, in the aspect's colour: it shows the breath, it
+/// does not decorate it. Still with Reduce Motion, off screen and in Low
+/// Power Mode.
+struct MindBreathRing: View {
+    let aspect: SomaAspect
+
+    @Environment(\.somaTheme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var isOnScreen = true
+    private var power = SomaPowerState.shared
+
+    init(aspect: SomaAspect) {
+        self.aspect = aspect
+    }
+
+    var body: some View {
+        let colors = theme.colors
+        let hue = theme.aspects[aspect].identity.color
+
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: reduceMotion || !isOnScreen || power.isLowPower)) { context in
+            let scale = reduceMotion ? 0.8 : MindBreatheSheet.breath(at: context.date.timeIntervalSinceReferenceDate).scale
+            ZStack {
+                Circle()
+                    .stroke(colors.inkPrimary.color.opacity(theme.metrics.hairlineOpacity), lineWidth: 1)
+                Circle()
+                    .fill(hue.opacity(0.14))
+                    .scaleEffect(scale * 0.86)
+                Circle()
+                    .stroke(hue, lineWidth: 1.5)
+                    .scaleEffect(scale * 0.86)
+            }
+        }
+        .somaOnScreen($isOnScreen)
+        .accessibilityHidden(true)
     }
 }
 
@@ -262,7 +293,7 @@ struct MindHeatmapCard: View {
                         Text(MindLensFormat.whole(minutes))
                             .somaFont(theme.typography.metric)
                             .foregroundStyle(colors.inkPrimary.color)
-                            .somaRollingNumber(MindLensFormat.whole(minutes))
+                            .contentTransition(.numericText())
                         Text("min")
                             .somaFont(theme.typography.caption)
                             .foregroundStyle(colors.inkSecondary.color)
@@ -365,56 +396,83 @@ struct MindHeatmapCard: View {
     }
 }
 
-/// A deeper Mind page as a tile: its line glyph on the Mind badge, drawn
-/// like the aspect glyphs, and its name under it.
+// MARK: - Deeper pages
+
+/// One way into a deeper Mind page: a glyph in its colour and a short name.
 struct MindGlyphTile: View {
     let route: MindRoute
-    let glyph: SomaMindGlyph.Kind
+    let symbol: String
     let title: LocalizedStringResource
+    let detail: LocalizedStringResource
+    let hue: SomaHealthHue
 
     @Environment(\.somaTheme) private var theme
 
     var body: some View {
         let metrics = theme.metrics
+        let colors = theme.colors
 
         TileLink(value: route) {
-            VStack(spacing: metrics.cardHeaderSpacing + 4) {
-                SomaMindGlyph(glyph)
+            VStack(alignment: .leading, spacing: metrics.cardHeaderSpacing) {
+                HStack(alignment: .top) {
+                    Image(systemName: symbol)
+                        .font(.system(size: metrics.journalTileGlyph, weight: .light))
+                        .foregroundStyle(colors.inkPrimary.color)
+                        .frame(height: metrics.journalTileGlyph * 1.2, alignment: .leading)
+                    Spacer(minLength: 0)
+                    Image(systemName: "arrow.up.right")
+                        .font(.system(size: metrics.browseChevronSize, weight: .semibold))
+                        .foregroundStyle(colors.inkSecondary.color)
+                }
+                Spacer(minLength: metrics.spaceS)
                 Text(title)
-                    .somaFont(theme.typography.caption)
-                    .foregroundStyle(theme.colors.inkPrimary.color)
+                    .somaFont(theme.typography.cardTitle)
+                    .foregroundStyle(colors.inkPrimary.color)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.75)
+                Text(detail)
+                    .somaFont(theme.typography.caption)
+                    .foregroundStyle(colors.inkSecondary.color)
+                    .lineLimit(2, reservesSpace: true)
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, metrics.cardPadding)
-            .background(theme.colors.surface.color, in: .rect(cornerRadius: metrics.cardCornerRadius, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: metrics.cardCornerRadius, style: .continuous)
-                    .strokeBorder(theme.colors.inkPrimary.color.opacity(metrics.hairlineOpacity), lineWidth: 0.5)
-            )
+            .padding(metrics.cardPadding)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(colors.surface.color, in: .rect(cornerRadius: metrics.cardCornerRadius, style: .continuous))
         }
         .accessibilityLabel(Text(title))
+        .accessibilityHint(Text(detail))
     }
 }
 
-/// Every deeper Mind page as a glyph tile, four to a row.
+/// Every deeper Mind page as a tile, two to a row: an ink glyph, the page's
+/// name and a line on what it holds. Colour stays out: eight gradient
+/// squircles read as a template, not as Soma.
 struct MindGlyphGrid: View {
     @Environment(\.somaTheme) private var theme
 
     var body: some View {
-        let spacing = theme.metrics.cardSpacing * 0.75
+        let spacing = theme.metrics.cardSpacing
 
-        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: spacing), count: 4), spacing: spacing) {
-            MindGlyphTile(route: .hrv, glyph: .hrv, title: "HRV")
-            MindGlyphTile(route: .stressRadar, glyph: .radar, title: "Radar")
-            MindGlyphTile(route: .moodForecast, glyph: .forecast, title: "Forecast")
-            MindGlyphTile(route: .innerMap, glyph: .innerMap, title: "Inner map")
-            MindGlyphTile(route: .detail, glyph: .score, title: "Score")
-            MindGlyphTile(route: .insights, glyph: .insights, title: "Insights")
-            MindGlyphTile(route: .meetings, glyph: .meetings, title: "Meetings")
-            MindGlyphTile(route: .habits(.recovery), glyph: .habits, title: "Habits")
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: spacing), count: 2), spacing: spacing) {
+            MindGlyphTile(route: .hrv, symbol: "waveform.path.ecg", title: "HRV", detail: "Variability and its trend", hue: .heart)
+            MindGlyphTile(route: .stressRadar, symbol: "scope", title: "Radar", detail: "What raised your stress", hue: .vitals)
+            MindGlyphTile(route: .moodForecast, symbol: "cloud.sun", title: "Forecast", detail: "Tomorrow\u{2019}s mood, from today", hue: .mobility)
+            MindGlyphTile(route: .innerMap, symbol: "circle.hexagongrid", title: "Inner map", detail: "Feelings and what drove them", hue: .symptoms)
+            MindGlyphTile(route: .detail, symbol: "brain.head.profile", title: "Score", detail: "How your Mind score is built", hue: .mind)
+            MindGlyphTile(route: .insights, symbol: "square.grid.3x3", title: "Insights", detail: "Patterns across your weeks", hue: .cycle)
+            MindGlyphTile(route: .meetings, symbol: "calendar", title: "Meetings", detail: "Calendar load against stress", hue: .hearing)
+            MindGlyphTile(route: .habits(.recovery), symbol: "leaf", title: "Habits", detail: "What helps you recover", hue: .nutrition)
+            MindGlyphTile(route: .assessments, symbol: "list.clipboard", title: "Questionnaires",
+                          detail: LocalizedStringResource(stringLiteral: MindGlyphGrid.assessmentLine(MindStore.shared.latest(.phq9))), hue: .mind)
+            MindGlyphTile(route: .connection, symbol: "person.2", title: "Connection",
+                          detail: LocalizedStringResource(stringLiteral: MindGlyphGrid.assessmentLine(MindStore.shared.latest(.ucla3), invitation: "Time with people, and how it feels")), hue: .heart)
         }
+    }
+
+    /// The questionnaires tile's line: the last PHQ-9 with its band and its
+    /// day, never the number alone, or the invitation when there is none.
+    static func assessmentLine(_ latest: MindAssessment?, invitation: String = "Take a 2 minute check") -> String {
+        guard let latest, let reading = latest.reading else { return invitation }
+        return "\(latest.instrument.title) \(reading.value), \(reading.word.localizedLowercase), \(MindAssessmentFormat.day(latest.date))"
     }
 }
 
@@ -430,6 +488,7 @@ struct MindGlyphGrid: View {
             }
             .padding()
         }
+        .softScrollEdges()
     }
     .somaTheme(.standard)
 }

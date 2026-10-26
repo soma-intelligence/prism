@@ -21,6 +21,9 @@ struct TrackEntryPage<Content: View, Footer: View, Principal: View>: View {
     /// Whether the sheet closes with Done (every change already saved) rather
     /// than Cancel (nothing saved until the action).
     var closesWithDone = false
+    /// Drawn full bleed behind the page instead of the plain canvas, with
+    /// the footer left clear over it: the water entry's rising level.
+    var backdrop: AnyView? = nil
     @ViewBuilder var content: Content
     @ViewBuilder var footer: Footer
     @ViewBuilder var principal: Principal
@@ -40,9 +43,9 @@ struct TrackEntryPage<Content: View, Footer: View, Principal: View>: View {
             .padding(.horizontal, metrics.pagePadding)
             .padding(.top, metrics.cardSpacing)
             .padding(.bottom, metrics.pagePadding)
-            .frame(maxWidth: metrics.pageMaxWidth)
-            .frame(maxWidth: .infinity)
+            .somaReadableWidth()
         }
+        .softScrollEdges()
         .scrollDisabled(!scrolls)
         .scrollBounceBehavior(.basedOnSize)
         .safeAreaInset(edge: .bottom) {
@@ -58,7 +61,6 @@ struct TrackEntryPage<Content: View, Footer: View, Principal: View>: View {
                     .background(colors.canvas.color.ignoresSafeArea(edges: .bottom))
             }
         }
-        .background(colors.canvas.color.ignoresSafeArea())
         .navigationTitle(title)
         .toolbarTitleDisplayMode(.inline)
         .toolbar {

@@ -46,7 +46,7 @@ enum PulseNights {
     /// ended between six in the evening before and six in the evening of that
     /// day. A nap in the afternoon is a shorter stretch, and loses to the night.
     static func nights(from samples: [HealthReading], calendar: Calendar) -> [PulseNight] {
-        let asleep = merged(samples.filter { asleepCodes.contains(Int($0.value)) })
+        let asleep = merged(samples.filter { asleepCodes.contains($0.code) })
         guard !asleep.isEmpty else { return [] }
 
         var stretches: [[Range<Date>]] = []
@@ -59,9 +59,9 @@ enum PulseNights {
             }
         }
 
-        let deep = merged(samples.filter { Int($0.value) == deepCode })
-        let staged = merged(samples.filter { stagedCodes.contains(Int($0.value)) })
-        let bed = merged(samples.filter { Int($0.value) == inBed })
+        let deep = merged(samples.filter { $0.code == deepCode })
+        let staged = merged(samples.filter { stagedCodes.contains($0.code) })
+        let bed = merged(samples.filter { $0.code == inBed })
 
         var longest: [Date: (span: Range<Date>, asleep: TimeInterval)] = [:]
         for stretch in stretches {

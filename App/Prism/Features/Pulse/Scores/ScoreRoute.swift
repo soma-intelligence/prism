@@ -100,7 +100,7 @@ struct ScoreInputsLoader: ViewModifier {
                 if inputs == nil { inputs = ScoreInputsCache.shared.value(for: parts) }
             }
             .task { await load(force: false) }
-            .refreshable { await load(force: true) }
+            .somaRefreshable { await load(force: true) }
     }
 
     private func load(force: Bool) async {

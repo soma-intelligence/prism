@@ -5,7 +5,7 @@
 
 import SwiftUI
 
-/// One card per aspect: its glyph and name, the value that sums it up,
+/// One card per aspect: its object and name, the value that sums it up,
 /// one line saying what the value means, and a small chart at the end.
 public struct SomaAspectCard<Chart: View>: View {
     private let aspect: SomaAspect
@@ -42,18 +42,16 @@ public struct SomaAspectCard<Chart: View>: View {
 
         SomaCard {
             HStack(alignment: .center, spacing: metrics.cardSpacing) {
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: theme.metrics.spaceS) {
                     HStack(spacing: metrics.identityDotSpacing) {
-                        SomaAspectGlyph(aspect, style: .caption)
+                        SomaObjectIcon(aspect)
                         Text(aspect.title)
                             .somaFont(type.eyebrow)
-                            .textCase(.uppercase)
                             .foregroundStyle(colors.inkSecondary.color)
                     }
 
                     HStack(alignment: .firstTextBaseline, spacing: 5) {
-                        Text(value ?? "-")
-                            .somaFont(type.metricCompact)
+                        SomaNumber(value, type.metricCompact)
                             .foregroundStyle(colors.inkPrimary.color)
                         if let unit {
                             Text(unit)

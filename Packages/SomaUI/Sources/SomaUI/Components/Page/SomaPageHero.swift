@@ -17,7 +17,7 @@ public struct SomaPageHero: View {
     @Environment(\.somaTheme) private var theme
 
     /// - Parameters:
-    ///   - eyebrow: set in small capitals above: "Lean mass · eight weeks".
+    ///   - eyebrow: set small above: "Six visits since July".
     ///   - title: the headline: "Your legs carried the change."
     ///   - reason: one or more sentences explaining it.
     public init(eyebrow: String?, title: String, reason: String?) {
@@ -34,7 +34,6 @@ public struct SomaPageHero: View {
             if let eyebrow {
                 Text(eyebrow)
                     .somaFont(type.eyebrow)
-                    .textCase(.uppercase)
                     .foregroundStyle(colors.inkSecondary.color)
             }
 

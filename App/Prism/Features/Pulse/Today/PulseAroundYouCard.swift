@@ -26,18 +26,17 @@ struct PulseAroundYouCard: View {
 
         SomaCard {
             HStack(alignment: .center, spacing: metrics.cardSpacing) {
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: theme.metrics.spaceS) {
                     HStack(spacing: metrics.identityDotSpacing) {
                         Circle()
                             .fill(colors.inkSecondary.color)
                             .frame(width: metrics.identityDotDiameter, height: metrics.identityDotDiameter)
                         Text("Around you")
                             .somaFont(type.eyebrow)
-                            .textCase(.uppercase)
                             .foregroundStyle(colors.inkSecondary.color)
                     }
 
-                    HStack(alignment: .firstTextBaseline, spacing: 5) {
+                    HStack(alignment: .firstTextBaseline, spacing: theme.metrics.spaceXS) {
                         Text(report.daylight.map { "\(Int($0.rounded()))" } ?? "-")
                             .somaFont(type.metricCompact)
                             .foregroundStyle(colors.inkPrimary.color)

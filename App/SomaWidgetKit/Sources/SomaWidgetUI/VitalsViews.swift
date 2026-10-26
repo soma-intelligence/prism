@@ -70,6 +70,15 @@ enum VitalKind: CaseIterable {
         }
     }
 
+    /// The hue the vital's word and week wear in full colour.
+    var aspect: SomaAspect {
+        switch self {
+        case .resting: .heart
+        case .hrv: .mind
+        case .sleep: .sleep
+        }
+    }
+
     func vital(_ snapshot: SomaWidgetSnapshot) -> SomaWidgetSnapshot.Vital {
         switch self {
         case .resting: snapshot.restingHR
@@ -114,21 +123,24 @@ struct NumberWithUnit: View {
     }
 }
 
-/// A value's word, in the secondary ink.
+/// A value's word: in its measure's hue when one is named and the widget
+/// shows colour, in the secondary ink otherwise.
 struct ValueLabel: View {
     let text: String
+    let aspect: SomaAspect?
 
     @Environment(\.somaTheme) private var theme
     @Environment(\.widgetRenderingMode) private var mode
 
-    init(_ text: String) {
+    init(_ text: String, aspect: SomaAspect? = nil) {
         self.text = text
+        self.aspect = aspect
     }
 
     var body: some View {
         Text(text)
-            .somaFont(theme.typography.widgetLabel)
-            .foregroundStyle(WidgetInk(theme: theme, mode: mode).secondary)
+            .somaFont(aspect == nil ? theme.typography.widgetLabel : theme.typography.widgetLabelStrong)
+            .foregroundStyle(WidgetInk(theme: theme, mode: mode).label(aspect))
             .lineLimit(1)
     }
 }
@@ -186,8 +198,8 @@ struct StageRowShape: Shape {
     }
 }
 
-/// Last night as four rows, awake at the top, deep at the bottom, each in its
-/// own ink.
+/// Last night as four rows, awake at the top, deep at the bottom, each a
+/// step of the sleep hue in full colour, of the ink elsewhere.
 struct HypnogramStrip: View {
     let stages: [Stage]
     let freshness: Freshness
@@ -197,7 +209,8 @@ struct HypnogramStrip: View {
 
     var body: some View {
         let metrics = theme.metrics
-        let ink = WidgetInk(theme: theme, mode: mode).value(freshness)
+        let inks = WidgetInk(theme: theme, mode: mode)
+        let ink = freshness == .fresh ? inks.mark(.sleep) : inks.secondary
         VStack(spacing: metrics.widgetStageRowGap) {
             ForEach(Hypnogram.rows, id: \.self) { kind in
                 HStack(spacing: metrics.widgetRowGap) {
@@ -228,10 +241,10 @@ private struct VitalColumn: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: theme.metrics.widgetRowSpacing) {
-            ValueLabel(kind.label)
+            ValueLabel(kind.label, aspect: kind.aspect)
             NumberWithUnit(text: kind.text(snapshot), unit: kind.unit, number: number, freshness: freshness)
             Spacer(minLength: 0)
-            HairlineTrace(values: kind.vital(snapshot).series7, showsNowDot: true, dimmed: freshness != .fresh)
+            HairlineTrace(values: kind.vital(snapshot).series7, showsNowDot: true, dimmed: freshness != .fresh, aspect: kind.aspect)
                 .frame(height: theme.metrics.widgetTraceHeight)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -252,11 +265,11 @@ private struct VitalRow: View {
     var body: some View {
         HStack(spacing: theme.metrics.widgetColumnSpacing) {
             VStack(alignment: .leading, spacing: 0) {
-                ValueLabel(kind.label)
+                ValueLabel(kind.label, aspect: kind.aspect)
                 NumberWithUnit(text: kind.text(snapshot), unit: kind.unit, number: number, freshness: freshness)
             }
             .frame(width: labelWidth, alignment: .leading)
-            HairlineTrace(values: kind.vital(snapshot).series7, showsNowDot: true, dimmed: freshness != .fresh)
+            HairlineTrace(values: kind.vital(snapshot).series7, showsNowDot: true, dimmed: freshness != .fresh, aspect: kind.aspect)
         }
     }
 }

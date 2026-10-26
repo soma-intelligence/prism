@@ -27,7 +27,7 @@ struct StrengthLoadPage: View {
         let report = SomaTools.StrengthLoad.report(from: sessions, endingOn: model.current.now)
         let bests = SomaTools.StrengthLoad.progression(from: sessions)
         let weekAgo = Calendar.current.date(byAdding: .day, value: -7, to: model.current.now) ?? model.current.now
-        let workouts = model.current.workouts.filter { ToolsInputs.strengthCodes.contains(Int($0.value)) && $0.start >= weekAgo }
+        let workouts = model.current.workouts.filter { ToolsInputs.strengthCodes.contains($0.code) && $0.start >= weekAgo }
 
         ToolPage(ToolKind.strengthLoad.title) {
             if report.isEmpty {

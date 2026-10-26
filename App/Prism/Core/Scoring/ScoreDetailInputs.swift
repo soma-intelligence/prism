@@ -102,6 +102,9 @@ nonisolated struct ScoreDetailInputs: Sendable, Equatable {
     @concurrent
     static func read(_ parts: Set<Part>, from source: any HealthSampleSource, now: Date,
                      calendar: Calendar) async -> ScoreDetailInputs {
+        // Whatever store this is handed, read it through the border that drops
+        // values no arithmetic can use.
+        let source: any HealthSampleSource = source is SanitizedHealthSource ? source : SanitizedHealthSource(base: source)
         var inputs = ScoreDetailInputs(now: now)
         let starts = SomaScoresReader.dayStarts(days: days, now: now, calendar: calendar)
         guard let first = starts.first else { return inputs }
@@ -119,14 +122,14 @@ nonisolated struct ScoreDetailInputs: Sendable, Equatable {
         let sleepFrom = calendar.date(byAdding: .hour, value: -18, to: first) ?? first
         let sleepReadings = await samples(Metric.sleep, from: sleepFrom, to: now)
         let sleepSamples = sleepReadings.compactMap {
-            ScoringSleepSample(code: Int($0.value), start: $0.start, end: $0.end, source: $0.source)
+            ScoringSleepSample(code: $0.code, start: $0.start, end: $0.end, source: $0.source)
         }
         inputs.nights = SomaScoringEngine.nightWindows(from: sleepSamples, days: days, now: now, calendar: calendar)
         if let last = inputs.nights.last ?? nil {
             // The in bed wrapper (code 0) is what a tracker writes when the
             // person got into bed, before the first stage.
             inputs.inBedStart = sleepReadings
-                .filter { Int($0.value) == 0 && $0.end > last.start.addingTimeInterval(-3 * 3600) && $0.start <= last.start }
+                .filter { $0.code == 0 && $0.end > last.start.addingTimeInterval(-3 * 3600) && $0.start <= last.start }
                 .map(\.start).min()
         }
         let nights = inputs.nights
@@ -188,7 +191,7 @@ nonisolated struct ScoreDetailInputs: Sendable, Equatable {
             inputs.workouts = await workouts.sorted { $0.start < $1.start }
             // HKCategoryValueAppleStandHour: 0 stood, 1 idle.
             let hours = await stand
-            inputs.standHours = hours.isEmpty ? nil : hours.filter { Int($0.value) == 0 }.count
+            inputs.standHours = hours.isEmpty ? nil : hours.filter { $0.code == 0 }.count
             inputs.age = await birth
             // Last night's beats too, for the stress line's night, when
             // `.nightHeart` did not read them already.

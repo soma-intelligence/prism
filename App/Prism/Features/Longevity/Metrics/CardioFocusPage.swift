@@ -56,7 +56,6 @@ struct CardioFocusPage: View {
                 VStack(alignment: .leading, spacing: theme.metrics.bodyRowSpacing) {
                     Text("Time in zones, 7 days")
                         .somaFont(theme.typography.eyebrow)
-                        .textCase(.uppercase)
                         .foregroundStyle(theme.colors.inkSecondary.color)
                     ForEach(0..<5, id: \.self) { index in
                         BodyBarRow(
@@ -95,7 +94,7 @@ struct CardioFocusPage: View {
         }
         .navigationTitle("Cardio focus")
         .task { history = await health.fitnessHistory(days: Self.readDays) }
-        .refreshable { history = await health.fitnessHistory(days: Self.readDays) }
+        .somaRefreshable { history = await health.fitnessHistory(days: Self.readDays) }
     }
 
     private func headline(_ focus: CardioFocus, hasData: Bool) -> String {

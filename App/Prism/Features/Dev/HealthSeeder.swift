@@ -84,8 +84,14 @@ final class HealthSeeder {
     /// when the whole catalog was offered to it. Re-derive it the same way when
     /// a new OS moves a type across the line: run the seeder with this set
     /// emptied and read the types out of the crash.
+    ///
+    /// One entry has not been through that yet: `AudioExposureEvent`, the
+    /// environmental twin of the headphone event, which the catalog only
+    /// started naming under its real identifier on 2026-10-24. It sits here
+    /// beside its twin until a run with the set emptied confirms it.
     static let readOnlyIdentifiers: Set<String> = [
         "HKCategoryTypeIdentifierAppleStandHour",
+        "HKCategoryTypeIdentifierAudioExposureEvent",
         "HKCategoryTypeIdentifierAppleWalkingSteadinessEvent",
         "HKCategoryTypeIdentifierHeadphoneAudioExposureEvent",
         "HKCategoryTypeIdentifierHighHeartRateEvent",

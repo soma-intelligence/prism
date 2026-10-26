@@ -68,18 +68,34 @@ final class PhoneMotion {
 
     /// Reads today, the week and today's activity, then keeps today live.
     func refresh() async {
-        authorization = source.isAvailable ? source.authorization : .unavailable
+        // Each property is written only when it changed: every page that
+        // shows steps reads these, and an unchanged write still redraws it.
+        let access = source.isAvailable ? source.authorization : .unavailable
+        if access != authorization { authorization = access }
         guard authorization == .authorized else { return }
 
         let now = clock()
         let midnight = calendar.startOfDay(for: now)
 
-        today = (try? await source.pedometer(from: midnight, to: now)) ?? today
-        week = await readWeek(midnight: midnight, now: now)
-        samples = (try? await source.activities(from: midnight, to: now)) ?? []
+        let day = (try? await source.pedometer(from: midnight, to: now)) ?? today
+        if day != today { today = day }
+        let days = await readWeek(midnight: midnight, now: now)
+        if days != week { week = days }
+        let read = (try? await source.activities(from: midnight, to: now)) ?? []
+        if read != samples { samples = read }
         retime(now: now)
 
         startLive(from: midnight)
+    }
+
+    /// What the phone counted between two moments: the cardio fitness test
+    /// polls this for its distance. A query rather than a second live stream,
+    /// because Core Motion's step counter keeps one live handler and the day's
+    /// count already holds it. Nil until Motion & Fitness is allowed: this is
+    /// never the read that puts the question.
+    func counted(from start: Date, to end: Date) async -> PedometerDay? {
+        guard source.isAvailable, source.authorization == .authorized else { return nil }
+        return try? await source.pedometer(from: start, to: end)
     }
 
     /// Stops the live streams. They also end with the app.
@@ -104,8 +120,9 @@ final class PhoneMotion {
     }
 
     private func retime(now: Date) {
-        timeline = MotionSegmenter.segments(from: samples, until: now)
-        if let last = samples.last(where: { $0.confidence >= .medium }) {
+        let segments = MotionSegmenter.segments(from: samples, until: now)
+        if segments != timeline { timeline = segments }
+        if let last = samples.last(where: { $0.confidence >= .medium }), last.kind != current {
             current = last.kind
         }
     }

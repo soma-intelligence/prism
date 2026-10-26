@@ -45,6 +45,8 @@ struct MetricProfile: Sendable, Equatable {
     var policy: InsightPolicy?
     /// A physical ceiling the axis never climbs past (100 percent oxygen).
     var ceiling: Double?
+    /// A day's goal, drawn as a line over a day's bars (owner, 2026-10-24).
+    var goal: Double?
 
     /// The profile for a HealthKit identifier: the table's entry, or one
     /// worked out from the catalog's kind and aggregation.
@@ -76,6 +78,7 @@ struct MetricProfile: Sendable, Equatable {
         projects: Bool = false,
         accumulates: Bool = false,
         ceiling: Double? = nil,
+        goal: Double? = nil,
         spread: Double,
         share: Double = 0,
         step: Double,
@@ -93,7 +96,8 @@ struct MetricProfile: Sendable, Equatable {
                 preference: preference, minimumSpread: spread, minimumShare: share, trendStep: step,
                 weight: weight, partialToday: accumulates
             ),
-            ceiling: ceiling
+            ceiling: ceiling,
+            goal: goal
         )
     }
 
@@ -107,7 +111,7 @@ struct MetricProfile: Sendable, Equatable {
         // Fitness.
         "HKQuantityTypeIdentifierVO2Max": entry(true, chart: .points, sparse: true, period: .sixMonths, spread: 1, step: 1, weight: 0.8),
         "HKQuantityTypeIdentifierHeartRateRecoveryOneMinute": entry(true, chart: .points, sparse: true, period: .threeMonths, spread: 3, step: 3, weight: 0.7),
-        "HKQuantityTypeIdentifierStepCount": entry(true, chart: .bars, accumulates: true, spread: 1000, share: 0.2, step: 1000, weight: 0.7),
+        "HKQuantityTypeIdentifierStepCount": entry(true, chart: .bars, accumulates: true, goal: 10_000, spread: 1000, share: 0.2, step: 1000, weight: 0.7),
         "HKQuantityTypeIdentifierWalkingSpeed": entry(true, spread: 0.2, step: 0.2, weight: 0.6),
         "HKQuantityTypeIdentifierWalkingHeartRateAverage": entry(false, spread: 2, step: 2, weight: 0.7),
         // Walking, as the phone and the watch read it.

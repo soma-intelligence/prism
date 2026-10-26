@@ -25,17 +25,25 @@ public extension SomaMetrics {
     var chartCompactPlotHeight: CGFloat { 110 }
     /// A sparkline in a trend row or tile.
     var chartSparkHeight: CGFloat { 36 }
-    /// A sparkline's stroke, the dot that ends it on the latest value, the
-    /// points its curve is drawn through, and how far its line is softened
-    /// toward the secondary ink (the dot keeps the full hue).
-    var sparkLine: CGFloat { 1.75 }
-    var sparkEndDot: CGFloat { 7 }
-    var sparkSamples: Int { 48 }
-    var sparkLineMix: Double { 0.3 }
+    /// A trend row's height: title, status and a cue line, held even when
+    /// the row has no cue.
+    var trendRowMinHeight: CGFloat { 92 }
+    /// A trend tile's height: title, value, status and its chart, so tiles
+    /// side by side share one top edge and one chart baseline.
+    var trendTileMinHeight: CGFloat { 164 }
+    /// The chart at a trend tile's foot.
+    var trendTileChartHeight: CGFloat { 44 }
+    /// How many points an eased sparkline keeps: a month of days averaged
+    /// down to about one point every day and a half.
+    var sparkEasedPoints: Int { 20 }
+    /// The faint halo round the last value of an eased sparkline.
+    var chartHaloOpacity: Double { 0.22 }
+    /// The gap between the day bars of a trend tile.
+    var sparkBarGap: CGFloat { 2 }
     /// Room kept round the plot so a dot on the edge is never clipped.
     var chartPlotInset: CGFloat { 6 }
     /// Gap between the plot and its labels.
-    var chartLabelGap: CGFloat { 6 }
+    var chartLabelGap: CGFloat { spaceXS }
 
     /// The stroke of a chart's line.
     var chartStroke: CGFloat { 1.75 }
@@ -58,11 +66,21 @@ public extension SomaMetrics {
 /// the least room two labels need before they part).
 public extension SomaMetrics {
     var trendTileSpacing: CGFloat { 8 }
-    var trendTileChartHeight: CGFloat { 52 }
     var trendTileLabelGap: CGFloat { 6 }
     var trendTileLabelWidth: CGFloat { 34 }
     var trendTileLabelLine: CGFloat { 16 }
 
     /// The line that closes a night on a day's chart, in the sleep hue.
     var chartNightEdgeOpacity: Double { 0.5 }
+}
+
+/// Sizes other components still read, kept from the parallel design lines.
+public extension SomaMetrics {
+    /// A sparkline's stroke, the dot that ends it on the latest value, the
+    /// points its curve is drawn through, and how far its line is softened
+    /// toward the secondary ink (the dot keeps the full hue).
+    var sparkLine: CGFloat { 1.75 }
+    var sparkEndDot: CGFloat { 7 }
+    var sparkSamples: Int { 48 }
+    var sparkLineMix: Double { 0.3 }
 }

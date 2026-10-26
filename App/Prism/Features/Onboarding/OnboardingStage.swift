@@ -76,9 +76,9 @@ struct OnboardingStage: Equatable {
     }
 }
 
-/// The ground under the whole run: the aspect's colour field, or its
-/// landscape photograph in the Landscape theme, fading from one aspect to the
-/// next instead of each screen painting its own.
+/// The ground under the whole run: the plain canvas. The aspect's colour
+/// field that used to fade from screen to screen left with the redesign
+/// (owner, 2026-10-23).
 struct OnboardingGround: View {
     let aspect: SomaAspect
     let strength: Double
@@ -86,20 +86,10 @@ struct OnboardingGround: View {
     @Environment(\.somaTheme) private var theme
 
     var body: some View {
-        GeometryReader { proxy in
-            ZStack {
-                SomaAspectBackdrop(aspect: aspect)
-                    .id(aspect)
-                    .transition(.opacity)
-            }
-            .frame(width: proxy.size.width, height: proxy.size.height * 0.62)
-            .clipped()
-            .opacity(strength)
-            .animation(theme.motion.onboardingGround, value: aspect)
-        }
-        .ignoresSafeArea()
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
+        theme.colors.canvas.color
+            .ignoresSafeArea()
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
     }
 }
 
@@ -153,7 +143,7 @@ struct OnboardingTopBar: View {
             }
         }
         .frame(height: metrics.onboardingTopBarHeight)
-        .padding(.horizontal, metrics.pagePadding * 0.66)
+        .padding(.horizontal, metrics.spaceM)
     }
 }
 
@@ -260,6 +250,7 @@ struct OnboardingPage<Content: View>: View {
             .frame(maxWidth: metrics.pageMaxWidth)
             .frame(maxWidth: .infinity)
         }
+        .softScrollEdges()
         .scrollBounceBehavior(.basedOnSize)
         .scrollIndicators(.hidden)
     }

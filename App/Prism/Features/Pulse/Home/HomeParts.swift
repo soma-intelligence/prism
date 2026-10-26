@@ -47,6 +47,7 @@ struct HomeSheet<Content: View>: View {
                 .frame(maxWidth: metrics.pageMaxWidth, alignment: .leading)
                 .frame(maxWidth: .infinity)
             }
+            .softScrollEdges()
             .background(theme.colors.canvas.color.ignoresSafeArea())
             .toolbarTitleDisplayMode(.inline)
             .toolbar {
@@ -88,6 +89,7 @@ struct HomePage<Content: View>: View {
             .frame(maxWidth: metrics.pageMaxWidth, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
+        .softScrollEdges()
         .background(theme.colors.canvas.color.ignoresSafeArea())
         .navigationTitle(Text(title))
         .toolbarTitleDisplayMode(.inline)
@@ -133,6 +135,7 @@ struct HomeInputSheet<Content: View>: View {
                 .frame(maxWidth: metrics.pageMaxWidth, alignment: .leading)
                 .frame(maxWidth: .infinity)
             }
+            .softScrollEdges()
 #if !os(visionOS)
             // The headset's keyboard floats apart from the window.
             .scrollDismissesKeyboard(.interactively)
@@ -161,7 +164,7 @@ struct HomeInputSheet<Content: View>: View {
 
 // MARK: - Words
 
-/// Small capitals over a section.
+/// A quiet label over a section, in sentence case.
 struct HomeEyebrow: View {
     let text: String
 
@@ -172,7 +175,6 @@ struct HomeEyebrow: View {
     var body: some View {
         Text(text)
             .somaFont(theme.typography.eyebrow)
-            .textCase(.uppercase)
             .foregroundStyle(theme.colors.inkSecondary.color)
             .accessibilityAddTraits(.isHeader)
     }
@@ -228,7 +230,7 @@ struct HomeValue: View {
     @Environment(\.somaTheme) private var theme
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 6) {
+        HStack(alignment: .firstTextBaseline, spacing: theme.metrics.spaceS) {
             Text(value ?? "-")
                 .somaFont(theme.typography.metric)
                 .foregroundStyle(theme.colors.inkPrimary.color)
@@ -304,7 +306,7 @@ struct HomeValueRow: View {
         let colors = theme.colors
 
         HStack(alignment: .firstTextBaseline, spacing: theme.metrics.cardSpacing) {
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: theme.metrics.spaceXS) {
                 Text(name)
                     .somaFont(type.body)
                     .foregroundStyle(colors.inkPrimary.color)
@@ -418,7 +420,7 @@ struct HomeChip: View {
             Text(title)
                 .somaFont(theme.typography.body)
                 .foregroundStyle(isOn ? colors.onAccent.color : colors.inkPrimary.color)
-                .padding(.horizontal, 14)
+                .padding(.horizontal, theme.metrics.spaceL)
                 .frame(minHeight: theme.metrics.minimumTapTarget)
                 .background(Capsule().fill(isOn ? colors.accent.color : colors.surface.color))
             .contentShape(.capsule)

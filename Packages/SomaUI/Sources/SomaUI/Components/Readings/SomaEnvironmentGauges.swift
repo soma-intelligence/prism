@@ -189,6 +189,139 @@ public struct SomaArcGauge<Center: View>: View {
     }
 }
 
+// MARK: - Sun path
+
+/// The sun's day as Weather draws it: the sun's height over the hours, a
+/// smooth wave that rises out of the night at sunrise, peaks at noon and
+/// sinks below the horizon at sunset, a little of the night shown at each
+/// end. The part already travelled is drawn in the daylight colours with a
+/// soft fade under it, the rest a fine line, and the sun sits where it is
+/// now. An ellipse stretched across the card read as a deformed circle
+/// (owner, 2026-10-24); the wave is the sun's real shape in time. Without
+/// times, the wave stands alone with a dash at each end.
+public struct SomaSunPath: View {
+    private let progress: Double?
+    private let rise: String?
+    private let set: String?
+
+    @Environment(\.somaTheme) private var theme
+
+    /// - Parameter progress: the share of daylight gone by: 0 at sunrise,
+    ///   1 at sunset, under 0 before it rose and over 1 after it set. Nil
+    ///   when the times are unknown.
+    public init(progress: Double?, rise: String?, set: String?) {
+        self.progress = progress
+        self.rise = rise
+        self.set = set
+    }
+
+    /// How much night is drawn before sunrise and after sunset, as a share
+    /// of the day.
+    private static let night = 0.09
+
+    public var body: some View {
+        let metrics = theme.metrics
+        let colors = theme.colors
+        let sun = metrics.environmentSunDiameter * 0.8
+        let gradient = SomaDataScale.daylight.gradient
+        let gold = SomaDataScale.daylight.value(at: 120).color
+        let progress = progress
+        let isUp = progress.map { (0...1).contains($0) } ?? false
+        let night = Self.night
+
+        VStack(spacing: theme.metrics.spaceS) {
+            Canvas { context, size in
+                let inset = sun / 2 + 2
+                // One wave at one scale, so it crosses the horizon without a
+                // fold: the horizon sits where the dips at each end just fit.
+                let dip = CGFloat(sin(.pi * night))
+                let amplitude = (size.height - inset * 2) / (1 + dip)
+                let horizon = inset + amplitude
+                let span = 1 + night * 2
+                func x(_ t: Double) -> CGFloat { inset + (size.width - inset * 2) * CGFloat((t + night) / span) }
+                func y(_ t: Double) -> CGFloat { horizon - amplitude * CGFloat(sin(.pi * t)) }
+                let peak = horizon - amplitude
+                func wave(from start: Double, to end: Double) -> Path {
+                    var path = Path()
+                    let steps = max(2, Int(abs(end - start) * 120))
+                    path.move(to: CGPoint(x: x(start), y: y(start)))
+                    for step in 1...steps {
+                        let t = start + (end - start) * Double(step) / Double(steps)
+                        path.addLine(to: CGPoint(x: x(t), y: y(t)))
+                    }
+                    return path
+                }
+
+                // The horizon, a hairline across the whole width.
+                var line = Path()
+                line.move(to: CGPoint(x: 0, y: horizon))
+                line.addLine(to: CGPoint(x: size.width, y: horizon))
+                context.stroke(line, with: .color(colors.inkPrimary.color.opacity(metrics.hairlineOpacity * 2)), lineWidth: 0.75)
+
+                // The whole day, fine.
+                context.stroke(wave(from: -night, to: 1 + night),
+                               with: .color(colors.inkSecondary.color.opacity(0.4)),
+                               style: StrokeStyle(lineWidth: 1, lineCap: .round))
+
+                guard let progress else { return }
+                let travelled = min(1 + night, max(-night, progress))
+                let shading = GraphicsContext.Shading.linearGradient(
+                    gradient, startPoint: CGPoint(x: x(0), y: horizon), endPoint: CGPoint(x: x(1), y: horizon))
+                let lit = min(max(travelled, 0), 1)
+                if lit > 0 {
+                    // A soft fade under the travelled daylight, clear at the
+                    // horizon, so the morning reads as filled without a block.
+                    var area = wave(from: 0, to: lit)
+                    area.addLine(to: CGPoint(x: x(lit), y: horizon))
+                    area.addLine(to: CGPoint(x: x(0), y: horizon))
+                    area.closeSubpath()
+                    context.fill(area, with: .linearGradient(
+                        Gradient(colors: [gold.opacity(0.28), gold.opacity(0)]),
+                        startPoint: CGPoint(x: 0, y: peak), endPoint: CGPoint(x: 0, y: horizon)))
+                    context.stroke(wave(from: 0, to: lit), with: shading,
+                                   style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                }
+
+                let at = CGPoint(x: x(travelled), y: y(travelled))
+                let disc = CGRect(x: at.x - sun / 2, y: at.y - sun / 2, width: sun, height: sun)
+                if isUp {
+                    context.fill(Path(ellipseIn: disc.insetBy(dx: -3, dy: -3)), with: .color(colors.surface.color))
+                    context.fill(Path(ellipseIn: disc), with: .color(gold))
+                } else {
+                    context.fill(Path(ellipseIn: disc), with: .color(colors.surface.color))
+                    context.stroke(Path(ellipseIn: disc.insetBy(dx: 0.75, dy: 0.75)),
+                                   with: .color(colors.inkSecondary.color), lineWidth: 1.5)
+                }
+            }
+            .frame(height: metrics.environmentSunPathHeight)
+
+            HStack {
+                SunTime(symbol: "sunrise", time: rise)
+                Spacer(minLength: 0)
+                SunTime(symbol: "sunset", time: set)
+            }
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+private struct SunTime: View {
+    let symbol: String
+    let time: String?
+
+    @Environment(\.somaTheme) private var theme
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Image(systemName: symbol)
+                .foregroundStyle(theme.colors.inkSecondary.color)
+            Text(verbatim: time ?? "-")
+                .foregroundStyle(time == nil ? theme.colors.inkSecondary.color : theme.colors.inkPrimary.color)
+        }
+        .somaFont(theme.typography.captionValue)
+    }
+}
+
 // MARK: - Thermometer pill
 
 /// The temperature now and the day's range as a pill: the number, then the
@@ -229,7 +362,7 @@ public struct SomaThermometerPill: View {
                 .somaRollingNumber(now.map(Self.degrees))
                 .frame(minWidth: 44, alignment: .leading)
 
-            VStack(spacing: 5) {
+            VStack(spacing: theme.metrics.spaceXS) {
                 GeometryReader { geometry in
                     let width = geometry.size.width
                     ZStack(alignment: .leading) {
@@ -303,7 +436,7 @@ public struct SomaWeatherPill: View {
         let metrics = theme.metrics
         let colors = theme.colors
 
-        HStack(spacing: 10) {
+        HStack(spacing: theme.metrics.spaceM) {
             Image(systemName: symbol)
                 .foregroundStyle(colors.inkSecondary.color)
                 .frame(width: metrics.environmentPillDisc, height: metrics.environmentPillDisc)
@@ -319,7 +452,7 @@ public struct SomaWeatherPill: View {
                     .lineLimit(1)
             }
         }
-        .padding(.leading, 10)
+        .padding(.leading, theme.metrics.spaceM)
         .padding(.trailing, metrics.cardPadding)
         .frame(minHeight: metrics.environmentPillHeight)
         .background(Capsule().fill(colors.surface.color))
@@ -347,7 +480,7 @@ public struct SomaWeatherPill: View {
                 SomaThermometerPill(now: 18, low: 12, high: 21)
                 SomaThermometerPill(now: nil, low: nil, high: nil)
             }
-            .padding(16)
+            .padding(SomaMetrics.standard.spaceL)
         }
     }
 }

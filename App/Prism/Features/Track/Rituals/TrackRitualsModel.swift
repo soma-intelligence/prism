@@ -139,7 +139,7 @@ struct MindRituals: Equatable, Sendable {
             ))
         }
 
-        let walks = inputs.workouts.filter { Int($0.value) == walkingActivity }
+        let walks = inputs.workouts.filter { $0.code == walkingActivity }
         if !walks.isEmpty {
             let days = Set(walks.map { calendar.startOfDay(for: $0.start) })
             let typical = PulseSignals.median(walks.map { $0.end.timeIntervalSince($0.start) / 60 })
@@ -199,7 +199,7 @@ struct MindRituals: Equatable, Sendable {
             let reading = tonight.reading == .variability ? "evening HRV" : "deep sleep"
             tonightDetail = "Your \(reading) runs \(value) after it, \(tonight.effect.held) of \(tonight.effect.tries) times."
         } else {
-            tonightDetail = "Ten slow minutes. Soma measures what they do for you."
+            tonightDetail = "10 minutes of slow breathing. Soma compares your evening HRV on days with it and without it."
         }
 
         return MindRituals(

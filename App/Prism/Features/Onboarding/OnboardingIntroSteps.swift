@@ -49,9 +49,9 @@ private struct OnboardingFocusTile: View {
         let colors = theme.colors
 
         Button(action: action) {
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: theme.metrics.spaceM) {
                 HStack(alignment: .top) {
-                    SomaOrb(aspect: area.aspect, scale: .mini)
+                    SomaObjectIcon(aspect: area.aspect, size: .row)
                     Spacer()
                     Image(systemName: "checkmark")
                         .font(.system(size: metrics.browseChevronSize, weight: .semibold))
@@ -67,7 +67,7 @@ private struct OnboardingFocusTile: View {
                 Spacer(minLength: 0)
             }
             .frame(maxWidth: .infinity, minHeight: metrics.miniOrbDiameter * 2.3, alignment: .topLeading)
-            .padding(metrics.cardPadding * 0.8)
+            .padding(metrics.spaceM)
             .background(
                 RoundedRectangle(cornerRadius: metrics.cardCornerRadius, style: .continuous)
                     .fill(isOn ? colors.surface.color : colors.surfaceRecessed.color)

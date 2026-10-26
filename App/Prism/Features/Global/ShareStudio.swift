@@ -135,7 +135,7 @@ struct ShareStudioPage: View {
     }
 
     private func actionLabel(_ title: LocalizedStringKey, symbol: String, prominent: Bool = false) -> some View {
-        VStack(spacing: theme.metrics.scoreLabelSpacing * 2) {
+        VStack(spacing: theme.metrics.spaceXS) {
             Image(systemName: symbol)
                 .font(.system(size: theme.metrics.browseGlyphSize, weight: .medium))
                 .foregroundStyle(prominent ? theme.colors.onAccent.color : theme.colors.inkPrimary.color)
@@ -254,10 +254,9 @@ struct ShareCardFace: View {
     var body: some View {
         let metrics = theme.metrics
         let colors = theme.colors
-        VStack(alignment: .leading, spacing: metrics.scoreLabelSpacing * 2) {
+        VStack(alignment: .leading, spacing: metrics.spaceXS) {
             Text(card.kind.eyebrow)
                 .somaFont(theme.typography.eyebrow)
-                .textCase(.uppercase)
                 .foregroundStyle(colors.inkSecondary.color)
             Text(card.headline(exact: style.exactNumbers))
                 .somaFont(style.exactNumbers ? theme.typography.metric : theme.typography.cardTitle)

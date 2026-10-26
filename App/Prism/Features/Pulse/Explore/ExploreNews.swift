@@ -44,6 +44,33 @@ struct ExploreNewsRail: View {
     }
 }
 
+/// The grid while the first news is read: cards in the shape of the real
+/// ones, breathing, so the section is already where it will be and nothing
+/// below it jumps when the stories land.
+struct ReadingNewsRail: View {
+    @Environment(\.somaTheme) private var theme
+
+    var body: some View {
+        let metrics = theme.metrics
+        // Titles of a few lengths, so the cards read as stories and not as
+        // one card repeated. Redacted, the words never show.
+        let titles = ["A short headline", "A headline that runs a little longer", "A third story"]
+
+        VStack(alignment: .leading, spacing: metrics.cardSpacing) {
+            SomaShelfHeader(String(localized: "Latest"), action: nil, perform: nil)
+            LazyVGrid(columns: ExploreGrid.columns(metrics), alignment: .leading, spacing: metrics.articleGridSpacing) {
+                ForEach(Array(titles.enumerated()), id: \.offset) { index, title in
+                    SomaArticleCard(title: title, topic: SiteNewsSource.sourceName, caption: SiteNewsSource.sourceName,
+                                    tone: .stone, mark: .track(.read), seed: "reading-\(index)", style: .tile)
+                }
+            }
+        }
+        .readingPlaceholder(true)
+        .accessibilityElement()
+        .accessibilityLabel(Text("Reading the news"))
+    }
+}
+
 /// One news item opened: its picture, the publication, the title and the
 /// summary, then the way to the original.
 struct NewsReader: View {

@@ -36,7 +36,6 @@ struct ArticleReader: View {
                 VStack(alignment: .leading, spacing: metrics.articleTextSpacing * 2) {
                     Text(meta)
                         .somaFont(type.eyebrow)
-                        .textCase(.uppercase)
                         .foregroundStyle(colors.inkSecondary.color)
                     Text(article.title)
                         .somaFont(type.articleReaderTitle)
@@ -73,9 +72,8 @@ struct ArticleReader: View {
             }
             .padding(.top, metrics.cardSpacing)
             .padding(.horizontal, metrics.pagePadding)
-            .padding(.bottom, metrics.pagePadding * 2)
-            .frame(maxWidth: metrics.pageMaxWidth, alignment: .leading)
-            .frame(maxWidth: .infinity)
+            .padding(.bottom, metrics.spaceXXL)
+            .somaReadableWidth()
         }
         .background(colors.canvas.color.ignoresSafeArea())
 #if os(iOS)
@@ -229,7 +227,6 @@ private struct ArticleSourceList: View {
         VStack(alignment: .leading, spacing: metrics.cardSpacing) {
             Text("Sources")
                 .somaFont(type.eyebrow)
-                .textCase(.uppercase)
                 .foregroundStyle(colors.inkSecondary.color)
                 .accessibilityAddTraits(.isHeader)
 

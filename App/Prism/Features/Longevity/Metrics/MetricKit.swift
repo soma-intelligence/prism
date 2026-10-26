@@ -64,7 +64,7 @@ enum MetricLead {
         case .unavailable:
             return ("No Health store here.", "This device has no Apple Health. These readings come from iPhone and Apple Watch.")
         case .failed(let message):
-            return ("Could not read Health.", message)
+            return (HealthProblemWords.title, HealthProblemWords.message(detail: message))
         default:
             return nil
         }
@@ -105,11 +105,10 @@ struct MetricRowsCard: View {
     var body: some View {
         let metrics = theme.metrics
 
-        VStack(alignment: .leading, spacing: metrics.cardHeaderSpacing * 2) {
+        VStack(alignment: .leading, spacing: metrics.spaceS) {
             if let eyebrow {
                 Text(eyebrow)
                     .somaFont(theme.typography.eyebrow)
-                    .textCase(.uppercase)
                     .foregroundStyle(theme.colors.inkSecondary.color)
             }
             SomaCard {
@@ -127,7 +126,7 @@ struct MetricRowsCard: View {
                             .somaFont(theme.typography.caption)
                             .foregroundStyle(theme.colors.inkSecondary.color)
                             .fixedSize(horizontal: false, vertical: true)
-                            .padding(.top, metrics.cardHeaderSpacing * 2)
+                            .padding(.top, metrics.spaceS)
                     }
                 }
             }
@@ -138,6 +137,7 @@ struct MetricRowsCard: View {
     private func link(_ row: MetricRowItem) -> some View {
         if let route = row.route {
             NavigationLink(value: route) { MetricRow(row: row, opens: true) }
+                .zoomSource(route)
                 .buttonStyle(.plain)
         } else if let action = row.action {
             Button(action: action) { MetricRow(row: row, opens: true) }
@@ -159,7 +159,7 @@ private struct MetricRow: View {
         let colors = theme.colors
 
         HStack(alignment: .firstTextBaseline, spacing: theme.metrics.metricColumnSpacing) {
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: theme.metrics.spaceXS) {
                 Text(row.title)
                     .somaFont(type.body)
                     .foregroundStyle(colors.inkPrimary.color)
@@ -202,10 +202,9 @@ struct MetricTextCard: View {
 
     var body: some View {
         SomaCard {
-            VStack(alignment: .leading, spacing: theme.metrics.cardHeaderSpacing * 2) {
+            VStack(alignment: .leading, spacing: theme.metrics.spaceS) {
                 Text(eyebrow)
                     .somaFont(theme.typography.eyebrow)
-                    .textCase(.uppercase)
                     .foregroundStyle(theme.colors.inkSecondary.color)
                 MetricLeadText(lead: lead, rest: rest)
                     .fixedSize(horizontal: false, vertical: true)
@@ -363,10 +362,9 @@ struct MetricSplitCard: View {
         let total = parts.reduce(0) { $0 + $1.share }
 
         SomaCard {
-            VStack(alignment: .leading, spacing: metrics.cardHeaderSpacing * 2) {
+            VStack(alignment: .leading, spacing: metrics.spaceS) {
                 Text(eyebrow)
                     .somaFont(type.eyebrow)
-                    .textCase(.uppercase)
                     .foregroundStyle(colors.inkSecondary.color)
 
                 GeometryReader { proxy in

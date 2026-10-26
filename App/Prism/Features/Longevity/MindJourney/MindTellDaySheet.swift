@@ -39,8 +39,8 @@ struct MindTellDaySheet: View {
                         Text("How did today go? Who did you see, and where?")
                             .somaFont(type.body)
                             .foregroundStyle(colors.inkSecondary.color)
-                            .padding(.top, 8)
-                            .padding(.leading, 5)
+                            .padding(.top, theme.metrics.spaceS)
+                            .padding(.leading, theme.metrics.spaceXS)
                             .accessibilityHidden(true)
                     }
                     TextEditor(text: $text)
@@ -111,7 +111,7 @@ struct MindPullChip: View {
 
     var body: some View {
         let colors = theme.colors
-        HStack(spacing: 6) {
+        HStack(spacing: theme.metrics.spaceS) {
             if pull != .none {
                 Circle()
                     .fill(pull == .lifted ? theme.aspects[.mind].identity.color : colors.danger.color)

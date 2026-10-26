@@ -299,7 +299,7 @@ struct SomaTimelineStats: View {
         if !event.stats.isEmpty {
             HStack(spacing: theme.metrics.timelineStatSpacing) {
                 ForEach(event.stats, id: \.self) { stat in
-                    HStack(spacing: 3) {
+                    HStack(spacing: theme.metrics.spaceXS) {
                         Image(systemName: stat.symbol)
                             .imageScale(.small)
                             .foregroundStyle(event.resolvedHue.color.opacity(event.isPlanned ? 0.6 : 1))

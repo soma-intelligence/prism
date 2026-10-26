@@ -297,7 +297,7 @@ struct MindInsights: Equatable, Sendable {
         let shortNights = Set(nights.filter { $0.asleep < shortNight }.map(\.day))
 
         let hardTraining = Set(inputs.workouts.filter { workout in
-            Int(workout.value) != MindRituals.walkingActivity
+            workout.code != MindRituals.walkingActivity
                 && workout.end.timeIntervalSince(workout.start) / 60 >= hardWorkoutMinutes
         }.map { calendar.startOfDay(for: $0.start) })
 

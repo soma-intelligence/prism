@@ -1,57 +1,57 @@
 // deno test --allow-read (or supabase/scripts/test-functions.sh, which runs these under Bun).
 import { assert, assertEquals } from "jsr:@std/assert@1";
-import { type Deps, handle } from "./index.ts";
+import { BAN, type Deps, handle } from "./index.ts";
 
 const env: Record<string, string> = { SUPABASE_URL: "https://p.supabase.co", SUPABASE_ANON_KEY: "anon", SUPABASE_SERVICE_ROLE_KEY: "eyJservice" };
 const user = "0f8fad5b-d9cb-469f-a165-70867728950e";
+const now = new Date("2026-10-25T09:00:00Z");
 
-function fake(opts: { session?: boolean; failRemove?: boolean } = {}) {
+function fake(opts: { session?: boolean; failMark?: boolean; failBan?: boolean } = {}) {
   const calls: { method: string; url: string; body?: string; auth?: string }[] = [];
-  const listing: Record<string, { name: string; id: string | null }[]> = {
-    [`avatars:${user}`]: [{ name: "avatar.jpg", id: "1" }],
-    [`health-uploads:${user}`]: [{ name: "exports", id: null }],
-    [`health-uploads:${user}/exports`]: [{ name: "2026-10-03.zip", id: "2" }],
-  };
   const f = (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
     const url = String(input);
     const method = init?.method ?? "GET";
     const headers = (init?.headers ?? {}) as Record<string, string>;
     calls.push({ method, url, body: init?.body ? String(init.body) : undefined, auth: headers.Authorization });
     if (url.endsWith("/auth/v1/user")) return Promise.resolve(opts.session === false ? new Response("{}", { status: 401 }) : Response.json({ id: user }));
-    const list = url.match(/\/storage\/v1\/object\/list\/(.+)$/);
-    if (list) return Promise.resolve(Response.json(listing[`${list[1]}:${JSON.parse(String(init!.body)).prefix}`] ?? []));
-    if (method === "DELETE" && url.includes("/storage/v1/object/")) return Promise.resolve(new Response("[]", { status: opts.failRemove ? 500 : 200 }));
-    if (method === "DELETE" && url.includes("/auth/v1/admin/users/")) return Promise.resolve(new Response("{}", { status: 200 }));
+    if (method === "PATCH" && url.includes("/rest/v1/profiles")) return Promise.resolve(new Response(null, { status: opts.failMark ? 500 : 204 }));
+    if (method === "PUT" && url.includes("/auth/v1/admin/users/")) return Promise.resolve(new Response("{}", { status: opts.failBan ? 500 : 200 }));
     return Promise.resolve(new Response("", { status: 404 }));
   };
-  return { deps: { env: (n: string) => env[n], fetch: f as typeof fetch } as Deps, calls };
+  return { deps: { env: (n: string) => env[n], fetch: f as typeof fetch, now: () => now } as Deps, calls };
 }
 
 const req = () => new Request("https://x/functions/v1/delete-account", { method: "POST", headers: { Authorization: "Bearer user-jwt" } });
 
-Deno.test("removes the caller's files in both buckets, then the auth user", async () => {
+Deno.test("marks the profile deleted and bans the user, erasing nothing", async () => {
   const { deps, calls } = fake();
   const response = await handle(req(), deps);
   assertEquals(response.status, 200);
-  assertEquals((await response.json()).files, 2);
-  const deletes = calls.filter((c) => c.method === "DELETE");
-  assertEquals(deletes.map((c) => c.url), [
-    "https://p.supabase.co/storage/v1/object/avatars",
-    "https://p.supabase.co/storage/v1/object/health-uploads",
-    `https://p.supabase.co/auth/v1/admin/users/${user}`,
+  assertEquals((await response.json()).closed, true);
+  const writes = calls.filter((c) => c.method !== "GET");
+  assertEquals(writes.map((c) => `${c.method} ${c.url}`), [
+    `PATCH https://p.supabase.co/rest/v1/profiles?id=eq.${user}`,
+    `PUT https://p.supabase.co/auth/v1/admin/users/${user}`,
   ]);
-  assertEquals(JSON.parse(deletes[1].body!).prefixes, [`${user}/exports/2026-10-03.zip`]);
-  assert(deletes.every((c) => c.auth === "Bearer eyJservice"));
+  assertEquals(JSON.parse(writes[0].body!), { status: "deleted", deleted_at: now.toISOString(), updated_at: now.toISOString() });
+  assertEquals(JSON.parse(writes[1].body!), { ban_duration: BAN });
+  assert(!calls.some((c) => c.method === "DELETE"), "nothing is deleted");
+  assert(writes.every((c) => c.auth === "Bearer eyJservice"));
 });
 
 Deno.test("without a session nothing is touched", async () => {
   const { deps, calls } = fake({ session: false });
   assertEquals((await handle(req(), deps)).status, 401);
-  assert(!calls.some((c) => c.method === "DELETE"));
+  assert(!calls.some((c) => c.method !== "GET"));
 });
 
-Deno.test("a storage failure stops before the user is deleted", async () => {
-  const { deps, calls } = fake({ failRemove: true });
+Deno.test("a profile failure stops before the ban", async () => {
+  const { deps, calls } = fake({ failMark: true });
   assertEquals((await handle(req(), deps)).status, 502);
   assert(!calls.some((c) => c.url.includes("/admin/users/")));
+});
+
+Deno.test("a ban failure reports a retry", async () => {
+  const { deps } = fake({ failBan: true });
+  assertEquals((await handle(req(), deps)).status, 502);
 });

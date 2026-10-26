@@ -13,11 +13,18 @@ import SomaUI
 /// Panels are entered by the person (typed, or read from a photo or a PDF on
 /// the device and checked) and kept on the phone. With none, the page says
 /// so and the add card is the whole page.
+///
+/// A supplement on the Track plan that can skew a marker on the panel
+/// (biotin and TSH, creatine and creatinine) gets a note under the groups,
+/// from ``MedicationInteractions``: information for reading the result,
+/// never a reason given to stop or change anything.
 struct BloodPanelPage: View {
     @Environment(HealthDashboard.self) private var health
+    @Environment(\.somaTheme) private var theme
 
     @State private var store = BloodPanelStore.shared
     @State private var profile = CardiometabolicProfileStore.shared
+    @State private var log = TrackLogStore.shared
     @State private var bioAge: Double?
     @State private var isAdding = false
 
@@ -46,6 +53,18 @@ struct BloodPanelPage: View {
                                     LabBandItem(marker: value, previous: store.previous(of: value.key), route: .marker(value.key))
                                 })
                 }
+                ForEach(interactionNotes(panel)) { note in
+                    SomaCard {
+                        VStack(alignment: .leading, spacing: theme.metrics.cardSpacing) {
+                            LabEyebrow("\(note.supplement) on your plan")
+                            LabLeadText(note.text)
+                            Text("Source: \(note.source)")
+                                .somaFont(theme.typography.caption)
+                                .foregroundStyle(theme.colors.inkSecondary.color)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                }
                 if store.panels.count > 1 {
                     LabRowGroup(heading: "Every panel", rows: store.panels.map { panel in
                         LabRow(panel.date.labDay, detail: count(panel.markers.count))
@@ -59,13 +78,21 @@ struct BloodPanelPage: View {
                 actionTitle: "Add",
                 action: { isAdding = true }
             ) {
-                SomaOrb(aspect: .body, scale: .mini)
+                SomaObjectIcon(aspect: .body, size: .row)
             }
             LabFootnote("Indicative adult ranges, not a diagnosis.")
         }
-        .navigationTitle("Blood Panel")
+        .labPageTitle(Text("Blood Panel"))
         .sheet(isPresented: $isAdding) { AddBloodTestSheet() }
         .task(id: store.panels) { await loadAge() }
+    }
+
+    /// The supplements on the plan that can skew a marker of this panel.
+    private func interactionNotes(_ panel: BloodPanel) -> [InteractionNote] {
+        MedicationInteractions.folded(MedicationInteractions.notes(
+            for: log.activeSupplements,
+            markers: panel.markers.map(BloodMarkerCatalog.definition(for:))
+        ))
     }
 
     private func count(_ n: Int) -> String { n == 1 ? "one marker" : "\(n) markers" }

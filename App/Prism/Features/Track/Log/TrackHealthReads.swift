@@ -21,7 +21,7 @@ enum TrackHealthReads {
 
     /// The latest sample of a metric, converted to the unit asked for.
     static func latest(_ identifier: String, from health: HealthDashboard) async -> HealthReading? {
-        guard !(health.reader is EmptyHealthSource),
+        guard !(health.readsEmptyStore),
               let metric = HealthMetricCatalog.metric(for: identifier),
               let source = await health.prepare([identifier]) else { return nil }
         return try? await source.latest(metric)
@@ -30,7 +30,7 @@ enum TrackHealthReads {
     /// The median night of the last two weeks, as clock hours from falling
     /// asleep to waking. Nil under three nights.
     static func sleepWindow(from health: HealthDashboard, now: Date = .now, calendar: Calendar = .current) async -> (from: Double, to: Double)? {
-        guard !(health.reader is EmptyHealthSource),
+        guard !(health.readsEmptyStore),
               let metric = HealthMetricCatalog.metric(for: Metric.sleep),
               let source = await health.prepare([Metric.sleep]) else { return nil }
         let start = calendar.date(byAdding: .day, value: -14, to: now) ?? now

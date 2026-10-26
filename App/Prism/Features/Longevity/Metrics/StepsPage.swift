@@ -48,13 +48,13 @@ struct StepsPage: View {
         }
         .navigationTitle("Steps")
         .task { await load() }
-        .refreshable { await load() }
+        .somaRefreshable { await load() }
     }
 
     private func load() async {
         let now = Date()
         guard let source = await health.prepare([FitnessHistory.Metric.steps]) else { return }
-        let totals = await FitnessHistory.dailyTotals(FitnessHistory.Metric.steps, days: 62, now: now, source: source, calendar: .current)
+        let totals = await HealthDailyTotals.read(FitnessHistory.Metric.steps, days: 62, now: now, source: source, calendar: .current)
         report = StepsReport.make(totals: totals, now: now)
     }
 }

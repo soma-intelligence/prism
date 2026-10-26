@@ -79,6 +79,10 @@ nonisolated struct TrackSupplement: Codable, Equatable, Identifiable, Sendable {
     var cadence: TrackCadence = .daily
     var startedOn: Date
     var isActive = true
+    /// A reminder at `minute` on each due day, asked for on the dose page.
+    /// Optional so a record written before reminders existed still reads:
+    /// nil is no reminder.
+    var reminds: Bool?
 }
 
 /// The units a dose is counted in.
@@ -417,6 +421,14 @@ final class TrackLogStore {
     func setActive(_ isActive: Bool, supplement id: UUID) {
         guard let index = supplements.firstIndex(where: { $0.id == id }) else { return }
         supplements[index].isActive = isActive
+        save()
+    }
+
+    /// Turns the dose reminder of a supplement on or off. The phone's
+    /// pending requests follow through ``MedicationReminders/sync(asking:)``.
+    func setReminds(_ reminds: Bool, supplement id: UUID) {
+        guard let index = supplements.firstIndex(where: { $0.id == id }) else { return }
+        supplements[index].reminds = reminds
         save()
     }
 

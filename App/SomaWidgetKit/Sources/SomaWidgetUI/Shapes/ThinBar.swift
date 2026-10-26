@@ -8,6 +8,7 @@ import SomaWidgetKit
 public struct ThinBar: View {
     private let fraction: Double?
     private let dimmed: Bool
+    private let aspect: SomaAspect?
 
     @Environment(\.somaTheme) private var theme
     @Environment(\.widgetRenderingMode) private var mode
@@ -18,9 +19,11 @@ public struct ThinBar: View {
 
     /// A nil fraction draws the track alone; `dimmed` draws the value in the
     /// secondary ink, for a stale snapshot.
-    init(fraction: Double?, dimmed: Bool) {
+    /// `aspect` colours the value in its hue where the widget shows colour.
+    init(fraction: Double?, dimmed: Bool, aspect: SomaAspect? = nil) {
         self.fraction = fraction.map { min(max($0, 0), 1) }
         self.dimmed = dimmed
+        self.aspect = aspect
     }
 
     public var body: some View {
@@ -31,7 +34,7 @@ public struct ThinBar: View {
                 Capsule().fill(ink.track)
                 if let fraction, fraction > 0 {
                     Capsule()
-                        .fill(dimmed ? ink.secondary : ink.primary)
+                        .fill(dimmed ? ink.secondary : ink.mark(aspect))
                         .frame(width: max(height, proxy.size.width * fraction))
                         .widgetAccentable()
                 }

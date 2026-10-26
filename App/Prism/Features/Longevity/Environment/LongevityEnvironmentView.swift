@@ -17,9 +17,10 @@ import HealthScoring
 /// the weather, air quality and last night's outdoor temperature there from
 /// Open-Meteo (``EnvironmentWeatherClient``), since the app has no WeatherKit
 /// capability. Sunrise and sunset are worked out on the device
-/// (``EnvironmentSun``). The bedroom is what the Sleep environment sheet
-/// keeps; the sleep places are what ``SleepPlaceFinder`` found and the
-/// person named, with nights set by hand.
+/// (``EnvironmentSun``). The bedroom and the sleep places are what the Sleep
+/// environment sheet keeps, read only. The week (``EnvironmentWeek``) rides
+/// the Health report, with the air and today's pollen laid in; a high pollen
+/// morning raises an alert when the person turned that on.
 ///
 /// Each card opens ``EnvironmentDetailSheet``: the measure over 7 or 30 days,
 /// and for a Health reading the way into the Vault. Embedded by
@@ -28,23 +29,17 @@ struct LongevityEnvironmentView: View {
     @Environment(HealthDashboard.self) private var health
     @Environment(\.somaTheme) private var theme
 
-    /// What the lens drew the last time, kept on the device, so it opens on
-    /// its numbers rather than on dashes (``LongevitySnapshotStore``). Each
-    /// part below stands in for its read until that read lands.
-    @State private var kept = LongevitySnapshotStore.shared.environment
-    @State private var report: EnvironmentReport?
     @State private var location = EnvironmentLocation.shared
-    /// Whether this opening has asked where you are yet.
-    @State private var locationLanded = false
-    @State private var outside: EnvironmentConditions?
-    @State private var outsideLanded = false
     @State private var outdoorNight: Double?
-    @State private var nightLanded = false
     @State private var places = SleepPlaceStore.shared
-    @State private var finder = SleepPlaceFinder.shared
+    @State private var notifications = SomaNotifications.shared
     @State private var sleepInputs: ScoreDetailInputs?
     @State private var detail: EnvironmentMeasure?
     @State private var sheet: BedroomSheet?
+
+    /// The last read, this launch's or the last one's: the lens draws it at
+    /// once and the next read replaces every card in one go.
+    private var cache: LongevityCache { .shared }
 
     private enum BedroomSheet: String, Identifiable {
         case environment
@@ -54,29 +49,25 @@ struct LongevityEnvironmentView: View {
 
     var body: some View {
         let metrics = theme.metrics
-        let lens = shownLens
-        let report = lens.report
-        let updated = LongevityShown(kept: kept, fresh: self.report.map { _ in lens }).updated(now: Date())
+        let report = merged
 
+        ScrollViewReader { scroller in
         SomaPageScroll {
             VStack(alignment: .leading, spacing: metrics.leadSpacing) {
-                SomaUpdatedHeader(updated) {
-                    TimelineView(.periodic(from: .now, by: 60)) { context in
-                        EnvironmentLensContent(
-                            report: report,
-                            sky: EnvironmentSky.make(now: context.date, place: lens.place),
-                            bedroom: bedroom(lens),
-                            here: EnvironmentHere(access: location.access, place: lens.place, isHere: lens.isHere,
-                                                  exact: location.exact),
-                            sleepHeat: finder.heat(),
-                            sleepMain: finder.places.first,
-                            sleepPending: finder.pending,
-                            open: { detail = $0 },
-                            openBedroom: { sheet = .environment },
-                            openPlaces: { sheet = .places },
-                            requestLocation: { location.request() }
-                        )
-                    }
+                TimelineView(.periodic(from: .now, by: 60)) { context in
+                    EnvironmentLensContent(
+                        report: report,
+                        sky: EnvironmentSky.make(now: context.date, place: location.place),
+                        bedroom: bedroom,
+                        here: EnvironmentHere(access: location.access, place: location.place, isHere: location.isHere),
+                        sleepPlaces: EnvironmentSleepPlace.make(store: places, scores: health.scores?.detail.sleep ?? [], now: context.date),
+                        open: { detail = $0 },
+                        openBedroom: { sheet = .environment },
+                        openPlaces: { sheet = .places },
+                        requestLocation: { location.request() },
+                        pollenAlerts: notifications.schedule.pollenAlerts,
+                        setPollenAlerts: setPollenAlerts
+                    )
                 }
                 MindHealthStatus(status: health.status)
             }
@@ -85,138 +76,113 @@ struct LongevityEnvironmentView: View {
             .frame(maxWidth: metrics.pageMaxWidth, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
+        .softScrollEdges()
+#if DEBUG
+        .task {
+            // `-environment.scroll pollen` (or week) brings that card into
+            // view, for screenshots.
+            if let card = UserDefaults.standard.string(forKey: "environment.scroll") {
+                try? await Task.sleep(for: .seconds(1))
+                scroller.scrollTo(card, anchor: .top)
+            }
+        }
+#endif
+        }
         .aspectWash(nil)
         .scoreInputs([.nights, .sound], into: $sleepInputs)
-        .refreshable { await load() }
-        .task { await load() }
+        .somaRefreshable { await load(force: true) }
+        .task { await load(force: false) }
         .task(id: location.place) { await loadOutside() }
-        .onChange(of: sleepInputs, initial: true) { _, inputs in
-            // Matches the phone's stays to the nights Health holds.
-            guard let inputs else { return }
-            finder.refresh(nights: inputs.recordedNights.map { DateInterval(start: $0.start, end: max($0.start, $0.end)) })
-        }
-        .task(id: NightKey(night: (sleepInputs?.nights.last ?? nil)?.start, place: location.place)) { await loadNight() }
-        .onChange(of: lens) { _, lens in
-            // Kept for the next opening once Health's part has landed.
-            if self.report != nil { LongevitySnapshotStore.shared.save(environment: lens) }
-        }
+        .task(id: sleepInputs?.nights.last ?? nil) { await loadNight() }
         .sheet(item: $detail) { measure in
             EnvironmentDetailSheet(measure: measure, report: report)
         }
         .sheet(item: $sheet) { sheet in
             switch sheet {
             case .environment: SleepEnvironmentSheet(scores: health.scores, inputs: sleepInputs)
-            case .places: SleepPlacesSheet(scores: health.scores, inputs: sleepInputs)
+            case .places: SleepPlaceLedgerSheet(scores: health.scores, inputs: sleepInputs)
             }
         }
     }
 
-    /// What reruns last night's outdoor temperature: the night, and where
-    /// you are.
-    private struct NightKey: Equatable {
-        var night: Date?
-        var place: EnvironmentSun.Place?
+    /// The Health report with the weather where you are laid in.
+    private var merged: EnvironmentReport {
+        var report = cache.environment ?? EnvironmentReport.make(from: EnvironmentInputs(now: Date()))
+        report.outside = cache.outside
+        return report
     }
 
-    /// The lens as drawn now: each part read in this opening, else the one
-    /// kept from the last, else nothing yet.
-    private var shownLens: EnvironmentLensSnapshot {
-        let kept = kept?.value
-        var report = self.report ?? kept?.report ?? EnvironmentReport.make(from: EnvironmentInputs(now: Date()))
-        report.outside = outsideLanded ? outside : kept?.report.outside
-        let place = location.place ?? (locationLanded ? nil : kept?.place)
-        return EnvironmentLensSnapshot(
-            report: report,
-            outdoorNight: nightLanded ? outdoorNight : kept?.outdoorNight,
-            noise: sleepInputs.map { $0.nightSound.last ?? nil } ?? kept?.noise,
-            place: place,
-            isHere: location.place != nil ? location.isHere : (place == nil ? false : kept?.isHere ?? false)
-        )
-    }
-
-    private func bedroom(_ lens: EnvironmentLensSnapshot) -> EnvironmentBedroom {
+    private var bedroom: EnvironmentBedroom {
         EnvironmentBedroom(
-            outdoor: lens.outdoorNight,
-            noise: lens.noise,
+            outdoor: outdoorNight,
+            noise: sleepInputs?.nightSound.last ?? nil,
             temperature: places.bedroom.temperature,
             isDark: places.bedroom.isDark,
             place: places.place(forNightEnding: Date())?.name
         )
     }
 
-    /// A read landing: the numbers roll to it.
-    private func land(_ change: () -> Void) {
-        withAnimation(reduceMotion ? nil : theme.motion.numberRoll, change)
+    /// The Health report and where you are, side by side: finding the place
+    /// can take seconds, and the report does not wait on it.
+    private func load(force: Bool) async {
+        async let place: Void = location.refresh()
+        await cache.loadEnvironment(health, force: force)
+        await place
     }
 
-    private func load() async {
-        let calendar = Calendar.current
-        let now = Date()
-        await location.refresh()
-        locationLanded = true
-        if location.place == nil {
-            // Nowhere to ask the weather for: the kept weather goes too.
-            land {
-                outside = nil
-                outsideLanded = true
-            }
-        }
-        await loadNight()
-#if DEBUG
-        if EnvironmentReport.usesPreview {
-            land { report = EnvironmentReport.preview }
-            return
-        }
-#endif
-        guard let source = await health.prepare(EnvironmentInputs.metrics) else {
-            land { report = EnvironmentReport.make(from: EnvironmentInputs(now: now), calendar: calendar) }
-            return
-        }
-        let inputs = await EnvironmentInputs.read(from: source, now: now, calendar: calendar, wholeYear: true)
-        let read = EnvironmentReport.make(from: inputs, calendar: calendar)
-        land { report = read }
-        LongevitySnapshotStore.shared.save(environment: shownLens)
-    }
-
-    /// The weather where you are, kept thirty minutes by the client. Until
-    /// this opening knows where you are, and when the service could not be
-    /// reached (or the place moved on before it answered), the last weather
-    /// stands.
+    /// The weather where you are, kept thirty minutes by the client. The
+    /// last one known stays drawn while the place is still being found.
     private func loadOutside() async {
-        guard let place = location.place else { return }
-        let read = await EnvironmentWeatherClient.shared.conditions(latitude: place.latitude, longitude: place.longitude)
-        guard !Task.isCancelled, let read else { return }
-        land {
-            outside = read
-            outsideLanded = true
+        guard let place = location.place else {
+            if location.access != .allowed, SleepPlaceStore.shared.weatherCity == nil { cache.setOutside(nil) }
+            return
         }
+        guard let conditions = await EnvironmentWeatherClient.shared.conditions(latitude: place.latitude, longitude: place.longitude) else { return }
+        cache.setOutside(conditions)
+        await raisePollenAlert(conditions)
+    }
+
+    /// The pollen switch, from the pollen card. Turning it on asks for
+    /// notifications then, in context, if that was never asked.
+    private func setPollenAlerts(_ isOn: Bool) {
+        notifications.schedule.pollenAlerts = isOn
+        Task {
+            await notifications.apply(asking: isOn)
+            if isOn, let outside = cache.outside { await raisePollenAlert(outside) }
+        }
+    }
+
+    /// Today's high pollen, once a morning, when the person asked for it:
+    /// into the inbox, and onto the phone when notifications are on.
+    private func raisePollenAlert(_ conditions: EnvironmentConditions) async {
+        guard let alert = DataAlertRules.pollenMorning(
+            peak: conditions.pollen.flatMap(PollenPeak.strongest),
+            schedule: notifications.schedule,
+            prefs: notifications.settings.notifications,
+            now: Date()
+        ), !notifications.inbox.contains(where: { $0.id == alert.id }) else { return }
+        notifications.add(InboxItem(id: alert.id, kind: .dataAlert, title: alert.title, body: alert.body,
+                                    date: Date(), link: alert.link))
+        if notifications.isOn { try? await notifications.scheduler.add(alert) }
     }
 
     /// The outdoor temperature over last night, where it was slept: the
-    /// place set for it, else where you are now. Waits for the night and
-    /// for where you are, keeping the last value until then.
+    /// place set for it, else where you are now.
     private func loadNight() async {
-        guard let sleepInputs, locationLanded else { return }
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
-        let window = (sleepInputs.nights.last ?? nil).map { ($0.start, $0.end) }
+        let window = (sleepInputs?.nights.last ?? nil).map { ($0.start, $0.end) }
             ?? (today.addingTimeInterval(-3600), today.addingTimeInterval(7 * 3600))
         let slept = places.place(forNightEnding: Date())
-        var night: Double?
-        if let latitude = slept?.latitude ?? location.place?.latitude,
-           let longitude = slept?.longitude ?? location.place?.longitude {
-            // The service out of reach keeps the last night's value.
-            guard let conditions = await EnvironmentWeatherClient.shared.conditions(latitude: latitude, longitude: longitude),
-                  !Task.isCancelled else { return }
-            night = conditions.mean(from: window.0, to: window.1)
+        guard let latitude = slept?.latitude ?? location.place?.latitude,
+              let longitude = slept?.longitude ?? location.place?.longitude,
+              let conditions = await EnvironmentWeatherClient.shared.conditions(latitude: latitude, longitude: longitude)
+        else {
+            outdoorNight = nil
+            return
         }
-        land {
-            outdoorNight = night
-            nightLanded = true
-        }
+        outdoorNight = conditions.mean(from: window.0, to: window.1)
     }
-
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 }
 
 #Preview("Environment") {

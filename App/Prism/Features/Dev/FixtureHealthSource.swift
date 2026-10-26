@@ -34,10 +34,15 @@ struct FixtureHealthSource: HealthSampleSource {
         readings[metric.identifier]?.max { $0.end < $1.end }
     }
 
+    /// Counted the way HealthKit's statistics count on a device: a stretch
+    /// two sources both cover counts once, the watch's reading first.
     func total(_ metric: HealthMetric, from: Date, to: Date) async throws -> HealthReading? {
-        let inside = (readings[metric.identifier] ?? []).filter { $0.start >= from && $0.start < to }
+        let inside = (readings[metric.identifier] ?? []).filter {
+            $0.end > $0.start ? ($0.end > from && $0.start < to) : ($0.start >= from && $0.start < to)
+        }
         guard !inside.isEmpty else { return nil }
-        return HealthReading(metric: metric.identifier, value: inside.map(\.value).reduce(0, +), unit: metric.unit, start: from, end: to)
+        let sum = CumulativeTotal.deduplicated(inside, from: from, to: to) { $0.device == "Apple Watch" ? 0 : 1 }
+        return HealthReading(metric: metric.identifier, value: sum, unit: metric.unit, start: from, end: to)
     }
 
     func average(_ metric: HealthMetric, from: Date, to: Date) async throws -> HealthReading? {
@@ -147,6 +152,16 @@ struct FixtureHealthSource: HealthSampleSource {
         if let metric = HealthMetricCatalog.metric(for: birth), let born = calendar.date(byAdding: .year, value: -38, to: today) {
             out[birth] = [HealthReading(metric: birth, value: 38, unit: metric.unit, start: born, end: now)]
         }
+        // The date of birth, read the way HealthKit's characteristic reads:
+        // the age in whole years as the value, the birthday as the start.
+        if let birthday = calendar.date(byAdding: .year, value: -46, to: today) {
+            let identifier = "HKCharacteristicTypeIdentifierDateOfBirth"
+            out[identifier] = [HealthReading(metric: identifier, value: 46, unit: .none, start: birthday, end: now)]
+        }
+        // The heart and steps around the fixture's meetings.
+        FixtureMeetings.addReadings(to: &out, now: now, calendar: calendar)
+        // Heart rhythm, steadiness and falls.
+        FixtureRhythm.addReadings(to: &out, now: now, calendar: calendar)
         return out
     }
 }

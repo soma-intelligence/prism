@@ -232,6 +232,7 @@ struct MindReasonText: View {
         }
         .padding()
     }
+    .softScrollEdges()
     .somaTheme(.standard)
 }
 #endif

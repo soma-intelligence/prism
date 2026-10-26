@@ -128,9 +128,10 @@ public struct SomaQuestionStack<Content: View>: View {
 
 // MARK: - Yes or no
 
-/// Yes and no as two wide pills: no drawn as an outline, yes filled with the
-/// question's aspect hue. The chosen one swells for the beat before the next
-/// question comes.
+/// Yes and no as two wide pills, equal until one is chosen: both a hairline
+/// capsule, so neither answer is suggested. The chosen one fills with ink
+/// and swells for the beat before the next question comes; the other steps
+/// back. `aspect` is kept for callers.
 public struct SomaYesNoPills: View {
     private let yes: String
     private let no: String
@@ -160,22 +161,21 @@ public struct SomaYesNoPills: View {
     private func pill(_ title: String, value: Bool) -> some View {
         let colors = theme.colors
         let metrics = theme.metrics
-        let hue = theme.aspects[aspect].identity.color
         let isChosen = chosen == value
         let isPassed = chosen != nil && !isChosen
 
         return Button { onAnswer(value) } label: {
             Text(title)
                 .somaFont(theme.typography.field)
-                .foregroundStyle(value ? colors.onOrb.color : colors.inkPrimary.color)
+                .foregroundStyle(isChosen ? colors.onAccent.color : colors.inkPrimary.color)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
                 .frame(maxWidth: .infinity, minHeight: metrics.answerPillHeight)
                 .background {
-                    if value {
-                        Capsule().fill(hue)
+                    if isChosen {
+                        Capsule().fill(colors.inkPrimary.color)
                     } else {
-                        Capsule().strokeBorder(colors.inkPrimary.color.opacity(metrics.questionOutlineOpacity), lineWidth: 1.5)
+                        Capsule().strokeBorder(colors.inkPrimary.color.opacity(metrics.questionOutlineOpacity), lineWidth: metrics.inputHairline)
                     }
                 }
                 .scaleEffect(isChosen ? metrics.answerChosenScale : 1)
@@ -199,9 +199,10 @@ public enum SomaScaleTone: Sendable, Equatable {
     case neutral(SomaAspect)
 }
 
-/// Five orbs in a row, one tap to answer. Before a choice each carries a
-/// faint wash of its colour so the row reads as a scale; the chosen one grows
-/// and fills, the others step back. The words under the ends name them.
+/// Five discs in a row, one tap to answer. Before a choice each carries a
+/// faint wash of its colour and a hairline rim so the row reads as a scale;
+/// the chosen one grows and fills flat, with no gloss and no glow, and the
+/// others step back. The words under the ends name them.
 public struct SomaScaleOrbs: View {
     private let chosen: Int?
     private let low: String
@@ -273,17 +274,8 @@ public struct SomaScaleOrbs: View {
 
         return Button { onSelect(step) } label: {
             Circle()
-                .fill(
-                    isChosen
-                        ? AnyShapeStyle(RadialGradient(
-                            colors: [hue.opacity(0.75), hue],
-                            center: UnitPoint(x: 0.35, y: 0.3),
-                            startRadius: 0, endRadius: diameter * 0.7
-                        ))
-                        : AnyShapeStyle(hue.opacity(wash))
-                )
-                .overlay(Circle().strokeBorder(hue.opacity(isChosen ? 0 : wash * 1.6), lineWidth: 1))
-                .shadow(color: hue.opacity(isChosen ? 0.45 : 0), radius: metrics.scaleOrbChosen * 0.25)
+                .fill(hue.opacity(isChosen ? 1 : wash))
+                .overlay(Circle().strokeBorder(hue.opacity(isChosen ? 0 : min(1, wash * 1.8)), lineWidth: metrics.inputHairline))
                 .frame(width: diameter, height: diameter)
                 .frame(maxWidth: .infinity, minHeight: metrics.scaleOrbChosen)
                 .contentShape(.rect)

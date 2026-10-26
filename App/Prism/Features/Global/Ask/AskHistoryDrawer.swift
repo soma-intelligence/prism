@@ -34,7 +34,7 @@ struct AskHistoryDrawer: View {
         let colors = theme.colors
 
         VStack(alignment: .leading, spacing: metrics.cardSpacing) {
-            HStack(spacing: metrics.scoreLabelSpacing * 2) {
+            HStack(spacing: metrics.spaceXS) {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(colors.inkSecondary.color)
                 TextField("Search conversations", text: $query)
@@ -65,7 +65,6 @@ struct AskHistoryDrawer: View {
                     ForEach(sections) { section in
                         Text(section.title)
                             .somaFont(theme.typography.eyebrow)
-                            .textCase(.uppercase)
                             .foregroundStyle(colors.inkSecondary.color)
                             .padding(.top, metrics.cardSpacing)
                             .accessibilityAddTraits(.isHeader)
@@ -77,7 +76,8 @@ struct AskHistoryDrawer: View {
                     }
                 }
             }
-            .refreshable { await CloudSync.shared.syncAskHistory() }
+            .softScrollEdges()
+            .somaRefreshable { await CloudSync.shared.syncAskHistory() }
 #if !os(visionOS)
             // The headset's keyboard floats apart from the window.
             .scrollDismissesKeyboard(.interactively)
@@ -85,7 +85,7 @@ struct AskHistoryDrawer: View {
 
             profileCard
         }
-        .padding(metrics.pagePadding * 0.8)
+        .padding(metrics.spaceM)
         .frame(maxHeight: .infinity, alignment: .top)
         .background(colors.canvas.color.ignoresSafeArea())
         .task { await CloudSync.shared.syncAskHistory() }
@@ -124,8 +124,8 @@ struct AskHistoryDrawer: View {
                     .somaFont(theme.typography.caption)
                     .foregroundStyle(theme.colors.inkSecondary.color)
             }
-            .padding(.horizontal, theme.metrics.scoreLabelSpacing * 2)
-            .padding(.vertical, theme.metrics.scoreLabelSpacing * 2)
+            .padding(.horizontal, theme.metrics.spaceXS)
+            .padding(.vertical, theme.metrics.spaceXS)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
                 RoundedRectangle(cornerRadius: theme.metrics.cardCornerRadius * 0.6, style: .continuous)

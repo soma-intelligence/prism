@@ -54,6 +54,16 @@ extension AskAnswering {
     }
 }
 
+/// A provider that cannot answer yet (a key or an address missing): fails at
+/// once with what to fix.
+struct FailingAskAnswering: AskAnswering {
+    let failure: AskFailure
+
+    func stream(messages: [AskMessage], facts: AskFacts) -> AsyncThrowingStream<String, Error> {
+        AsyncThrowingStream { $0.finish(throwing: failure) }
+    }
+}
+
 /// The default until the model is connected: it reports offline at once, so
 /// every question gets the answer the phone can give, with its move and its
 /// follow ups.

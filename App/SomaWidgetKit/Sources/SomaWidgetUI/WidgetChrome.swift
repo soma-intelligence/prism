@@ -78,9 +78,11 @@ struct WidgetInk {
     let primary: Color
     let secondary: Color
     let track: Color
+    private let aspects: SomaAspects?
 
     init(theme: SomaTheme, mode: WidgetRenderingMode) {
         let metrics = theme.metrics
+        aspects = mode == .fullColor ? theme.aspects : nil
         if mode == .fullColor {
             primary = theme.colors.inkPrimary.color
             secondary = theme.colors.inkSecondary.color
@@ -96,6 +98,21 @@ struct WidgetInk {
     /// The ink a value is drawn in: secondary once the snapshot is stale.
     func value(_ freshness: Freshness) -> Color {
         freshness == .fresh ? primary : secondary
+    }
+
+    /// The colour a measure's mark wears: its aspect's hue in full colour,
+    /// the way Health colours a heart reading red, and the primary ink where
+    /// the system flattens colour or when no aspect is named.
+    func mark(_ aspect: SomaAspect?) -> Color {
+        guard let aspect, let aspects else { return primary }
+        return aspects[aspect].identity.color
+    }
+
+    /// The colour a measure's word wears: its hue in full colour, the
+    /// secondary ink otherwise.
+    func label(_ aspect: SomaAspect?) -> Color {
+        guard let aspect, let aspects else { return secondary }
+        return aspects[aspect].identity.color
     }
 }
 

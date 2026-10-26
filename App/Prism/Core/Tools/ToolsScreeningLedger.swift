@@ -19,19 +19,24 @@ extension SomaTools {
         private(set) var records: [ScreeningDone]
         /// One answer per flag: answering twice revises, it does not pile up.
         private(set) var riskAnswers: [ScreeningRisk]
+        /// The items the person asked to be reminded of, by item id, with the
+        /// moment they asked. Opt in per item: nothing is reminded by default.
+        private(set) var reminders: [String: Date]
 
-        init(records: [ScreeningDone] = [], riskAnswers: [ScreeningRisk] = []) {
+        init(records: [ScreeningDone] = [], riskAnswers: [ScreeningRisk] = [], reminders: [String: Date] = [:]) {
             self.records = records
             self.riskAnswers = riskAnswers
+            self.reminders = reminders
         }
 
-        private enum CodingKeys: String, CodingKey { case records, riskAnswers }
+        private enum CodingKeys: String, CodingKey { case records, riskAnswers, reminders }
 
         init(from decoder: Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
             records = try c.decodeIfPresent([ScreeningDone].self, forKey: .records) ?? []
             riskAnswers = (try? c.decodeIfPresent([LossyRisk].self, forKey: .riskAnswers))?
                 .compactMap(\.value) ?? []
+            reminders = (try? c.decodeIfPresent([String: Date].self, forKey: .reminders)) ?? [:]
         }
 
         /// Decodes one risk row, dropping a flag a later version removed
@@ -118,6 +123,20 @@ extension SomaTools {
         /// family history block.
         var hasAnsweredAnyRisk: Bool { !riskAnswers.isEmpty }
 
+        // MARK: Reminders
+
+        /// Turns the reminder for one item on or off. Turning it on again
+        /// keeps the first moment it was asked for.
+        mutating func setReminder(_ isOn: Bool, itemID: String, now: Date = Date()) {
+            if isOn {
+                if reminders[itemID] == nil { reminders[itemID] = now }
+            } else {
+                reminders[itemID] = nil
+            }
+        }
+
+        func remindsOf(_ itemID: String) -> Bool { reminders[itemID] != nil }
+
         // MARK: Engine
 
         /// The statuses the page renders, straight from the engine.
@@ -125,10 +144,30 @@ extension SomaTools {
                       sex: ScreeningEligibility?,
                       today: Date = Date(),
                       catalog: [ScreeningItem] = ScreeningCatalog.items,
+                      birthday: Date? = nil,
                       calendar: Calendar = .current) -> [ScreeningDueEngine.Status] {
             ScreeningDueEngine.statuses(age: age, sex: sex, today: today,
                                         records: records, risk: riskAnswers,
-                                        catalog: catalog, calendar: calendar)
+                                        catalog: catalog, birthday: birthday, calendar: calendar)
         }
+    }
+}
+
+extension SomaTools.ScreeningLedger {
+    /// This ledger with results kept elsewhere in the app counted as done: a
+    /// calcium score or a DEXA with a T-score saved in the Lab is that
+    /// screening, so the person never logs it twice. A result already on the
+    /// ledger, or one the person logged for the same item that day, adds
+    /// nothing. Folded in as the ledger is read, never written to its file.
+    nonisolated func withResults(_ done: [SomaTools.ScreeningDone], calendar: Calendar = .current) -> SomaTools.ScreeningLedger {
+        var merged = records
+        for record in done {
+            let known = merged.contains { existing in
+                existing.id == record.id
+                    || (existing.itemID == record.itemID && calendar.isDate(existing.performedOn, inSameDayAs: record.performedOn))
+            }
+            if !known { merged.append(record) }
+        }
+        return SomaTools.ScreeningLedger(records: merged, riskAnswers: riskAnswers, reminders: reminders)
     }
 }

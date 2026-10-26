@@ -41,11 +41,11 @@ struct SkinReportPage: View {
                 actionTitle: "New scan",
                 action: { isScanning = true }
             ) {
-                SomaOrb(aspect: .body, scale: .mini)
+                SomaObjectIcon(aspect: .body, size: .row)
             }
             LabFootnote("Wellness only, never a diagnosis.")
         }
-        .navigationTitle("Skin Report")
+        .labPageTitle(Text("Skin Report"))
         .sheet(item: $index) { SkinIndexSheet(index: $0) }
         .sheet(isPresented: $isScanning) {
             NotWiredPage(

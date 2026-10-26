@@ -16,5 +16,6 @@ struct SomaWidgetsBundle: WidgetBundle {
         LogWidget()
         LogWaterControl()
         LogCoffeeControl()
+        SomaLiveActivity()
     }
 }

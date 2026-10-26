@@ -106,7 +106,7 @@ struct HomeDayLanes: View {
         let rowHeight = metrics.miniOrbDiameter * 0.9
         let aspects = theme.aspects
 
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: theme.metrics.spaceS) {
             HStack(alignment: .top, spacing: 8) {
                 VStack(alignment: .leading, spacing: 0) {
                     ForEach(lanes) { lane in
@@ -208,7 +208,7 @@ struct HomeStandBars: View {
             }
             .frame(height: metrics.chartCompactPlotHeight * 0.6)
             HomeAxis(labels: ["00", "06", "12", "18", "23"])
-            HStack(spacing: 14) {
+            HStack(spacing: theme.metrics.spaceM) {
                 legend("Stood", hue)
                 legend("Missed", out)
             }
@@ -218,7 +218,7 @@ struct HomeStandBars: View {
     }
 
     private func legend(_ title: String, _ color: Color) -> some View {
-        HStack(spacing: 5) {
+        HStack(spacing: theme.metrics.spaceXS) {
             Circle().fill(color).frame(width: theme.metrics.chartPointDiameter, height: theme.metrics.chartPointDiameter)
             Text(title)
                 .somaFont(theme.typography.caption)
@@ -281,7 +281,7 @@ struct HomeCycleTrack: View {
         let length = max(cycle.length ?? 28, cycle.day)
         let height = metrics.chartSparkHeight
 
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: theme.metrics.spaceS) {
             Canvas { context, size in
                 func x(_ day: Double) -> CGFloat { size.width * CGFloat((day - 1) / Double(length)) }
                 let thickness = metrics.chartThinBarWidth * 1.5
@@ -301,7 +301,7 @@ struct HomeCycleTrack: View {
             }
             .frame(height: height)
             HomeAxis(labels: ["1", "\(length / 2)", "\(length)"])
-            HStack(spacing: 14) {
+            HStack(spacing: theme.metrics.spaceM) {
                 legend("Period", hue)
                 if cycle.length != nil { legend("Fertile window", hue.opacity(0.35)) }
                 legend("Today", colors.inkPrimary.color)

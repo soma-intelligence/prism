@@ -232,7 +232,7 @@ struct OnboardingFlow: View {
     }
 
     private var todayAction: PulseNowAction {
-        PulseNowAction.make(today: nil, at: Date())
+        PulseNowAction.make(moves: [], at: Date())
     }
 
     @ViewBuilder
@@ -271,7 +271,7 @@ struct OnboardingFlow: View {
     private var backSwipe: some Gesture {
         DragGesture(minimumDistance: 24)
             .onEnded { value in
-                let edge = theme.metrics.pagePadding * 2
+                let edge = theme.metrics.spaceXXL
                 guard value.startLocation.x < edge,
                       value.translation.width > theme.metrics.iconButtonDiameter * 1.5,
                       abs(value.translation.height) < value.translation.width else { return }

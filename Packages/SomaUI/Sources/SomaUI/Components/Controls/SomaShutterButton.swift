@@ -51,7 +51,7 @@ public struct SomaShutterButton: View {
             }
             .frame(width: m.shutterDiameter, height: m.shutterDiameter)
             .contentShape(.circle)
-            .opacity(dimmed ? theme.motion.pressOpacity : 1)
+            .opacity(dimmed ? theme.motion.dimOpacity : 1)
         }
         .buttonStyle(.somaGlassPress)
         .animation(reduceMotion ? nil : theme.motion.selection, value: recording)

@@ -95,6 +95,28 @@ struct TrackTagStyle: Equatable {
 
     var tone: SomaTrackTone { section.tone }
 
+    /// The SF Symbol a check-in row wears for this tag, and the hue of its
+    /// section, for the surfaces still drawn with symbols and health hues.
+    var symbol: String {
+        switch glyph {
+        case .coffee: "cup.and.saucer.fill"
+        default: Self.symbols[section] ?? "tag.fill"
+        }
+    }
+
+    var hue: SomaHealthHue {
+        switch section {
+        case .daytime: .mobility
+        case .training: .nutrition
+        case .evening: .sleep
+        case .habits: .symptoms
+        }
+    }
+
+    private static let symbols: [Section: String] = [
+        .daytime: "sun.max.fill", .training: "figure.run", .evening: "moon.fill", .habits: "tag.fill",
+    ]
+
     static func of(_ tagID: String) -> TrackTagStyle {
         switch tagID {
         case "coffee-late": TrackTagStyle(section: .daytime, glyph: .coffee)
@@ -112,7 +134,7 @@ struct TrackTagStyle: Equatable {
     }
 }
 
-/// A small capitals label over a group or inside a card: TAGS, HOW YOU FEEL.
+/// A small label over a group or inside a card: Tags, How you feel.
 struct TrackEyebrow: View {
     let text: String
 
@@ -123,7 +145,6 @@ struct TrackEyebrow: View {
     var body: some View {
         Text(text)
             .somaFont(theme.typography.eyebrow)
-            .textCase(.uppercase)
             .foregroundStyle(theme.colors.inkSecondary.color)
             .accessibilityAddTraits(.isHeader)
     }

@@ -10,6 +10,7 @@ public struct HairlineTrace: View {
     private let values: [Double?]
     private let showsNowDot: Bool
     private let dimmed: Bool
+    private let aspect: SomaAspect?
 
     @Environment(\.somaTheme) private var theme
     @Environment(\.widgetRenderingMode) private var mode
@@ -20,10 +21,11 @@ public struct HairlineTrace: View {
 
     /// `dimmed` draws the line and the dot in the secondary ink, for a stale
     /// snapshot.
-    init(values: [Double?], showsNowDot: Bool, dimmed: Bool) {
+    init(values: [Double?], showsNowDot: Bool, dimmed: Bool, aspect: SomaAspect? = nil) {
         self.values = values
         self.showsNowDot = showsNowDot
         self.dimmed = dimmed
+        self.aspect = aspect
     }
 
     /// Each value placed on 0...1 between the series' lowest and highest. A
@@ -44,7 +46,7 @@ public struct HairlineTrace: View {
         let ink = WidgetInk(theme: theme, mode: mode)
         let metrics = theme.metrics
         let points = Self.normalised(values)
-        let stroke = dimmed ? ink.secondary : ink.primary
+        let stroke = dimmed ? ink.secondary : ink.mark(aspect)
         ZStack {
             TracePath(points: points)
                 .stroke(stroke, style: StrokeStyle(

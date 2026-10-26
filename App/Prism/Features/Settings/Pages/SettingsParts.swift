@@ -22,7 +22,6 @@ struct SettingsSection<Content: View>: View {
         VStack(alignment: .leading, spacing: theme.metrics.browseHeadingSpacing) {
             Text(title)
                 .somaFont(theme.typography.eyebrow)
-                .textCase(.uppercase)
                 .foregroundStyle(theme.colors.inkSecondary.color)
                 .padding(.leading, theme.metrics.browseRowPadding)
                 .accessibilityAddTraits(.isHeader)
@@ -59,28 +58,37 @@ struct SettingsFootnote: View {
 struct SettingsLine<Trailing: View>: View {
     let title: String
     let detail: String?
+    /// Set under a glyph row it belongs to, so its title lines up with that
+    /// row's title rather than with the glyph.
+    let indented: Bool
     let trailing: Trailing
 
     @Environment(\.somaTheme) private var theme
 
-    init(_ title: String, detail: String? = nil, @ViewBuilder trailing: () -> Trailing) {
+    init(_ title: String, detail: String? = nil, indented: Bool = false, @ViewBuilder trailing: () -> Trailing) {
         self.title = title
         self.detail = detail
+        self.indented = indented
         self.trailing = trailing()
     }
 
     var body: some View {
         let metrics = theme.metrics
         HStack(spacing: metrics.browseRowSpacing) {
+            if indented {
+                Color.clear.frame(width: metrics.browseGlyphColumn, height: 1)
+            }
             VStack(alignment: .leading, spacing: metrics.scoreLabelSpacing) {
                 Text(title)
                     .somaFont(theme.typography.body)
                     .foregroundStyle(theme.colors.inkPrimary.color)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
                 if let detail {
                     Text(detail)
                         .somaFont(theme.typography.caption)
                         .foregroundStyle(theme.colors.inkSecondary.color)
-                        .fixedSize(horizontal: false, vertical: true)
+                        .lineLimit(2)
                 }
             }
             .multilineTextAlignment(.leading)
@@ -94,14 +102,15 @@ struct SettingsLine<Trailing: View>: View {
     }
 }
 
-/// The switch every settings line uses: Soma's own, which reads in dark
-/// appearance where the system switch in the accent does not.
+/// The switch every settings line uses, in the status green.
 struct SettingsSwitch: View {
     let title: String
     @Binding var isOn: Bool
 
     var body: some View {
-        SomaSwitch(Text(title), isOn: $isOn)
+        Toggle(title, isOn: $isOn)
+            .labelsHidden()
+            .toggleStyle(.soma)
     }
 }
 
@@ -122,16 +131,16 @@ struct SettingsMenuValue<Value: Hashable>: View {
                 }
             }
         } label: {
-            HStack(spacing: theme.metrics.scoreLabelSpacing) {
-                Text(label(selection))
-                    .somaFont(theme.typography.rowValue)
-                    .foregroundStyle(theme.colors.inkSecondary.color)
-                Image(systemName: "chevron.up.chevron.down")
-                    .font(.system(size: theme.metrics.browseChevronSize, weight: .semibold))
-                    .foregroundStyle(theme.colors.inkSecondary.color)
-            }
-            .frame(minHeight: theme.metrics.minimumTapTarget)
-            .contentShape(.rect)
+            // The same pill the system's time picker draws beside it, so a
+            // row of times and a row of minutes read as one kind of control.
+            Text(label(selection))
+                .somaFont(theme.typography.body)
+                .foregroundStyle(theme.colors.inkPrimary.color)
+                .padding(.horizontal, theme.metrics.spaceM - 1)
+                .padding(.vertical, theme.metrics.spaceS - 1)
+                .background(Capsule().fill(.fill.quaternary))
+                .frame(minHeight: theme.metrics.minimumTapTarget)
+                .contentShape(.rect)
         }
         .menuStyle(.button)
         .buttonStyle(.plain)
@@ -160,6 +169,25 @@ struct SettingsTimeValue: View {
                 time = ClockTime(hour: parts.hour ?? 0, minute: parts.minute ?? 0)
             }
         )
+    }
+}
+
+/// Two times on the trailing edge, from and until, with a quiet word between
+/// so the pair reads as one window.
+struct SettingsTimeRange: View {
+    let from: (String, Binding<ClockTime>)
+    let until: (String, Binding<ClockTime>)
+
+    @Environment(\.somaTheme) private var theme
+
+    var body: some View {
+        HStack(spacing: theme.metrics.spaceXS) {
+            SettingsTimeValue(title: from.0, time: from.1)
+            Text("to")
+                .somaFont(theme.typography.caption)
+                .foregroundStyle(theme.colors.inkSecondary.color)
+            SettingsTimeValue(title: until.0, time: until.1)
+        }
     }
 }
 
@@ -318,11 +346,13 @@ struct SettingsTileLine<Trailing: View>: View {
                 Text(title)
                     .somaFont(theme.typography.body)
                     .foregroundStyle(theme.colors.inkPrimary.color)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
                 if let detail {
                     Text(detail)
                         .somaFont(theme.typography.caption)
                         .foregroundStyle(theme.colors.inkSecondary.color)
-                        .fixedSize(horizontal: false, vertical: true)
+                        .lineLimit(2)
                 }
             }
             Spacer(minLength: metrics.browseRowSpacing)
@@ -347,5 +377,6 @@ struct SettingsRowPressStyle: ButtonStyle {
                     ? theme.colors.inkPrimary.color.opacity(theme.metrics.browsePressOpacity)
                     : Color.clear
             )
+            .sensoryFeedback(.impact(weight: .light, intensity: 0.7), trigger: configuration.isPressed) { _, pressed in pressed }
     }
 }

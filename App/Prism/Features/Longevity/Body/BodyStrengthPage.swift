@@ -34,7 +34,7 @@ struct BodyStrengthPage: View {
                 actionTitle: "Plan it",
                 action: { isPlanning = true }
             ) {
-                SomaOrb(aspect: .body, scale: .mini)
+                SomaObjectIcon(aspect: .body, size: .row)
             }
             MetricRowsCard(eyebrow: "Training", rows: [
                 MetricRowItem("Muscle work", detail: "Which groups the month loaded", route: .muscleWork),
@@ -45,7 +45,7 @@ struct BodyStrengthPage: View {
         }
         .navigationTitle("Strength")
         .task { await load() }
-        .refreshable { await load() }
+        .somaRefreshable { await load() }
         .sheet(isPresented: $isPlanning) {
             TrainingMenuSheet()
         }
@@ -74,7 +74,7 @@ private struct BodySessionsCard: View {
             unit: "a week on average",
             note: page.sessionsNote
         ) {
-            VStack(spacing: 6) {
+            VStack(spacing: theme.metrics.spaceS) {
                 BodyDotColumns(counts: page.weeks.isEmpty ? Array(repeating: 0, count: BodyMath.trendWeeks) : page.weeks)
                     .frame(height: theme.metrics.bodySessionPlotHeight)
                 HStack {

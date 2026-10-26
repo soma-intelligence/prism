@@ -46,10 +46,9 @@ public struct SomaActionCard<Leading: View>: View {
         let colors = theme.colors
 
         SomaCard {
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: theme.metrics.spaceM) {
                 Text(eyebrow)
                     .somaFont(type.eyebrow)
-                    .textCase(.uppercase)
                     .foregroundStyle(colors.inkSecondary.color)
 
                 HStack(alignment: .center, spacing: metrics.moveRowGap) {
@@ -67,7 +66,7 @@ public struct SomaActionCard<Leading: View>: View {
                             Text(actionTitle)
                                 .somaFont(type.body)
                                 .foregroundStyle(colors.onAccent.color)
-                                .padding(.horizontal, 16)
+                                .padding(.horizontal, theme.metrics.spaceL)
                                 .frame(minHeight: metrics.chromeCapsuleHeight)
                                 .background(Capsule().fill(colors.accent.color))
                                 .contentShape(.capsule)

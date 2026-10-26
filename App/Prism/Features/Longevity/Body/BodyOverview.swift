@@ -38,7 +38,7 @@ enum BodyMetric {
     static func age(in source: any HealthSampleSource) async -> Int? {
         guard let birth = HealthMetricCatalog.metric(for: dateOfBirth),
               let reading = try? await source.latest(birth) else { return nil }
-        return Int(reading.value)
+        return reading.code
     }
 }
 

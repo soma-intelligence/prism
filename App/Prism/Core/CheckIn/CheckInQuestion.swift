@@ -40,7 +40,7 @@ nonisolated enum CheckInWindow: String, Codable, CaseIterable, Sendable {
 
 /// How a question is answered.
 nonisolated enum CheckInAnswerKind: Equatable, Sendable {
-    /// Two big pills.
+    /// Yes or no: the Journal's cross, dash and check on the row.
     case yesNo
     /// Five steps, 1 to 5, a word under each end, coloured the way the
     /// scale runs.
@@ -56,6 +56,21 @@ nonisolated enum CheckInAnswer: Codable, Equatable, Sendable {
     /// 1...5.
     case scale(Int)
     case number(Int)
+}
+
+extension CheckInAnswer {
+    /// The answer on a five step scale, for the places that keep one: a step
+    /// as given, a yes as the high end (4) and a no as the low end (2) of a
+    /// question phrased so that yes is the high end. Not the extremes: a yes
+    /// to "Energy left tonight?" is some, not all.
+    var step: Int? {
+        switch self {
+        case .scale(let step): step
+        case .yes: 4
+        case .no: 2
+        case .number: nil
+        }
+    }
 }
 
 /// The day a Journal tag lands on. A morning question about last night belongs
@@ -97,10 +112,15 @@ nonisolated struct CheckInQuestion: Identifiable, Equatable, Sendable {
     var windows: Set<CheckInWindow>
     var kind: CheckInAnswerKind
     var destination: CheckInDestination
-    /// The aspect the question is about: its hue fills the Yes pill.
+    /// The aspect the question is about: its hue tints the row's glyph and
+    /// its check.
     var aspect: SomaAspect
     /// Written from today's readings rather than taken from the catalog.
     var isDataDriven = false
+    /// Asked at most once in this many days: 1 is every day, 7 once a week.
+    /// The days count from the last one it was answered or skipped
+    /// (``CheckInContext/lastSettled``).
+    var everyDays = 1
 }
 
 /// The readings a data driven question is written from. Nil is "not
@@ -134,4 +154,7 @@ nonisolated struct CheckInContext: Equatable, Sendable {
     var homeCheckInElsewhere = false
     /// Mind is on (its consent was given), so its check-in may be written.
     var mindAvailable = false
+    /// The day each question asked less than daily was last answered or
+    /// skipped, here or in the Journal. A question missing from it is due.
+    var lastSettled: [String: Date] = [:]
 }

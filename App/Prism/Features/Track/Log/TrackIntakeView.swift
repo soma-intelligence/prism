@@ -122,7 +122,7 @@ struct TrackIntakeView: View {
             .foregroundStyle(colors.inkSecondary.color)
 
             TrackLeadText(lead: lastCallLine(reading), rest: window == nil ? "Bedtime taken as 23:00 until Health holds three nights." : nil)
-                .padding(.top, metrics.cardSpacing * 0.5)
+                .padding(.top, metrics.spaceS)
         }
     }
 

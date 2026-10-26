@@ -6,10 +6,9 @@
 import SwiftUI
 import SomaUI
 
-/// Last night, shared by the Sleep page and the
-/// Home sheet: the sleep period and its two totals, the score's parts as
-/// grades, the stages in lanes, and a tile per stage. Labels only, the
-/// numbers and the drawing do the telling.
+/// Last night as the reference design lays it out, for the Home sheet: the sleep period and
+/// its two totals, the stages in lanes, and a tile per stage. Labels only,
+/// the numbers and the drawing do the telling.
 struct SleepLastNightSection: View {
     let night: SleepNightSummary?
     var calendar: Calendar = .current
@@ -33,10 +32,6 @@ struct SleepLastNightSection: View {
             }
 
             SomaCard {
-                SomaSleepGradeGrid(night?.grades ?? SleepNightSummary.grades([]))
-            }
-
-            SomaCard {
                 if let night, !night.runs.isEmpty {
                     SomaHypnogram(runs: night.runs,
                                   bed: night.runs.first.map { ScoreMath.clock($0.start, calendar: calendar) },
@@ -45,8 +40,8 @@ struct SleepLastNightSection: View {
                     ScoreEmptyPlot(message: "Stages draw here from a night your watch records.")
                 }
             }
-
-            SomaStageTiles(night?.stages ?? [:])
+            // Time in each stage is on the chart's lanes now: one graph for
+            // the night (owner, 2026-10-24).
         }
     }
 }

@@ -43,7 +43,7 @@ struct TerritoryPage: View {
             ]
         ) {
             SomaCard {
-                VStack(alignment: .leading, spacing: theme.metrics.cardHeaderSpacing * 2) {
+                VStack(alignment: .leading, spacing: theme.metrics.spaceS) {
                     SomaCardHeader("Where you went", caption: "Each line is a route you took. The dot is home.")
                     TerritoryMap(routes: routes, home: home)
                 }
@@ -70,7 +70,7 @@ struct TerritoryPage: View {
         }
         .navigationTitle("Territory")
         .task { await load() }
-        .refreshable { await load() }
+        .somaRefreshable { await load() }
     }
 
     private func headline(places: [Territory.Place], distance: Double) -> String {

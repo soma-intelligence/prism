@@ -6,7 +6,8 @@
 import Foundation
 
 /// One item of health and wellness news: a short summary of a piece published
-/// elsewhere, with the way back to it. Read from `public.news_items`.
+/// elsewhere, with the way back to it. Read from the news Soma publishes on
+/// somalabs.me (`SiteNewsSource`) and from `public.news_items`.
 struct NewsItem: Identifiable, Hashable, Codable, Sendable {
     var id: String
     /// The publication: "NIH News in Health".
@@ -34,9 +35,18 @@ struct NewsItem: Identifiable, Hashable, Codable, Sendable {
     }
 }
 
+/// Anything the news can be read from.
+protocol NewsSource: Sendable {
+    /// Every item, newest first.
+    func items() async throws -> [NewsItem]
+    /// Whether an item already showing came from here: when this source
+    /// fails, those items stay rather than vanishing with the request.
+    func owns(_ item: NewsItem) -> Bool
+}
+
 /// Reads `public.news_items` over Supabase's REST endpoint with the same
 /// project and publishable key as the articles.
-struct SupabaseNewsSource: Sendable {
+struct SupabaseNewsSource: NewsSource {
     typealias Fetch = SupabaseArticleSource.Fetch
 
     static let table = "news_items"
@@ -77,6 +87,8 @@ struct SupabaseNewsSource: Sendable {
         }
         return try Self.decode(data)
     }
+
+    func owns(_ item: NewsItem) -> Bool { !item.id.hasPrefix(SiteNewsSource.idPrefix) }
 
     /// Newest first. A row without a title, a readable source address or a
     /// date is skipped rather than failing the section.
@@ -152,30 +164,77 @@ struct NewsCache: Sendable {
     }
 }
 
-/// The news Explore shows. There is no bundled news: with no backend, or
-/// nothing fetched and nothing cached, the section is empty and hides.
+/// The news Explore shows: the site's and the table's, merged newest first.
+/// There is no bundled news: with no source, or nothing fetched and nothing
+/// cached, the section says so or hides.
 @MainActor
 @Observable
 final class NewsFeed {
-    private(set) var items: [NewsItem]
-
-    private let source: SupabaseNewsSource?
-    private let cache: NewsCache?
-
-    init(source: SupabaseNewsSource?, cache: NewsCache?) {
-        self.source = source
-        self.cache = cache
-        items = source == nil ? [] : (cache?.load() ?? [])
+    /// Where the latest read stands.
+    enum Phase: Equatable, Sendable {
+        /// Not asked yet.
+        case idle
+        /// A read is out.
+        case reading
+        /// At least one source answered.
+        case read
+        /// Every source failed.
+        case failed
     }
 
-    static let shared = NewsFeed(source: ArticleBackend.configured.map { SupabaseNewsSource(backend: $0) },
-                                 cache: .standard)
+    private(set) var items: [NewsItem]
+    private(set) var phase: Phase = .idle
 
-    /// A failure keeps what is showing; an empty answer empties the section,
-    /// since old news is not worth keeping on screen once the table is clear.
+    private let sources: [any NewsSource]
+    private let cache: NewsCache?
+
+    init(sources: [any NewsSource], cache: NewsCache?) {
+        self.sources = sources
+        self.cache = cache
+        items = sources.isEmpty ? [] : (cache?.load() ?? [])
+    }
+
+    convenience init(source: SupabaseNewsSource?, cache: NewsCache?) {
+        self.init(sources: source.map { [$0] } ?? [], cache: cache)
+    }
+
+    /// The site's news always, the table's when this build has a backend.
+    static let shared = NewsFeed(
+        sources: [SiteNewsSource()] + (ArticleBackend.configured.map { [SupabaseNewsSource(backend: $0)] } ?? []),
+        cache: .standard)
+
+    /// True while nothing shows and the first answer is still on its way:
+    /// the section holds its place rather than appearing late.
+    var isWaiting: Bool {
+        !sources.isEmpty && items.isEmpty && (phase == .idle || phase == .reading)
+    }
+
+    /// Asks every source at once. A source that fails keeps what it had
+    /// showing; one that answers replaces its own items, an empty answer
+    /// included, since old news is not worth keeping once the source is clear.
     func refresh() async {
-        guard let source, let fresh = try? await source.items() else { return }
-        items = fresh
-        try? cache?.save(fresh)
+        guard !sources.isEmpty else { return }
+        phase = .reading
+        let sources = sources
+        let answers = await withTaskGroup(of: (Int, [NewsItem]?).self) { group in
+            for (index, source) in sources.enumerated() {
+                group.addTask { (index, try? await source.items()) }
+            }
+            var collected = [[NewsItem]?](repeating: nil, count: sources.count)
+            for await (index, items) in group { collected[index] = items }
+            return collected
+        }
+        guard answers.contains(where: { $0 != nil }) else {
+            phase = .failed
+            return
+        }
+        var seen = Set<String>()
+        let merged = zip(sources, answers)
+            .flatMap { source, answer in answer ?? items.filter { source.owns($0) } }
+            .filter { seen.insert($0.id).inserted }
+            .sorted { $0.publishedAt > $1.publishedAt }
+        items = merged
+        phase = .read
+        try? cache?.save(merged)
     }
 }

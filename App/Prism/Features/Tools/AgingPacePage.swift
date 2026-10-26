@@ -90,9 +90,9 @@ struct AgingPacePage: View {
 
     private func headline(_ reading: SomaTools.AgingPace.Reading) -> String {
         switch reading.band {
-        case .gaining: "Your body is aging slower than the calendar."
-        case .holding: "Your body keeps pace with the calendar."
-        case .faster: "Your body is aging faster than the calendar."
+        case .gaining: "Your markers point to aging slower than the calendar."
+        case .holding: "Your markers keep pace with the calendar."
+        case .faster: "Your markers point to aging faster than the calendar."
         }
     }
 

@@ -28,6 +28,16 @@ nonisolated enum SomaDeepLink: Hashable, Codable, Sendable {
     case vaultMetric(String)
     /// Pulse, on Trends: where the week reads.
     case trends
+    /// Mind's meetings page.
+    case meetings
+    /// Mind's questionnaires page, PHQ-9 and GAD-7.
+    case mindAssessments
+    /// Mind's connection page.
+    case mindConnection
+    /// The Screening Ledger, where a screening reminder points.
+    case screeningLedger
+    /// The medical record, where an appointment reminder points.
+    case medicalRecord
     /// Pulse, on Today.
     case today
     /// The notification center itself.
@@ -61,6 +71,11 @@ nonisolated enum SomaDeepLink: Hashable, Codable, Sendable {
         case .sleep: "sleep"
         case .vaultMetric(let identifier): "vault/\(identifier)"
         case .trends: "trends"
+        case .meetings: "meetings"
+        case .mindAssessments: "mind/assessments"
+        case .mindConnection: "mind/connection"
+        case .screeningLedger: "screenings"
+        case .medicalRecord: "record"
         case .today: "today"
         case .inbox: "inbox"
         case .score(let kind): "score/\(kind)"
@@ -86,6 +101,15 @@ nonisolated enum SomaDeepLink: Hashable, Codable, Sendable {
             guard let identifier = rest.first, !identifier.isEmpty else { return nil }
             self = .vaultMetric(identifier)
         case "trends": self = .trends
+        case "meetings": self = .meetings
+        case "mind":
+            switch rest.first {
+            case "assessments": self = .mindAssessments
+            case "connection": self = .mindConnection
+            default: return nil
+            }
+        case "screenings": self = .screeningLedger
+        case "record": self = .medicalRecord
         case "today": self = .today
         case "inbox": self = .inbox
         case "score":

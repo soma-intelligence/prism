@@ -69,6 +69,9 @@ nonisolated enum SomaScoresReader {
     /// value it would have fed is missing, and the engine treats it so.
     @concurrent
     static func read(from source: any HealthSampleSource, now: Date, calendar: Calendar) async -> ScoringInputs {
+        // Whatever store this is handed, read it through the border that drops
+        // values no arithmetic can use.
+        let source: any HealthSampleSource = source is SanitizedHealthSource ? source : SanitizedHealthSource(base: source)
         let starts = dayStarts(days: days, now: now, calendar: calendar)
         guard let first = starts.first else { return ScoringInputs(now: now, calendar: calendar) }
         // Sleep reaches back to the evening before the first day, so the
@@ -88,7 +91,7 @@ nonisolated enum SomaScoresReader {
         async let birth = latest(Metric.dateOfBirth, from: source)
 
         let sleepSamples = await sleep.compactMap {
-            ScoringSleepSample(code: Int($0.value), start: $0.start, end: $0.end, source: $0.source)
+            ScoringSleepSample(code: $0.code, start: $0.start, end: $0.end, source: $0.source)
         }
         let restingReadings = await resting
         let variabilityReadings = await variability

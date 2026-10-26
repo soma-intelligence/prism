@@ -7,7 +7,8 @@ import SwiftUI
 import SomaUI
 
 /// Recovery: the gauge, what it means for the day, the four signals it leans
-/// on against your usual, the readiness tank and the one move that fits.
+/// on against your usual, the band readiness falls in and the one move that
+/// fits.
 ///
 /// Pushed from the Mind page, the Heart page and Trends. The score
 /// and its terms come from ``SomaScores``; the usual bands from a month of
@@ -29,9 +30,13 @@ struct RecoveryPage: View {
             ScoreStage(aspect: .heart, lead: page.lead, series: health.scores?.recoverySeries ?? [])
             ScoreHead(page.lead)
             ScoreUsualCard(title: "What recovery leans on", aspect: .heart, lines: page.lines)
-            SomaChartCard(eyebrow: "Readiness", value: page.lead.value.map { "\($0)" }, unit: "of 100",
-                          note: page.readinessNote) {
-                ScoreTank(level: page.lead.value, word: page.lead.word, aspect: .mind)
+            // The gauge already sets the number large: the card names the
+            // band it falls in and shows where that sits among the three, in
+            // steps of the page's one colour rather than traffic lights.
+            SomaChartCard(eyebrow: "Readiness", value: page.lead.word, note: page.readinessNote) {
+                SomaBandStrip(bands: ScoreExplainerKit.bands("Run down", "Partly", "Recovered", higherIsBetter: nil),
+                              aspect: .heart, marker: page.lead.value.map(Double.init),
+                              markerLabel: page.lead.value == nil ? nil : String(localized: "Today"))
             }
             ScoreLinks(links: [
                 ScoreLink(title: "How your score is built") { sheet = .built },

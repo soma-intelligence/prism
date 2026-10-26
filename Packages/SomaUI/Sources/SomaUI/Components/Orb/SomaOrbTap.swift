@@ -6,61 +6,47 @@
 import SwiftUI
 
 public extension View {
-    /// Makes the orb answer a touch the moment it lands: it sinks a few
-    /// points and brightens while the finger is down, rises back with a
-    /// little bounce when it lifts, and `action` runs on the lift with a soft
-    /// haptic. Nothing leaves its rim and nothing waits on an animation.
-    ///
-    /// With Reduce Motion on, the orb keeps its size and only brightens
-    /// under the finger, at once rather than animated.
-    func somaOrbTap(action: @escaping () -> Void) -> some View {
-        modifier(SomaOrbTap(action: action))
+    /// Makes the orb answer a tap before it acts: a soft haptic, the sphere
+    /// squeezes and springs back, and only then `action` runs. No rings
+    /// ripple from the rim (owner, 2026-10-24). With Reduce Motion on, the
+    /// haptic and the action alone.
+    func somaOrbTap(aspect: SomaAspect, action: @escaping () -> Void) -> some View {
+        modifier(SomaOrbTap(aspect: aspect, action: action))
     }
 }
 
 struct SomaOrbTap: ViewModifier {
+    let aspect: SomaAspect
     let action: () -> Void
 
     @Environment(\.somaTheme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var isPressed = false
+    @State private var squeeze = false
     @State private var taps = 0
 
     func body(content: Content) -> some View {
-        let motion = theme.motion
-
         content
-            .scaleEffect(isPressed && !reduceMotion ? motion.orbPressScale : 1)
-            .brightness(isPressed ? motion.orbPressBrightness : 0)
-            .animation(reduceMotion ? nil : (isPressed ? motion.orbPress : motion.orbRelease), value: isPressed)
+            .scaleEffect(squeeze ? 0.94 : 1)
             .contentShape(.circle)
-            .onTapGesture {
-                taps &+= 1
-                action()
-            }
-            // Reports the finger down and up without ever completing, so the
-            // tap above still fires and a long press set by the call site
-            // still wins after its own delay. A drag past the reach, a scroll
-            // starting, lets the orb rise again.
-            .onLongPressGesture(minimumDuration: .infinity, maximumDistance: theme.metrics.orbPressReach) {
-            } onPressingChanged: { pressing in
-                isPressed = pressing
-            }
-            .sensoryFeedback(.impact(flexibility: .soft, intensity: 0.7), trigger: taps)
+            .onTapGesture { tap() }
+            .sensoryFeedback(.impact(weight: .medium, intensity: 0.8), trigger: taps)
     }
-}
 
-#Preview("Orb press") {
-    struct Demo: View {
-        @State private var opened = 0
-        var body: some View {
-            VStack(spacing: 24) {
-                SomaOrb(aspect: .sleep, label: "Wind down")
-                    .somaOrbTap { opened += 1 }
-                Text(verbatim: "Opened \(opened)")
-            }
-            .padding()
+    private func tap() {
+        taps &+= 1
+        guard !reduceMotion else {
+            action()
+            return
+        }
+        // The theme's press in and its emphasized spring out: the squeeze
+        // lands like any control under a finger, and the overshoot on the
+        // way back is the orb springing rather than a button releasing.
+        withAnimation(theme.motion.press) { squeeze = true }
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(140))
+            withAnimation(theme.motion.emphasized) { squeeze = false }
+            try? await Task.sleep(for: .milliseconds(160))
+            action()
         }
     }
-    return Demo()
 }

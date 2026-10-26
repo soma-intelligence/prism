@@ -60,6 +60,12 @@ final class AppRouter {
     /// silently drops a value of any other type.
     var longevityPath = NavigationPath()
 
+    /// What Track has pushed, held here rather than by the stack itself so a
+    /// page stays open through a change of width (a foldable opening or
+    /// closing, an iPad window resized, the sidebar giving way to the tab
+    /// bar), as `pulsePath` is. Typed paths would drop the journey's routes.
+    var trackPath = NavigationPath()
+
     init(selection: String = "pulse") {
         self.selection = selection
 #if DEBUG
@@ -68,5 +74,27 @@ final class AppRouter {
             self.selection = tab
         }
 #endif
+    }
+}
+
+/// One ``AppRouter`` per window.
+///
+/// Held by the window's root view rather than by the app, so that two windows
+/// of Soma side by side (a Split View of the app with itself, or two windows on
+/// a Mac or an iPad) each keep their own tab and their own pages. Resizing a
+/// window, or a foldable opening and closing, keeps the same root view, so the
+/// router and every stack it holds survive the change.
+private struct WindowRouter: ViewModifier {
+    @State private var router = AppRouter()
+
+    func body(content: Content) -> some View {
+        content.environment(router)
+    }
+}
+
+extension View {
+    /// Gives this window its own ``AppRouter``.
+    func windowRouter() -> some View {
+        modifier(WindowRouter())
     }
 }

@@ -35,8 +35,8 @@ struct TrackCameraScanIntro: View {
         let colors = theme.colors
 
         TrackEntryPage(title: "Camera scan") {
-            VStack(alignment: .leading, spacing: metrics.leadSpacing * 0.6) {
-                VStack(alignment: .leading, spacing: metrics.cardSpacing * 0.75) {
+            VStack(alignment: .leading, spacing: metrics.spaceM) {
+                VStack(alignment: .leading, spacing: metrics.spaceS) {
                     TrackEyebrow("Before you start")
                     Text("Thirty still seconds")
                         .somaFont(type.headline)
@@ -69,9 +69,9 @@ struct TrackCameraScanIntro: View {
                     .foregroundStyle(colors.inkSecondary.color)
                     .fixedSize(horizontal: false, vertical: true)
 
-                VStack(alignment: .leading, spacing: metrics.cardSpacing * 0.75) {
+                VStack(alignment: .leading, spacing: metrics.spaceS) {
                     TrackEyebrow("How long")
-                    HStack(spacing: metrics.cardSpacing * 0.75) {
+                    HStack(spacing: metrics.spaceS) {
                         option(.quick, title: "Quick", value: "20 seconds", detail: "Pulse only")
                         option(.complete, title: "Complete", value: "60 seconds", detail: "Pulse, HRV, breathing and skin")
                     }
@@ -87,7 +87,7 @@ struct TrackCameraScanIntro: View {
                 }
             }
         } footer: {
-            VStack(spacing: metrics.cardSpacing * 0.75) {
+            VStack(spacing: metrics.spaceS) {
                 SomaActionButton("Start the scan") {}
                     .disabled(true)
                 Text("The camera scan itself is not in this build yet.")
@@ -106,7 +106,7 @@ struct TrackCameraScanIntro: View {
         return Button {
             length = option
         } label: {
-            VStack(alignment: .leading, spacing: metrics.scoreLabelSpacing * 2) {
+            VStack(alignment: .leading, spacing: metrics.spaceXS) {
                 HStack {
                     Text(title)
                         .somaFont(type.body)

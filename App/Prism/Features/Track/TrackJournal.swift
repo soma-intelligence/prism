@@ -209,16 +209,16 @@ enum TrackJournal {
         if !low.isEmpty {
             let agreed = low.filter(\.agrees).count
             return agreed == low.count
-                ? "When you felt low, your body agreed every time."
-                : "When you felt low, your body agreed on \(agreed) of \(low.count) days."
+                ? "On every low day, your HRV was under your usual too."
+                : "On \(agreed) of \(low.count) low days, your HRV was under your usual too."
         }
         if !good.isEmpty {
             let agreed = good.filter(\.agrees).count
             return agreed == good.count
-                ? "When you felt good, your body agreed every time."
-                : "When you felt good, your body agreed on \(agreed) of \(good.count) days."
+                ? "On every good day, your HRV was at or above your usual too."
+                : "On \(agreed) of \(good.count) good days, your HRV was at or above your usual too."
         }
-        return "Neutral days agree when the body sits near its usual."
+        return "A neutral day matches when your HRV sits near your usual."
     }
 
     /// The line under the feeling bar: what the body said on the same day.
@@ -230,20 +230,20 @@ enum TrackJournal {
         points: [TrackFeelPoint]
     ) -> (lead: String, rest: String?) {
         guard let feeling else {
-            return ("Tap how the day felt.", "Soma sets it beside what your body measured.")
+            return ("Tap how the day felt.", "Soma sets it beside your HRV for the same day.")
         }
         guard let value = body.dayVariability[day], let usual = body.usualVariability else {
-            return ("Nothing from your body for this day yet.",
-                    "Heart rate variability from your watch fills this in.")
+            return ("No HRV recorded for this day yet.",
+                    "Your Apple Watch records it overnight.")
         }
         let deviation = value - usual
         let reading = "HRV is \(TrackFormat.whole(value)) ms, \(TrackFormat.whole(abs(deviation))) \(deviation < 0 ? "below" : "above") your usual."
         let parted = points.filter { !$0.agrees }.count
         if agrees(feeling: feeling, deviation: deviation, usual: usual) {
-            return ("Your body agrees: \(reading)",
+            return ("Matches how you felt. \(reading)",
                     "On \(points.count - parted) of the last \(points.count) days the two matched.")
         }
-        return ("Your body reads it differently: \(reading)",
+        return ("Differs from how you felt. \(reading)",
                 "On \(parted) of the last \(points.count) days the two parted like this.")
     }
 }

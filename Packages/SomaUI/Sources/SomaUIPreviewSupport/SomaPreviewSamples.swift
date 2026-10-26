@@ -204,6 +204,16 @@ public enum SomaPreviewSamples {
             ("record", theme.colors.record.color),
         ]
     }
+
+    /// Last night for the night pass: bed, waking, time asleep, the usual,
+    /// and where the night and the usual one sit on the pass's track.
+    public static let nightBed = "11:04 PM"
+    public static let nightWoke = "6:52 AM"
+    public static let nightAsleep = "7:21"
+    public static let nightUsual = "Usual 7:05"
+    public static let nightSpan = 0.22...0.75
+    public static let nightUsualSpan = 0.22...0.71
+    public static let nightMidnight = 0.29
 }
 
 // MARK: - Vault
@@ -225,5 +235,16 @@ public extension SomaPreviewSamples {
         VaultCategory(title: "Respiratory", symbol: "lungs", caption: "6 measures", aspect: .heart),
         VaultCategory(title: "Sleep", symbol: "bed.double", caption: "4 measures", aspect: .sleep),
         VaultCategory(title: "Hearing", symbol: "ear", caption: "5 measures", aspect: nil),
+    ]
+}
+
+public extension SomaPreviewSamples {
+    /// Today's three scores with their usual and their week: a good night,
+    /// a middling mind, a fair day. Every ``SomaScoresStyle`` in the gallery
+    /// draws these.
+    static let todayScores: [SomaRingScore] = [
+        SomaRingScore(aspect: .sleep, value: 87, trend: .up, usual: 78, week: [72, 80, 76, nil, 83, 79, 87]),
+        SomaRingScore(aspect: .mind, value: 41, trend: .down, usual: 58, week: [61, 55, 64, 52, 47, 50, 41]),
+        SomaRingScore(aspect: .activity, value: 68, trend: .up, usual: 52, week: [52, 38, 61, 44, 30, 47, 68]),
     ]
 }

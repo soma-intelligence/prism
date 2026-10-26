@@ -85,7 +85,7 @@ struct PulseExploreView: View {
             NewsReader(item: item)
                 .zoomDestination(item.id)
         }
-        .refreshable { await refresh() }
+        .somaRefreshable { await refresh() }
         // Kept alive beside Today and Trends: what is cached plans the cards
         // at once, and the network (the library, the news, the covers) waits
         // until Explore is the part on screen.
@@ -138,6 +138,14 @@ struct PulseExploreView: View {
         let latest = news.items
         if !latest.isEmpty {
             ExploreNewsRail(items: latest)
+        } else if news.isWaiting {
+            ReadingNewsRail()
+        } else if news.phase == .failed {
+            StateNote(symbol: "wifi.slash", title: "The news didn't load",
+                      message: "somalabs.me could not be reached. The reads here work offline; the news comes back with a connection.",
+                      actionTitle: "Try again") {
+                Task { await news.refresh() }
+            }
         }
 
         if !plan.saved.isEmpty {

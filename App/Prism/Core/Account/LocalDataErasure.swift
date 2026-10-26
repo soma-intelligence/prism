@@ -28,7 +28,6 @@ enum LocalDataErasure {
         sleepPlaces.erase()
         nights.erase()
         rituals.erase()
-        MindCalendarDayCache.clear()
     }
 
     /// "Erase data on this iPhone", for local mode, where there is no account

@@ -33,6 +33,9 @@ final class SettingsNavigationUITests: XCTestCase {
         app.launchArguments += ["-health.empty", "YES"]
         // Past the first run, which otherwise stands in for the tabs.
         app.launchArguments += ["-onboarding.completed", "YES"]
+        // No automatic check-in. In the morning and evening windows it rises
+        // shortly after launch, and the Profile tap only dismisses it.
+        app.launchArguments += ["-checkin.quiet", "YES"]
         app.launch()
 
         let profile = app.buttons["Profile"].firstMatch
@@ -51,7 +54,7 @@ final class SettingsNavigationUITests: XCTestCase {
         pop(in: app)
 
         // A page that never carried a stack, pushed after all of the above.
-        push("Appearance", expecting: "How Soma looks", in: app)
+        push("Appearance", expecting: "Dark", in: app)
         XCTAssertEqual(app.state, .runningForeground)
     }
 
@@ -75,7 +78,9 @@ final class SettingsNavigationUITests: XCTestCase {
     /// Goes back one page with the bar's own back button.
     @MainActor
     private func pop(in app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
-        let back = app.navigationBars.buttons["Back"].firstMatch
+        // The system back button is identified as "BackButton"; its label is
+        // the previous page's title, not "Back".
+        let back = app.navigationBars.buttons["BackButton"].firstMatch
         XCTAssertTrue(back.waitForExistence(timeout: 5), "No way back", file: file, line: line)
         back.tap()
     }

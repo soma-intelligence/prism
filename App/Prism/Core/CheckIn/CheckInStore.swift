@@ -63,6 +63,11 @@ final class CheckInStore {
         save()
     }
 
+    /// The start of the latest kept day `id` was answered or skipped on.
+    func lastSettled(_ id: String) -> Date? {
+        days.filter { $0.value.isSettled(id) }.keys.sorted().last.flatMap(date(from:))
+    }
+
     /// Notes the first launch. Returns whether this was it.
     @discardableResult
     func noteLaunch() -> Bool {
@@ -75,6 +80,12 @@ final class CheckInStore {
     func stamp(_ date: Date) -> String {
         let parts = calendar.dateComponents([.year, .month, .day], from: date)
         return String(format: "%04d-%02d-%02d", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0)
+    }
+
+    private func date(from stamp: String) -> Date? {
+        let parts = stamp.split(separator: "-").compactMap { Int($0) }
+        guard parts.count == 3 else { return nil }
+        return calendar.date(from: DateComponents(year: parts[0], month: parts[1], day: parts[2]))
     }
 
     private func prune() {

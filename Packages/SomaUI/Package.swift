@@ -26,9 +26,12 @@ let package = Package(
     targets: [
         .target(
             name: "SomaUI",
-            // The muscle figure rendered from Z-Anatomy (CC BY-SA 4.0), with
-            // its notice, copied as is so every platform reads the same files.
-            resources: [.copy("Resources/MuscleFigure")]
+            // The vendored muscle art's licence travels with its source, not in the bundle.
+            exclude: ["Components/Readings/MuscleArt/LICENSE-MuscleMap.txt"],
+            // The tactile objects and the photographs (`SomaImagery`), and the
+            // muscle figure rendered from Z-Anatomy (CC BY-SA 4.0) with its
+            // notice, copied as is so every platform reads the same files.
+            resources: [.process("Resources/Imagery.xcassets"), .copy("Resources/MuscleFigure")]
         ),
         .target(name: "SomaUIPreviewSupport", dependencies: ["SomaUI"]),
         .testTarget(name: "SomaUITests", dependencies: ["SomaUI"]),

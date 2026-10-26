@@ -36,10 +36,9 @@ public struct SomaReadout: View {
         var small = theme.typography.body
         small.size = metrics.readoutUnitSize
 
-        return VStack(spacing: metrics.scoreLabelSpacing * 2) {
+        return VStack(spacing: metrics.spaceXS) {
             HStack(alignment: .firstTextBaseline, spacing: metrics.readoutUnitGap) {
-                Text(value ?? "-")
-                    .somaFont(number)
+                SomaNumber(value, number)
                     .foregroundStyle(colors.inkPrimary.color)
                     .contentTransition(.numericText())
                 if let unit, !unit.isEmpty {
@@ -61,7 +60,8 @@ public struct SomaReadout: View {
     }
 }
 
-/// The white disc a finger drags along a track.
+/// The small white disc a finger drags along a track: crisp, with a hairline
+/// edge and a short, soft shadow, the way the system's slider thumb sits.
 public struct SomaKnob: View {
     @Environment(\.somaTheme) private var theme
 
@@ -69,11 +69,12 @@ public struct SomaKnob: View {
 
     public var body: some View {
         let metrics = theme.metrics
+        let ink = theme.colors.inkPrimary.color
         Circle()
             .fill(theme.colors.onOrb.color)
             .frame(width: metrics.knobDiameter, height: metrics.knobDiameter)
-            .overlay(Circle().strokeBorder(theme.colors.canvas.color, lineWidth: metrics.knobRingWidth))
-            .shadow(color: theme.colors.canvas.color.opacity(0.4), radius: metrics.knobRingWidth)
+            .overlay(Circle().strokeBorder(ink.opacity(metrics.hairlineOpacity), lineWidth: metrics.inputHairline * 0.5))
+            .shadow(color: .black.opacity(0.18), radius: metrics.knobRingWidth, y: metrics.knobRingWidth * 0.5)
             .accessibilityHidden(true)
     }
 }

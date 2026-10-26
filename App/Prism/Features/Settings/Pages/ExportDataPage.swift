@@ -18,6 +18,7 @@ import UniformTypeIdentifiers
 /// are signed in.
 struct ExportDataPage: View {
     @Environment(\.somaTheme) private var theme
+    @Environment(HealthDashboard.self) private var health
 
     @State private var account = AccountSession.shared
     @State private var alsoUpload = false
@@ -136,7 +137,7 @@ struct ExportDataPage: View {
     private func run() async {
         phase = .working
         do {
-            let result = try await DataExport.run(upload: alsoUpload && account.isSignedIn)
+            let result = try await DataExport.run(upload: alsoUpload && account.isSignedIn, scores: health.scores)
             phase = .ready(file: result.file, uploaded: result.uploadedPath != nil)
             present(result.file)
         } catch {
@@ -191,4 +192,5 @@ private struct ActivitySheet: UIViewControllerRepresentable {
 
 #Preview("Export") {
     NavigationStack { ExportDataPage() }
+        .environment(HealthDashboard())
 }

@@ -33,9 +33,8 @@ struct LocalDataErasureTests {
         let ritualsURL = folder.appending(path: "rituals.json")
 
         // Something in each file.
-        let snapshot = LongevitySnapshotStore(url: snapshotURL, owner: { "device" })
-        snapshot.save(mind: .preview, at: day)
-        await snapshot.settle()
+        let snapshot = LongevitySnapshotStore(url: snapshotURL)
+        try snapshot.write(Data("{}".utf8))
 
         let nights = SleepPlaceStore(url: nightsURL, calendar: calendar)
         let home = SleepPlaceStore.Place(name: "Home", latitude: 37.4443, longitude: -122.1598)
@@ -60,7 +59,6 @@ struct LocalDataErasureTests {
         #expect(!finder.visits.isEmpty && !finder.decisions.isEmpty)
 
         LocalDataErasure.run(snapshot: snapshot, sleepPlaces: finder, nights: nights, rituals: rituals)
-        await snapshot.settle()
 
         // Files gone.
         #expect(!exists(snapshotURL))
@@ -69,7 +67,6 @@ struct LocalDataErasureTests {
         #expect(!exists(ritualsURL))
 
         // Memory reset, so nothing is written back.
-        #expect(snapshot.mind == nil)
         #expect(finder.visits.isEmpty && finder.found.isEmpty && finder.decisions.isEmpty && finder.places.isEmpty)
         #expect(nights.nights.isEmpty && nights.detected.isEmpty && nights.weatherCity == nil)
         #expect(nights.bedroom == SleepPlaceStore.Bedroom())
@@ -81,7 +78,7 @@ struct LocalDataErasureTests {
         // A relaunch reads nothing back.
         #expect(SleepPlaceFinder(url: visitsURL, manual: SleepPlaceStore(url: nightsURL, calendar: calendar), calendar: calendar).visits.isEmpty)
         #expect(TrackRitualStore(url: ritualsURL, calendar: calendar).done.isEmpty)
-        #expect(LongevitySnapshotStore(url: snapshotURL, owner: { "device" }).mind == nil)
+        #expect(!FileManager.default.fileExists(atPath: snapshotURL.path))
     }
 
     @Test("Erase data on this iPhone: the Journal, Track logs, moods and Explore reads go too, files and memory")
@@ -109,7 +106,7 @@ struct LocalDataErasureTests {
 
         LocalDataErasure.runOnDevice(
             journal: journal,
-            snapshot: LongevitySnapshotStore(url: nil, owner: { "device" }),
+            snapshot: LongevitySnapshotStore(url: folder.appending(path: "longevity-snapshot.json")),
             sleepPlaces: SleepPlaceFinder(url: nil, manual: SleepPlaceStore(url: nil, calendar: calendar), calendar: calendar),
             nights: SleepPlaceStore(url: nil, calendar: calendar),
             rituals: TrackRitualStore(url: nil, calendar: calendar),

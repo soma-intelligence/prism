@@ -11,7 +11,7 @@ public enum SomaTrend: Sendable, Equatable, Codable {
     case down
 }
 
-/// One value in a row of scores: a label in small capitals over a large light
+/// One value in a row of scores: a small label over a large light
 /// number, with a mark when it rose or fell.
 public struct SomaScore: Identifiable, Sendable {
     public var id: SomaAspect { aspect }
@@ -99,11 +99,20 @@ public struct SomaScoreRow: View {
 private struct SomaScoreView: View {
     let score: SomaScore
 
+    @Environment(\.somaTheme) private var theme
+
     var body: some View {
-        SomaStatView(
-            label: score.aspect.title, value: score.value, unit: score.unit, trend: score.trend,
-            cue: score.cue, cueTone: score.cueTone
-        )
+        // The aspect's glyph in its category ink says what the number is
+        // before the label is read, the way Health leads a reading with its
+        // category. The label stays, so the glyph is hidden from VoiceOver.
+        VStack(spacing: theme.metrics.cardHeaderSpacing * 2) {
+            SomaGlyph(aspect: score.aspect, size: .inline, tinted: true)
+                .accessibilityHidden(true)
+            SomaStatView(
+                label: score.aspect.title, value: score.value, unit: score.unit, trend: score.trend,
+                cue: score.cue, cueTone: score.cueTone
+            )
+        }
     }
 }
 

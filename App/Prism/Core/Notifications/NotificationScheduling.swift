@@ -63,6 +63,7 @@ nonisolated struct SystemNotificationScheduler: NotificationScheduling {
         content.body = notification.body
         content.sound = .default
         content.threadIdentifier = notification.kind.rawValue
+        if notification.kind == .dose { content.categoryIdentifier = MedicationReminders.categoryIdentifier }
         if let link = notification.link {
             content.userInfo = [SomaDeepLink.userInfoKey: link.url.absoluteString]
         }
@@ -75,6 +76,9 @@ nonisolated struct SystemNotificationScheduler: NotificationScheduling {
             )
         case .at(let date):
             UNTimeIntervalNotificationTrigger(timeInterval: max(date.timeIntervalSinceNow, 1), repeats: false)
+        case .wallClock(let parts):
+            // No time zone in the components: the phone's own, wherever it is.
+            UNCalendarNotificationTrigger(dateMatching: parts, repeats: false)
         }
         try await center.add(UNNotificationRequest(identifier: notification.id, content: content, trigger: trigger))
     }

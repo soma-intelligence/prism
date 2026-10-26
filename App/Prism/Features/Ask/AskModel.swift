@@ -159,10 +159,10 @@ enum Ask {
         switch facts.variabilityTrend {
         case .down:
             lead = "Your HRV is \(hrv) ms, below your usual."
-            rest = "That usually means your nervous system is still working something off: a short night, a late meal, a hard day." + restingLine
+            rest = "A short night, a late meal, alcohol or hard training the day before can each lower it. Your Journal shows which of those you logged." + restingLine
         case .up:
             lead = "Your HRV is \(hrv) ms, above your usual."
-            rest = "Your nervous system is well recovered today." + restingLine
+            rest = "Higher than usual tends to follow full nights and easy days." + restingLine
         case nil:
             lead = "Your HRV is \(hrv) ms, close to your usual."
             rest = "Nothing stands out today." + restingLine
@@ -236,8 +236,8 @@ enum Ask {
             .compactMap { $0 }
             .formatted(.list(type: .and))
         return AskAnswer(
-            lead: "Your body looks ready for a hard session.",
-            rest: "\(readings.prefix(1).uppercased())\(readings.dropFirst()) sit at or above your usual. Tonight decides it, so check again in the morning.",
+            lead: "Your readings support a hard session.",
+            rest: "\(readings.prefix(1).uppercased())\(readings.dropFirst()) sit at or above your usual. Ask again tomorrow morning, after tonight\u{2019}s sleep.",
             signals: sources.count, sources: sources, move: nil, followUps: followUps, isModelMissing: false
         )
     }

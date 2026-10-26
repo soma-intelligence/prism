@@ -65,3 +65,9 @@ public extension SomaMetrics {
     /// sit in from the tile's corners.
     var mapChipInset: CGFloat { 10 }
 }
+
+/// Sizes other components still read, kept from the parallel design lines.
+public extension SomaMetrics {
+    /// The sun's path from horizon to the top of its arc, labels apart.
+    var environmentSunPathHeight: CGFloat { 74 }
+}

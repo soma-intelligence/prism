@@ -103,7 +103,7 @@ enum BodyCatalog {
             "HKQuantityTypeIdentifierEnvironmentalAudioExposure",
             "HKQuantityTypeIdentifierHeadphoneAudioExposure",
             "HKQuantityTypeIdentifierEnvironmentalSoundReduction",
-            "HKCategoryTypeIdentifierEnvironmentalAudioExposureEvent",
+            "HKCategoryTypeIdentifierAudioExposureEvent",
             "HKCategoryTypeIdentifierHeadphoneAudioExposureEvent",
         ]),
         BodyCategory("Heart", symbol: "heart.fill", [

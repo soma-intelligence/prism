@@ -7,11 +7,11 @@ import Foundation
 
 /// The weather and air the sun and skin tools read.
 ///
-/// The app has no weather source yet: there is no WeatherKit entitlement and no
-/// location permission, so ``ToolWeather/current`` is nil and Sun Budget and
-/// Skin Forecast show their dashes and say what fills them. When a source
-/// lands (the one the Pulse scores use), it fills this value and both pages
-/// light up with no other change.
+/// The same read as the Environment lens: Open-Meteo for the place
+/// ``EnvironmentLocation`` knows (``EnvironmentWeatherClient``), taken by
+/// ``ToolsModel`` when the tools load. Without a place, or when the services
+/// do not answer, ``ToolWeather/current`` is nil and Sun Budget and Skin
+/// Forecast show their dashes and say what fills them.
 nonisolated struct ToolWeather: Sendable, Equatable {
     var place: String
     var latitude: Double
@@ -25,6 +25,26 @@ nonisolated struct ToolWeather: Sendable, Equatable {
     var humidityPercent: Double?
     var windKph: Double?
 
-    /// Nothing reads the weather yet.
-    static let current: ToolWeather? = nil
+    /// The last read, nil until a place and its weather are known.
+    @MainActor static var current: ToolWeather? { ToolsModel.shared.weather }
+}
+
+nonisolated extension ToolWeather {
+    /// Today's weather at a place, from the Environment lens's read: the UV
+    /// now and the day's highest, the air, the heat and the wind. Open-Meteo
+    /// gives no hourly UV here, so the sun tools draw the day from its peak.
+    init(place: String, latitude: Double, longitude: Double, conditions: EnvironmentConditions) {
+        self.init(
+            place: place,
+            latitude: latitude,
+            longitude: longitude,
+            uvNow: conditions.uv,
+            hourlyUV: [],
+            uvPeak: conditions.uvDays.last ?? nil,
+            aqi: conditions.aqi.map { Int($0.rounded()) },
+            temperatureC: conditions.temperature,
+            humidityPercent: conditions.humidity,
+            windKph: conditions.wind
+        )
+    }
 }

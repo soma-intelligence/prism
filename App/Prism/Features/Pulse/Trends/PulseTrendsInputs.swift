@@ -59,8 +59,8 @@ extension PulseTrendsInputs {
 
         async let sleep = samples(PulseInputs.Metric.sleep, from: yearAgo)
         async let variability = samples(PulseInputs.Metric.heartRateVariability, from: sixtyAgo)
-        async let steps = dailyTotals(PulseInputs.Metric.steps, from: lastMonth, now: now, source: source, calendar: calendar)
-        async let exercise = dailyTotals(PulseInputs.Metric.exercise, from: exerciseFrom, now: now, source: source, calendar: calendar)
+        async let steps = HealthDailyTotals.read(PulseInputs.Metric.steps, from: lastMonth, now: now, source: source, calendar: calendar)
+        async let exercise = HealthDailyTotals.read(PulseInputs.Metric.exercise, from: exerciseFrom, now: now, source: source, calendar: calendar)
 
         return PulseTrendsInputs(
             now: now,
@@ -69,46 +69,5 @@ extension PulseTrendsInputs {
             stepsByDay: await steps,
             exerciseByDay: await exercise
         )
-    }
-
-    /// One total per day from `start` to today, at most a handful in flight.
-    static func dailyTotals(
-        _ identifier: String,
-        from start: Date,
-        now: Date,
-        source: any HealthSampleSource,
-        calendar: Calendar
-    ) async -> [Date: Double] {
-        guard let metric = HealthMetricCatalog.metric(for: identifier) else { return [:] }
-        var days: [Date] = []
-        var day = calendar.startOfDay(for: start)
-        while day <= now {
-            days.append(day)
-            guard let next = calendar.date(byAdding: .day, value: 1, to: day) else { break }
-            day = next
-        }
-
-        let inFlight = 12
-        return await withTaskGroup(of: (Date, Double?).self) { group in
-            var result: [Date: Double] = [:]
-            var pending = days.makeIterator()
-
-            func add(_ day: Date) {
-                let end = min(calendar.date(byAdding: .day, value: 1, to: day) ?? now, now)
-                group.addTask {
-                    (day, (try? await source.total(metric, from: day, to: end))?.value)
-                }
-            }
-
-            for _ in 0..<inFlight {
-                guard let next = pending.next() else { break }
-                add(next)
-            }
-            for await (day, value) in group {
-                if let value { result[day] = value }
-                if let next = pending.next() { add(next) }
-            }
-            return result
-        }
     }
 }

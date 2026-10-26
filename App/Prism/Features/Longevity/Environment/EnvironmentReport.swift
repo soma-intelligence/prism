@@ -50,6 +50,10 @@ struct EnvironmentReport: Equatable, Codable {
     /// The weather where you are, set by the lens once it is read; nil
     /// until then, or when the service could not be reached.
     var outside: EnvironmentConditions?
+    /// The last seven days, from Health alone; the lens lays the weather
+    /// in with ``EnvironmentWeek/laying(_:)``. Nil in a report saved by an
+    /// older build.
+    var week: EnvironmentWeek?
 
     /// The line under the Around you card's value.
     var summary: String
@@ -139,7 +143,7 @@ struct EnvironmentReport: Equatable, Codable {
         }
         let reason: String
         if sentences.isEmpty {
-            reason = "Your Apple Watch records time in daylight and the sound around you. Air quality, UV and the weather need a weather source Soma does not have yet."
+            reason = "Your Apple Watch records time in daylight and the sound around you. Air quality, UV and the weather are read for where you are, once Soma knows the place."
         } else {
             reason = sentences.joined(separator: " ")
         }
@@ -181,6 +185,7 @@ struct EnvironmentReport: Equatable, Codable {
             soundDays: byDay(inputs.sound) { PulseTrends.mean($0) },
             headphoneDays: byDay(inputs.headphones) { PulseTrends.mean($0) },
             today: today,
+            week: EnvironmentWeek.make(inputs: [inputs], now: inputs.now, calendar: calendar),
             summary: summary,
             suggestionTitle: isLow && more > 0 ? "\(spelled(more)) minutes outside" : "Time outside",
             suggestionDetail: "Days with more daylight tend to end in easier sleep. Your watch counts every minute.",

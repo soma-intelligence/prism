@@ -155,7 +155,7 @@ nonisolated struct ToolsInputs: Sendable, Equatable {
         async let birth = latest(Metric.dateOfBirth)
 
         let stages = await sleep.compactMap {
-            ScoringSleepSample(code: Int($0.value), start: $0.start, end: $0.end, source: $0.source)
+            ScoringSleepSample(code: $0.code, start: $0.start, end: $0.end, source: $0.source)
         }
         return ToolsInputs(
             now: now,

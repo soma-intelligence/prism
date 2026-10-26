@@ -147,7 +147,7 @@ struct HomeNightStages: Equatable, Sendable {
         var segments: [Segment] = []
         var totals: [Stage: TimeInterval] = [:]
         for stage in Stage.allCases {
-            let spans = PulseNights.merged(samples.filter { Int($0.value) == stage.rawValue })
+            let spans = PulseNights.merged(samples.filter { $0.code == stage.rawValue })
                 .compactMap { span -> Range<Date>? in
                     let start = max(span.lowerBound, window.lowerBound)
                     let end = min(span.upperBound, window.upperBound)
@@ -189,7 +189,7 @@ enum HomeStandHour: Equatable, Sendable {
         var idle = Set<Int>()
         for sample in samples where calendar.startOfDay(for: sample.start) == today {
             let hour = calendar.component(.hour, from: sample.start)
-            if Int(sample.value) == 0 { stood.insert(hour) } else { idle.insert(hour) }
+            if sample.code == 0 { stood.insert(hour) } else { idle.insert(hour) }
         }
         return (0..<24).map { hour in
             if stood.contains(hour) { return .stood }

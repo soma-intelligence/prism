@@ -60,7 +60,7 @@ struct CardiometabolicRiskPage: View {
             lever
             LabFootnote("PREVENT (AHA, 2023). Wellness estimate, not a diagnosis.")
         }
-        .navigationTitle("Cardiometabolic Risk")
+        .labPageTitle(Text("Cardiometabolic Risk"))
         .task(id: panels.panels) { await load() }
         .onChange(of: profile.profile) { compute() }
         .sheet(isPresented: $isAdding) { AddBloodTestSheet() }
@@ -144,7 +144,7 @@ struct CardiometabolicRiskPage: View {
                 title: driver.label,
                 detail: "Bringing it to its optimum takes \(LabMath.format(driver.deltaPercent, decimals: 1) ?? "-") points off the ten year risk."
             ) {
-                SomaOrb(aspect: .heart, scale: .mini)
+                SomaObjectIcon(aspect: .heart, size: .row)
             }
         } else if let enhancer = report?.enhancers.filter({ $0.tier != .optimal }).max(by: { $0.tier < $1.tier }) {
             SomaActionCard(
@@ -154,7 +154,7 @@ struct CardiometabolicRiskPage: View {
                 actionTitle: "Add",
                 action: { isAdding = true }
             ) {
-                SomaOrb(aspect: .heart, scale: .mini)
+                SomaObjectIcon(aspect: .heart, size: .row)
             }
         }
     }

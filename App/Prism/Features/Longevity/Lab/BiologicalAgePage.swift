@@ -52,11 +52,11 @@ struct BiologicalAgePage: View {
                 actionTitle: "Add",
                 action: { isAdding = true }
             ) {
-                SomaOrb(aspect: .body, scale: .mini)
+                SomaObjectIcon(aspect: .body, size: .row)
             }
             LabFootnote("Wellness estimate, not a diagnosis.")
         }
-        .navigationTitle("Biological Age")
+        .labPageTitle(Text("Biological Age"))
         .task(id: panels.panels) { await load() }
         .sheet(isPresented: $isAdding) { AddBloodTestSheet() }
         .sheet(isPresented: $isShowingConfidence) { ConfidenceSheet(result: result, person: person) }
@@ -93,7 +93,11 @@ struct BiologicalAgePage: View {
         let read = await LabReads.bioAgeInputs(from: source, person: person, panel: panels.latest,
                                                panels: panels.panels.count, now: now, calendar: .current)
         if person.age == nil { person.age = read.daily.ageYears.map { Int($0) } }
-        result = read.inputs.flatMap(BiologicalAge.compute)
+        var inputs = read.inputs
+        // A lab VO2 max under a year old replaces the watch's estimate.
+        inputs?.labVO2 = FunctionalResultStore.shared.labVO2
+        inputs?.asOf = now
+        result = inputs.flatMap(BiologicalAge.compute)
         if let panel = panels.latest, let age = person.age, let sex = person.sex {
             blood = BloodAgeReading.make(panel: panel, chronologicalAge: Double(age), sex: sex)
         } else {

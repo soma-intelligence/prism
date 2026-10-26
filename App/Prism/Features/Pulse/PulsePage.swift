@@ -5,6 +5,7 @@
 
 import SwiftUI
 import SomaUI
+import SomaWidgetKit
 
 /// The parts of the Pulse tab.
 enum PulseSection: PageSection {

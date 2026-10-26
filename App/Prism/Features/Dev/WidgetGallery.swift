@@ -63,7 +63,6 @@ struct WidgetGallery: View {
     private func title(_ text: String) -> some View {
         Text(text)
             .somaFont(theme.typography.eyebrow)
-            .textCase(.uppercase)
             .foregroundStyle(theme.colors.inkSecondary.color)
     }
 

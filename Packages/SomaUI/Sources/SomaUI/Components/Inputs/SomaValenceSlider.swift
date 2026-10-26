@@ -7,8 +7,9 @@ import SwiftUI
 
 /// Seven stops from very unpleasant to very pleasant, with a thumb to drag.
 ///
-/// The track carries the whole mood scale as a gradient, cool to warm, and
-/// the thumb holds a dot of the colour under it. The thumb follows the finger
+/// A thin track carries the whole mood scale as a quiet gradient, cool to
+/// warm, with a fine tick under it at each stop, and the white thumb holds a
+/// small dot of the colour under it. The thumb follows the finger
 /// and settles on the nearest stop when it lifts; the word for the stop it is
 /// on sits under the track and changes as it moves. Before a feeling is
 /// chosen the track is dimmed and the thumb rests at neutral.
@@ -67,7 +68,7 @@ public struct SomaValenceSlider: View {
                     .minimumScaleFactor(0.8)
                     .contentTransition(reduceMotion ? .identity : .opacity)
                     .animation(reduceMotion ? nil : theme.motion.selection, value: line)
-                    .padding(.top, metrics.cardSpacing * 0.5)
+                    .padding(.top, metrics.spaceS)
                     .accessibilityHidden(true)
             }
         }
@@ -105,15 +106,17 @@ public struct SomaValenceSlider: View {
             ZStack(alignment: .topLeading) {
                 Capsule()
                     .fill(LinearGradient(gradient: SomaMoodScale.gradient(theme: theme), startPoint: .leading, endPoint: .trailing))
-                    .frame(width: width, height: metrics.valenceTrackHeight)
-                    .opacity(value == nil ? metrics.valenceUnsetOpacity : 1)
+                    .frame(width: run, height: metrics.valenceTrackHeight)
+                    .opacity(value == nil ? metrics.valenceUnsetOpacity : metrics.valenceTrackOpacity)
                     .position(x: width / 2, y: y)
 
+                // A fine tick under the track at each stop, in ink.
                 ForEach(0..<stops, id: \.self) { stop in
-                    Circle()
-                        .fill(colors.onOrb.color.opacity(0.7))
-                        .frame(width: metrics.valenceStopDiameter, height: metrics.valenceStopDiameter)
-                        .position(x: inset + run * SomaMoodScale.share(stop, stops: stops), y: y)
+                    Capsule()
+                        .fill(colors.inkPrimary.color.opacity(metrics.inputTickFaint))
+                        .frame(width: metrics.inputHairline, height: metrics.valenceStopDiameter)
+                        .position(x: inset + run * SomaMoodScale.share(stop, stops: stops),
+                                  y: y + thumb / 2 + metrics.spaceXS)
                 }
 
                 Circle()
@@ -126,10 +129,10 @@ public struct SomaValenceSlider: View {
                             .opacity(value == nil ? 0 : 1)
                     }
                     .overlay {
-                        Circle().strokeBorder(colors.inkPrimary.color.opacity(isDark ? 0 : metrics.hairlineOpacity), lineWidth: 1)
+                        Circle().strokeBorder(colors.inkPrimary.color.opacity(metrics.hairlineOpacity), lineWidth: metrics.inputHairline * 0.5)
                     }
-                    .shadow(color: .black.opacity(isDark ? 0.4 : 0.16), radius: thumb * 0.18, y: thumb * 0.06)
-                    .scaleEffect(dragShare == nil ? 1 : 1.08)
+                    .shadow(color: .black.opacity(isDark ? 0.35 : 0.14), radius: metrics.knobRingWidth * 1.5, y: metrics.knobRingWidth * 0.5)
+                    .scaleEffect(dragShare == nil ? 1 : 1.06)
                     .position(x: inset + run * share, y: y)
                     .animation(reduceMotion || dragShare != nil ? nil : theme.motion.selection, value: share)
             }

@@ -57,6 +57,19 @@ struct HomeMedicalCard: Codable, Equatable, Sendable {
     var contactPhone = ""
 
     var isEmpty: Bool { self == HomeMedicalCard() }
+
+    /// The free text lists as they read before moving into the medical
+    /// record (`MedicalRecord.migrate(from:)`), one labelled line each, so
+    /// the move keeps every word. Nil when all three are empty.
+    var recordNote: String? {
+        let lines = [
+            ("Allergies", allergies), ("Medications", medications), ("Conditions", conditions),
+        ].compactMap { label, text -> String? in
+            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? nil : "\(label): \(trimmed)"
+        }
+        return lines.isEmpty ? nil : lines.joined(separator: "\n")
+    }
 }
 
 /// What the Pulse home keeps that no other tab logs: check-ins, workout

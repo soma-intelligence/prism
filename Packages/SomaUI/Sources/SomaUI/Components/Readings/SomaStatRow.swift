@@ -10,7 +10,7 @@ import SwiftUI
 /// rather than by an aspect: fitness age, lean mass, HRV.
 public struct SomaStat: Identifiable, Sendable {
     public var id: String { label.key }
-    /// Set in small capitals over the number.
+    /// Set small over the number.
     public var label: LocalizedStringResource
     /// The number as it should read, or nil for a dash: not measured is not
     /// zero.
@@ -87,6 +87,7 @@ struct SomaStatView: View {
     var cueTone: SomaCueTone = .neutral
 
     @Environment(\.somaTheme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         let metrics = theme.metrics
@@ -96,17 +97,19 @@ struct SomaStatView: View {
         VStack(spacing: metrics.scoreLabelSpacing) {
             Text(label)
                 .somaFont(type.eyebrow)
-                .textCase(.uppercase)
                 .foregroundStyle(colors.inkSecondary.color)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
 
             HStack(alignment: .center, spacing: metrics.trendMarkSpacing) {
                 HStack(alignment: .firstTextBaseline, spacing: metrics.trendMarkSpacing) {
-                    Text(value ?? "-")
-                        .somaFont(type.metric)
+                    SomaNumber(value, type.metric)
                         .foregroundStyle(colors.inkPrimary.color)
-                        .somaRollingNumber(value, holdsWidth: true)
+                        // A value that changes rolls to its new figure in
+                        // place, as Flighty's times do; with Reduce Motion it
+                        // simply changes.
+                        .contentTransition(reduceMotion ? .identity : .numericText())
+                        .animation(reduceMotion ? nil : theme.motion.navigation, value: value)
                     if let unit, value != nil {
                         Text(unit)
                             .somaFont(type.caption)
@@ -121,14 +124,23 @@ struct SomaStatView: View {
                 }
             }
 
-            // Under a dash too: a missing value that says what it needs is
-            // not mistaken for a broken one.
-            if let cue {
-                Text(cue)
-                    .somaFont(type.caption)
-                    .foregroundStyle(cueTone.color(colors))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
+            if let cue, value != nil {
+                // Good news and something to watch lead with a dot in the
+                // cue's ink, as a status reads everywhere else; the word
+                // carries the meaning and the dot confirms it.
+                HStack(spacing: metrics.trendMarkSpacing) {
+                    if cueTone != .neutral {
+                        Circle()
+                            .fill(cueTone.color(colors))
+                            .frame(width: metrics.statusDotSize, height: metrics.statusDotSize)
+                            .accessibilityHidden(true)
+                    }
+                    Text(cue)
+                        .somaFont(type.caption)
+                        .foregroundStyle(cueTone.color(colors))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                }
             }
         }
         .accessibilityElement(children: .ignore)

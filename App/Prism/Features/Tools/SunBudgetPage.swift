@@ -11,9 +11,9 @@ import SomaUI
 ///
 /// The burn time comes from the erythemal dose engine: the UV index against the
 /// minimal erythemal dose of the person's skin type. The UV comes from the
-/// weather, which the app cannot read yet, so until then the numbers are
-/// dashes and the page says why; the skin type and the time spent in daylight
-/// are real.
+/// weather where the person is (``ToolWeather``); until a place is known the
+/// numbers are dashes and the page says why. The skin type and the time spent
+/// in daylight never wait on it.
 struct SunBudgetPage: View {
     @Environment(HealthDashboard.self) private var health
     @Environment(\.somaTheme) private var theme
@@ -34,14 +34,14 @@ struct SunBudgetPage: View {
             } else {
                 ToolHero(eyebrow: "UV not read yet",
                          headline: "Sun Budget needs the UV where you are.",
-                         lead: "Soma has no weather source yet, so there is no UV to read against your skin.",
+                         lead: "Soma reads it for the place the Environment lens knows, and there is none yet.",
                          rest: "Everything below that needs it waits as a dash; your skin type and time outside are ready.")
                 ToolStats([
                     SomaStat("UV now", value: nil),
                     SomaStat("Peak", value: nil),
                     SomaStat("Burn at peak", value: nil, unit: "min"),
                 ])
-                ToolEmptyCard(eyebrow: "Today’s UV", message: "The day’s UV curve and the stretch where bare skin needs cover appear once Soma can read the weather.")
+                ToolEmptyCard(eyebrow: "Today’s UV", message: "The day’s UV curve and the stretch where bare skin needs cover appear once the weather where you are is read.")
             }
 
             SomaCard {

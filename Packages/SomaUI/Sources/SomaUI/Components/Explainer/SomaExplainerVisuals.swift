@@ -224,7 +224,7 @@ private struct SomaExplainerCore: View {
         ZStack {
             Circle()
                 .fill(colors.surface.color)
-                .shadow(color: .black.opacity(0.10), radius: 10, y: 4)
+                .overlay(Circle().strokeBorder(colors.inkPrimary.color.opacity(theme.metrics.hairlineOpacity), lineWidth: 0.5))
             VStack(spacing: 2) {
                 if let value {
                     Text(value)
@@ -367,101 +367,8 @@ public struct SomaExplainerRanges: View {
 
     public var body: some View {
         SomaExplainerSection(title) {
-            strip
+            SomaBandStrip(bands: bands, aspect: aspect, marker: marker, markerLabel: markerLabel)
                 .padding(theme.metrics.explainerRowPadding)
-        }
-    }
-
-    private var strip: some View {
-        let metrics = theme.metrics
-        let type = theme.typography
-        let colors = theme.colors
-        let low = bands.first?.range.lowerBound ?? 0
-        let high = bands.last?.range.upperBound ?? 1
-        let span = max(0.0001, high - low)
-        let gap = metrics.explainerRangeGap
-        let position = marker.map { min(1, max(0, ($0 - low) / span)) }
-
-        return VStack(alignment: .leading, spacing: metrics.explainerBarGap) {
-            GeometryReader { proxy in
-                let width = proxy.size.width
-                let usable = width - gap * CGFloat(max(0, bands.count - 1))
-                ZStack(alignment: .topLeading) {
-                    HStack(spacing: gap) {
-                        ForEach(bands) { band in
-                            Capsule()
-                                .fill(color(band.tone))
-                                .frame(width: usable * (band.range.upperBound - band.range.lowerBound) / span)
-                        }
-                    }
-                    .frame(height: metrics.explainerRangeHeight)
-                    .offset(y: metrics.explainerRangeLabelRoom + (metrics.explainerRangeMarker - metrics.explainerRangeHeight) / 2)
-
-                    if let position {
-                        let x = width * position
-                        Circle()
-                            .fill(colors.inkPrimary.color)
-                            .overlay(Circle().strokeBorder(colors.surface.color, lineWidth: 3))
-                            .frame(width: metrics.explainerRangeMarker, height: metrics.explainerRangeMarker)
-                            .offset(x: x - metrics.explainerRangeMarker / 2, y: metrics.explainerRangeLabelRoom)
-                        if let markerLabel {
-                            Text(markerLabel)
-                                .somaFont(type.captionValue)
-                                .foregroundStyle(colors.inkPrimary.color)
-                                .fixedSize()
-                                .frame(width: width, alignment: position < 0.2 ? .leading : position > 0.8 ? .trailing : .center)
-                                .offset(x: position < 0.2 || position > 0.8 ? 0 : x - width / 2)
-                        }
-                    }
-                }
-            }
-            .frame(height: metrics.explainerRangeLabelRoom + metrics.explainerRangeMarker)
-
-            GeometryReader { proxy in
-                let usable = proxy.size.width - gap * CGFloat(max(0, bands.count - 1))
-                HStack(alignment: .top, spacing: gap) {
-                    ForEach(bands) { band in
-                        VStack(alignment: .leading, spacing: metrics.explainerLineSpacing) {
-                            Text(band.title)
-                                .somaFont(type.caption)
-                                .foregroundStyle(colors.inkPrimary.color)
-                            Text(threshold(band))
-                                .somaFont(type.captionValue)
-                                .foregroundStyle(colors.inkSecondary.color)
-                        }
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                        .frame(width: usable * (band.range.upperBound - band.range.lowerBound) / span, alignment: .leading)
-                    }
-                }
-            }
-            .frame(height: metrics.explainerGlyphDiameter + metrics.explainerLineSpacing)
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(bands.map { "\($0.title), \(threshold($0))" }.joined(separator: "; ")))
-        .accessibilityValue(Text(markerLabel ?? ""))
-    }
-
-    /// "Under 34", "34 to 66", "67 and over": each band's upper bound is
-    /// where the next one starts.
-    private func threshold(_ band: SomaExplainerBand) -> String {
-        if let detail = band.detail { return detail }
-        let lower = Int(band.range.lowerBound.rounded())
-        let upper = Int(band.range.upperBound.rounded())
-        if band.id == bands.first?.id { return String(localized: "under \(upper)") }
-        if band.id == bands.last?.id { return String(localized: "\(lower) and over") }
-        return String(localized: "\(lower) to \(upper - 1)")
-    }
-
-    private func color(_ tone: SomaExplainerBand.Tone) -> Color {
-        let hue = theme.aspects[aspect].identity.color
-        switch tone {
-        case .good: return SomaHealthHue.nutrition.color
-        case .fair: return SomaHealthHue.mobility.color
-        case .poor: return SomaHealthHue.vitals.color
-        case .light: return hue.opacity(0.3)
-        case .middle: return hue.opacity(0.6)
-        case .strong: return hue
         }
     }
 }

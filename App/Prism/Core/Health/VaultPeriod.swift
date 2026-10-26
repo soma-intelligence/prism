@@ -68,7 +68,13 @@ enum VaultPeriod: String, CaseIterable, Identifiable, Hashable, Sendable {
     /// the chevrons page to.
     func shifted(_ date: Date, by pages: Int, calendar: Calendar) -> Date {
         guard pages != 0 else { return date }
-        let (component, size): (Calendar.Component, Int) = switch self {
+        let (component, size) = step
+        return calendar.date(byAdding: component, value: -pages * size, to: date) ?? date
+    }
+
+    /// One whole span as a calendar move.
+    private var step: (component: Calendar.Component, size: Int) {
+        switch self {
         case .day: (.day, 1)
         case .week: (.day, 7)
         case .month: (.month, 1)
@@ -76,7 +82,40 @@ enum VaultPeriod: String, CaseIterable, Identifiable, Hashable, Sendable {
         case .sixMonths: (.weekOfYear, 26)
         case .year: (.month, 12)
         }
-        return calendar.date(byAdding: component, value: -pages * size, to: date) ?? date
+    }
+
+    /// The whole spans a chart pages through, oldest first, back to the one
+    /// that holds `earliest`. The last is the span ending now; each earlier
+    /// one ends exactly where the next begins, every edge counted from that
+    /// latest end, so a page is always one whole span and never a stretch
+    /// between two.
+    func pages(from earliest: Date, now: Date, calendar: Calendar) -> [DateInterval] {
+        let latest = interval(endingAt: now, calendar: calendar)
+        let (component, size) = step
+        var result = [latest]
+        var back = 1
+        // A cap well past a year of days, in case `earliest` is far back.
+        while let oldest = result.last, oldest.start > earliest, back <= 400 {
+            guard let start = calendar.date(byAdding: component, value: -(back + 1) * size, to: latest.end),
+                  start < oldest.start else { break }
+            result.append(DateInterval(start: start, end: oldest.start))
+            back += 1
+        }
+        return result.reversed()
+    }
+
+    /// Every bucket from the one holding `start` through the one holding
+    /// `now`, oldest first: the whole run a scrolling chart moves through.
+    func buckets(from start: Date, through now: Date, calendar: Calendar) -> [DateInterval] {
+        let end = calendar.dateInterval(of: bucket, for: now)?.end ?? now
+        var cursor = calendar.dateInterval(of: bucket, for: start)?.start ?? start
+        var result: [DateInterval] = []
+        while cursor < end {
+            guard let next = calendar.date(byAdding: bucket, value: 1, to: cursor), next > cursor else { break }
+            result.append(DateInterval(start: cursor, end: min(next, end)))
+            cursor = next
+        }
+        return result
     }
 
     /// The buckets of the span, oldest first, each one bucket long.

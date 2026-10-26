@@ -107,7 +107,10 @@ struct TrackHeightView: View {
     private func save(_ measure: TrackMeasure, _ centimetres: Double) {
         log.addMeasure(measure, value: centimetres, at: .now)
         let quantity: TrackHealthWriter.Quantity = measure == .height ? .height(centimetres: centimetres) : .waist(centimetres: centimetres)
-        Task { await TrackHealthWriter.save([quantity], at: .now) }
+        Task {
+            let reached = await TrackHealthWriter.save([quantity], at: .now)
+            Confirmations.shared.logged(measure == .height ? "Height" : "Waist", reachedHealth: reached)
+        }
     }
 
     private func load() async {

@@ -79,7 +79,6 @@ struct MindBreatheSheet: View {
             VStack(spacing: metrics.leadSpacing) {
                 Text("Breathe")
                     .somaFont(type.eyebrow)
-                    .textCase(.uppercase)
                     .foregroundStyle(colors.inkSecondary.color)
                     .padding(.top, metrics.heroTopPadding)
 
@@ -134,12 +133,12 @@ struct MindBreatheSheet: View {
 
         return VStack(spacing: metrics.heroSpacing) {
             Spacer(minLength: 0)
-            SomaOrb(aspect: .mind, scale: .mini)
+            SomaObjectIcon(aspect: .mind, size: .row)
             Text("Done")
                 .somaFont(type.headline)
                 .foregroundStyle(colors.inkPrimary.color)
                 .accessibilityAddTraits(.isHeader)
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
+            HStack(alignment: .firstTextBaseline, spacing: theme.metrics.spaceS) {
                 Text(minutes >= 1 ? "\(minutes)" : "-")
                     .somaFont(type.display)
                     .foregroundStyle(colors.inkPrimary.color)

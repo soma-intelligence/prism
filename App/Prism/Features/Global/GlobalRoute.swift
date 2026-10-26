@@ -5,7 +5,7 @@
 
 import SwiftUI
 
-/// The app wide pages: health records, the calendar, activity status and its
+/// The app wide pages: health records, the medical record, the calendar, activity status and its
 /// legend, and the Share studio.
 ///
 /// Registered on every tab's stack by `journeyDestinations()`, so a link
@@ -15,6 +15,12 @@ import SwiftUI
 /// them present `page` inside ``GlobalSheet``.
 enum GlobalRoute: Hashable, Identifiable {
     case healthRecords
+    /// The person's own medical record: conditions, allergies, vaccines,
+    /// family history, care team and appointments.
+    case medicalRecord
+    /// The PDF for a visit, made from the record and everything else Soma
+    /// holds, shared only from the share sheet.
+    case doctorReport
     case calendar
     case activityStatus
     case activityLegend
@@ -27,6 +33,10 @@ enum GlobalRoute: Hashable, Identifiable {
         switch self {
         case .healthRecords:
             HealthRecordsPage()
+        case .medicalRecord:
+            MedicalRecordPage()
+        case .doctorReport:
+            DoctorReportPage()
         case .calendar:
             CalendarPage()
         case .activityStatus:

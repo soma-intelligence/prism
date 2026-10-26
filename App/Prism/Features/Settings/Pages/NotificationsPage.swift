@@ -40,11 +40,11 @@ struct NotificationsPage: View {
                         if item.id == "journal" {
                             journalLine
                         } else if item.id == "morning" {
-                            line(.morningCheckIn, "Morning", fallback: "How you slept", isOn: prefs.morningCheckIn) {
+                            line(.morningCheckIn, "Morning", fallback: "How you slept", isOn: prefs.morningCheckIn, nextInDetail: false) {
                                 SettingsTimeValue(title: "Morning check-in", time: prefs.morningTime)
                             }
                         } else {
-                            line(.eveningCheckIn, "Evening", fallback: "The day in a line", isOn: prefs.eveningCheckIn) {
+                            line(.eveningCheckIn, "Evening", fallback: "The day in a line", isOn: prefs.eveningCheckIn, nextInDetail: false) {
                                 SettingsTimeValue(title: "Evening check-in", time: prefs.eveningTime)
                             }
                         }
@@ -64,9 +64,8 @@ struct NotificationsPage: View {
                         case "stand":
                             line(.stand, "Stand", fallback: "Ten to each hour", isOn: schedule.stand) { EmptyView() }
                         case "standWindow":
-                            SettingsLine(String(localized: "Between")) {
-                                SettingsTimeValue(title: "Stand from", time: schedule.standFrom)
-                                SettingsTimeValue(title: "Stand until", time: schedule.standUntil)
+                            SettingsLine(String(localized: "Hours"), indented: true) {
+                                SettingsTimeRange(from: ("Stand from", schedule.standFrom), until: ("Stand until", schedule.standUntil))
                             }
                         default:
                             line(.lastMeal, "Last meal", fallback: "Before \(settings.customization.lastMealBy.text)", isOn: prefs.eveningNudges) { EmptyView() }
@@ -75,14 +74,48 @@ struct NotificationsPage: View {
                 }
 
                 SettingsSection("Insights") {
-                    SomaBrowseGroup([SettingsItem].items("weekly", "alerts")) { item in
+                    SomaBrowseGroup([SettingsItem].items("weekly", "alerts", "pollen", "meetings", "screenings")) { item in
                         if item.id == "weekly" {
-                            line(.weeklySummary, "Weekly summary", fallback: "Sunday evening", isOn: schedule.weekly) {
+                            line(.weeklySummary, "Weekly", fallback: "Your week, on Sundays", isOn: schedule.weekly, nextInDetail: false) {
                                 SettingsTimeValue(title: "Weekly summary", time: schedule.weeklyTime)
+                            }
+                        } else if item.id == "pollen" {
+                            // The same switch as the pollen card's: turning it
+                            // on asks for notifications, through the schedule's
+                            // onChange below.
+                            SettingsTileLine("Pollen", symbol: "allergens",
+                                             detail: String(localized: "A morning alert when it is high")) {
+                                SettingsSwitch(title: String(localized: "Morning pollen alert"), isOn: schedule.pollenAlerts)
+                            }
+                        } else if item.id == "meetings" {
+                            SettingsTileLine("Meetings", symbol: "calendar.badge.exclamationmark",
+                                             detail: String(localized: "Before one that could run tense")) {
+                                SettingsSwitch(title: "Meetings", isOn: schedule.meetingAlerts)
+                            }
+                        } else if item.id == "screenings" {
+                            SettingsTileLine("Screenings", symbol: SomaNotificationKind.screeningDue.symbol,
+                                             detail: String(localized: "Before one you asked about comes due")) {
+                                SettingsSwitch(title: "Screenings", isOn: schedule.screeningReminders)
                             }
                         } else {
                             SettingsTileLine("Data alerts", symbol: SomaNotificationKind.dataAlert.symbol, detail: String(localized: "When a reading leaves your usual")) {
                                 SettingsSwitch(title: "Data alerts", isOn: schedule.dataAlerts)
+                            }
+                        }
+                    }
+                }
+
+                SettingsSection("Mind") {
+                    SomaBrowseGroup([SettingsItem].items("assessments", "connection")) { item in
+                        if item.id == "assessments" {
+                            SettingsTileLine("Questionnaires", symbol: SomaNotificationKind.assessment.symbol,
+                                             detail: String(localized: "PHQ-9 and GAD-7, every two weeks")) {
+                                SettingsSwitch(title: "Questionnaires", isOn: schedule.assessmentReminders)
+                            }
+                        } else {
+                            SettingsTileLine("Connection", symbol: "person.2",
+                                             detail: String(localized: "The connection check, each month")) {
+                                SettingsSwitch(title: "Connection", isOn: schedule.connectionReminders)
                             }
                         }
                     }
@@ -97,9 +130,8 @@ struct NotificationsPage: View {
                                 SettingsSwitch(title: "Quiet hours", isOn: prefs.quietHours)
                             }
                         default:
-                            SettingsLine(String(localized: "From and until")) {
-                                SettingsTimeValue(title: "Quiet from", time: prefs.quietFrom)
-                                SettingsTimeValue(title: "Quiet until", time: prefs.quietUntil)
+                            SettingsLine(String(localized: "Hours"), indented: true) {
+                                SettingsTimeRange(from: ("Quiet from", prefs.quietFrom), until: ("Quiet until", prefs.quietUntil))
                             }
                         }
                     }
@@ -123,6 +155,14 @@ struct NotificationsPage: View {
         }
         .onChange(of: settings.customization.lastMealBy) { Task { await notifications.apply() } }
         .onChange(of: notifications.schedule.isEnabled) { Task { await syncJournal() } }
+        .onChange(of: notifications.schedule.isEnabled) { Task { await MedicationReminders.sync() } }
+        .onChange(of: [notifications.schedule.isEnabled, notifications.schedule.screeningReminders]) {
+            Task { await ScreeningReminders.sync() }
+        }
+        .onChange(of: [notifications.schedule.isEnabled, notifications.schedule.assessmentReminders,
+                       notifications.schedule.connectionReminders]) {
+            Task { await MindQuestionnaireReminders.sync() }
+        }
     }
 
     // MARK: The Journal
@@ -143,7 +183,7 @@ struct NotificationsPage: View {
             if questions.asksFeeling {
                 SettingsMenuValue(
                     title: "Journal reminder", options: Array(0..<24),
-                    label: { TrackFormat.hour($0) },
+                    label: { Self.hourText($0) },
                     selection: Binding(
                         get: { journal.questions.feelingHour },
                         set: { hour in
@@ -233,17 +273,25 @@ struct NotificationsPage: View {
 
     // MARK: Rows
 
-    /// A switch row whose line reads the next time it fires while on.
+    /// A switch row whose line reads the next time it fires while on, unless
+    /// its own time sits beside it: then the line says what it is, and the
+    /// time is not written twice.
     private func line<Extra: View>(
         _ kind: SomaNotificationKind, _ title: LocalizedStringResource, fallback: String,
-        isOn: Binding<Bool>, @ViewBuilder extra: () -> Extra
+        isOn: Binding<Bool>, nextInDetail: Bool = true, @ViewBuilder extra: () -> Extra
     ) -> some View {
-        let next = isOn.wrappedValue ? notifications.nextFire(kind) : nil
+        let next = isOn.wrappedValue && nextInDetail ? notifications.nextFire(kind) : nil
         return SettingsTileLine(String(localized: title), symbol: kind.symbol,
                                 detail: next.map { NotificationCenterSheet.when($0) } ?? fallback) {
             if isOn.wrappedValue { extra() }
             SettingsSwitch(title: String(localized: title), isOn: isOn)
         }
+    }
+
+    /// An hour on the hour, written the way the time pills beside it are.
+    static func hourText(_ hour: Int) -> String {
+        let date = Calendar.current.date(bySettingHour: hour, minute: 0, second: 0, of: Date()) ?? Date()
+        return date.formatted(date: .omitted, time: .shortened)
     }
 
     private func openSystemSettings() {

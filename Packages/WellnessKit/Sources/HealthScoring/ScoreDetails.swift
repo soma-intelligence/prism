@@ -18,8 +18,8 @@ import Foundation
 /// `share` is the component's weight after the zero-and-renormalize step, so
 /// the shares of one night sum to 100, and `points` is what it earned out of
 /// its share. The points sum to the score (before rounding).
-public struct ScoringSleepPart: Sendable, Hashable {
-    public enum Kind: String, Sendable, Hashable, CaseIterable {
+public struct ScoringSleepPart: Sendable, Hashable, Codable {
+    public enum Kind: String, Sendable, Hashable, CaseIterable, Codable {
         case duration, efficiency, deep, rem, continuity, dip
     }
 
@@ -58,7 +58,7 @@ public struct ScoringSleepPart: Sendable, Hashable {
 // MARK: - Last night on a clock
 
 /// One run of a single sleep stage with where it sat on the clock.
-public struct ScoringStageRun: Sendable, Hashable {
+public struct ScoringStageRun: Sendable, Hashable, Codable {
     /// "awake", "rem", "core" or "deep".
     public let stage: String
     public let start: Date

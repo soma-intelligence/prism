@@ -28,3 +28,9 @@ public extension SomaPreviewSamples {
         SomaHeatPoint(id: "friend", latitude: 37.4468, longitude: -122.1552, weight: 0.2),
     ]
 }
+
+/// Sizes other components still read, kept from the parallel design lines.
+public extension SomaPreviewSamples {
+    /// The share of daylight gone by, with its sunrise and sunset.
+    static let sunProgress: Double = 0.62
+}

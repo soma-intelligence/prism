@@ -152,6 +152,31 @@ nonisolated enum BiologicalAge {
         var bloodMarkers: [BloodMarkerKey: Double] = [:]
         var extendedBloodMarkers: [String: Double] = [:]
         var bloodPanels = 0
+        /// A VO2 max measured in a lab. It replaces the watch's estimate while
+        /// it is under `labVO2MaxMonths` old.
+        var labVO2: LabVO2?
+        /// The day the inputs were read, for the lab test's age. Nil is now.
+        var asOf: Date?
+    }
+
+    /// A VO2 max measured on a treadmill or a bike with a mask, and its day.
+    struct LabVO2: Sendable, Equatable {
+        var value: Double
+        var date: Date
+    }
+
+    /// How long a lab VO2 max stays the better reading. A cardiopulmonary
+    /// test measures the oxygen itself where the watch estimates it from
+    /// heart rate and pace (Apple, Using Apple Watch to Estimate
+    /// Cardio Fitness with VO2 max, 2021), and fitness drifts within a year.
+    static let labVO2MaxMonths = 12
+
+    /// The lab test when it is recent enough, else nil.
+    static func recentLabVO2(_ inputs: Inputs, calendar: Calendar = .current) -> LabVO2? {
+        guard let lab = inputs.labVO2, lab.value > 0,
+              let cutoff = calendar.date(byAdding: .month, value: -labVO2MaxMonths, to: inputs.asOf ?? Date()),
+              lab.date >= cutoff else { return nil }
+        return lab
     }
 
     static let gompertzGamma = log(2) / 8.0
@@ -195,7 +220,11 @@ nonisolated enum BiologicalAge {
             logHazard += years * gompertzGamma
         }
 
-        if let s = signal(inputs.vo2Max, minDays: minDays) {
+        if let lab = recentLabVO2(inputs) {
+            // One measured test outweighs months of the watch's estimate.
+            let z = vo2MaxZ(lab.value, age: age, sex: sex)
+            add("VO2 max, lab test", z: z, logH: -betaVO2Max * z, days: 1)
+        } else if let s = signal(inputs.vo2Max, minDays: minDays) {
             let z = vo2MaxZ(s.mean, age: age, sex: sex)
             add("VO2 max", z: z, logH: -betaVO2Max * z, days: s.days)
         }

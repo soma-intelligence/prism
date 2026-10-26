@@ -74,7 +74,7 @@ struct MindStressRadarPage: View {
                     actionTitle: "Breathe",
                     action: { isBreathing = true }
                 ) {
-                    SomaOrb(aspect: .mind, scale: .mini)
+                    SomaObjectIcon(aspect: .mind, size: .row)
                 }
             }
         }
@@ -159,7 +159,7 @@ struct MindBandScale: View {
                 MindEyebrow(text: "Reference scale")
                 HStack(alignment: .top, spacing: 4) {
                     ForEach(MindStressBand.allCases, id: \.self) { band in
-                        VStack(alignment: .leading, spacing: 6) {
+                        VStack(alignment: .leading, spacing: theme.metrics.spaceS) {
                             Capsule()
                                 .fill(band == .high ? colors.danger.color : hue.opacity(0.35 + 0.25 * Double(band.rawValue)))
                                 .frame(height: theme.metrics.chartTrackHeight * 1.5)
@@ -200,7 +200,7 @@ struct MindDayTimeline: View {
         let rows = ["Sleep", "Move", "Meals", "Stress"]
         let labelWidth = theme.metrics.aspectChartWidth * 0.55
 
-        VStack(spacing: 6) {
+        VStack(spacing: theme.metrics.spaceS) {
             GeometryReader { proxy in
                 let width = proxy.size.width - labelWidth
                 let rowHeight = proxy.size.height / CGFloat(rows.count)

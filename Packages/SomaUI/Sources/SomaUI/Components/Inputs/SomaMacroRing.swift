@@ -20,8 +20,9 @@ public struct SomaMacroPart: Identifiable, Sendable {
     }
 }
 
-/// A meal as a ring in proportion: each part's arc is its share of the
-/// energy, and its name and grams sit just outside it.
+/// A meal as a thin ring in proportion: each part's arc is its share of the
+/// energy, in steps of one hue with a small gap between, and its name and
+/// grams sit just outside it. No glow behind it.
 public struct SomaMacroRing<Center: View>: View {
     private let parts: [SomaMacroPart]
     private let aspect: SomaAspect
@@ -40,7 +41,8 @@ public struct SomaMacroRing<Center: View>: View {
         let colors = theme.colors
         let hue = theme.aspects[aspect].identity.color
         let total = parts.reduce(0) { $0 + max(0, $1.weight) }
-        let gap = metrics.dialSegmentGap
+        // The gap as drawn, plus what the round caps reach into it.
+        let gap = metrics.dialSegmentGap + Double(metrics.macroRingWidth / (metrics.macroRingDiameter / 2)) * 180 / .pi
 
         GeometryReader { proxy in
             let middle = CGPoint(x: proxy.size.width / 2, y: proxy.size.height / 2)
@@ -48,14 +50,9 @@ public struct SomaMacroRing<Center: View>: View {
             let spans = Self.spans(parts.map { max(0, $0.weight) }, total: total)
 
             ZStack {
-                Circle()
-                    .fill(RadialGradient(colors: [hue.opacity(0.18), .clear], center: .center, startRadius: 0, endRadius: radius))
-                    .frame(width: radius * 2, height: radius * 2)
-                    .position(middle)
-
                 if total <= 0 {
                     Circle()
-                        .stroke(colors.surface.color, lineWidth: metrics.macroRingWidth)
+                        .stroke(colors.inkPrimary.color.opacity(metrics.hairlineOpacity), lineWidth: metrics.macroRingWidth)
                         .frame(width: radius * 2, height: radius * 2)
                         .position(middle)
                 } else {
@@ -63,7 +60,7 @@ public struct SomaMacroRing<Center: View>: View {
                         let span = spans[index]
                         if span.to - span.from > gap {
                             arc(middle, radius, span.from + gap / 2, span.to - gap / 2)
-                                .stroke(hue.opacity(1 - 0.22 * Double(index)), style: StrokeStyle(lineWidth: metrics.macroRingWidth))
+                                .stroke(hue.opacity(1 - 0.3 * Double(index)), style: StrokeStyle(lineWidth: metrics.macroRingWidth, lineCap: .round))
                         }
                         VStack(spacing: metrics.scoreLabelSpacing) {
                             Text(part.title)
@@ -81,7 +78,7 @@ public struct SomaMacroRing<Center: View>: View {
                 center.position(middle)
             }
         }
-        .frame(height: metrics.macroRingDiameter + (metrics.macroRingWidth + metrics.macroLabelReach) * 2 + metrics.cardSpacing * 2)
+        .frame(height: metrics.macroRingDiameter + (metrics.macroRingWidth + metrics.macroLabelReach) * 2 + metrics.spaceXL)
         .accessibilityElement(children: .combine)
     }
 

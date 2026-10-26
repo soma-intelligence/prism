@@ -24,7 +24,7 @@ struct HomeQuickAddSheet: View {
 
     var body: some View {
         let now = Date()
-        let columns = [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)]
+        let columns = [GridItem(.flexible(), spacing: theme.metrics.spaceM), GridItem(.flexible(), spacing: theme.metrics.spaceM)]
 
         NavigationStack {
             SomaPageScroll {
@@ -32,7 +32,7 @@ struct HomeQuickAddSheet: View {
                     Text("Add to today")
                         .somaFont(theme.typography.body)
                         .foregroundStyle(theme.colors.inkSecondary.color)
-                    LazyVGrid(columns: columns, spacing: 10) {
+                    LazyVGrid(columns: columns, spacing: theme.metrics.spaceM) {
                         tile("Water", symbol: "drop.fill", aspect: .gut, detail: waterLine(now), hint: "Adds a glass, 250 ml") {
                             pour(.water, ml: 250)
                         }
@@ -58,6 +58,7 @@ struct HomeQuickAddSheet: View {
                 .padding(.horizontal, theme.metrics.pagePadding)
                 .padding(.bottom, theme.metrics.pagePadding)
             }
+            .softScrollEdges()
             .background(theme.colors.canvas.color.ignoresSafeArea())
             .toolbarTitleDisplayMode(.inline)
             .toolbar {
@@ -83,7 +84,7 @@ struct HomeQuickAddSheet: View {
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: theme.metrics.spaceS) {
                 Image(systemName: symbol)
                     .imageScale(.large)
                     .foregroundStyle(theme.aspects[aspect].identity.color)
@@ -111,7 +112,10 @@ struct HomeQuickAddSheet: View {
     /// ``TrackLogStore`` first, then written to Apple Health.
     private func pour(_ drink: TrackDrink, ml: Double, caffeineMg: Double? = nil) {
         let entry = track.addDrink(drink, ml: ml, caffeineMg: caffeineMg, at: Date())
-        Task { await TrackHealthWriter.saveDrink(entry) }
+        Task {
+            let reached = await TrackHealthWriter.saveDrink(entry)
+            Confirmations.shared.logged(drink.title, reachedHealth: reached)
+        }
     }
 
     private func waterLine(_ now: Date) -> String {
@@ -187,6 +191,7 @@ struct HomeAllCategoriesSheet: View {
                                 .contentShape(.rect)
                                 .zoomSource(item.route)
                             }
+                            .zoomSource(item.route)
                             .buttonStyle(.plain)
                         }
                     }
@@ -215,6 +220,7 @@ struct HomeAllCategoriesSheet: View {
                                 HomeValueRow(name: hit.title, detail: hit.category, value: nil)
                                     .contentShape(.rect)
                             }
+                            .zoomSource(PulseRoute.category(hit.category))
                             .buttonStyle(.plain)
                         }
                     }
@@ -240,6 +246,7 @@ struct HomeAllCategoriesSheet: View {
             .contentShape(.rect)
             .zoomSource(value)
         }
+        .zoomSource(value)
         .buttonStyle(.plain)
     }
 
@@ -286,7 +293,7 @@ struct HomeStandSheet: View {
             HomeReason(reason(stood: stood, missed: missed))
 
             SomaCard {
-                VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: theme.metrics.spaceM) {
                     HomeEyebrow("Today, hour by hour")
                     HomeStandBars(hours: hours)
                 }

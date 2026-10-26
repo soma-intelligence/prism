@@ -77,7 +77,7 @@ struct TrackFastingView: View {
             .padding(.top, metrics.cardSpacing)
 
             if running == nil {
-                HStack(spacing: metrics.cardSpacing * 0.75) {
+                HStack(spacing: metrics.spaceS) {
                     ForEach(TrackFasting.presets, id: \.self) { hours in
                         SomaChoiceChip("\(Int(hours)) h", isOn: length == hours) {
                             length = hours

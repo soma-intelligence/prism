@@ -66,9 +66,9 @@ struct ToolDigest {
             guard let starts = store.shift.starts else { return "Off. For nights and early starts." }
             return "Shift at \(ToolFormat.clock(hour: Double(starts) / 60))."
         case .sunBudget:
-            return ToolWeather.current == nil ? "Waiting on a weather source." : "UV read for today."
+            return ToolWeather.current == nil ? "Waiting on the weather where you are." : "UV read for today."
         case .skinForecast:
-            return ToolWeather.current == nil ? "Waiting on a weather source." : "Today’s index is ready."
+            return ToolWeather.current == nil ? "Waiting on the weather where you are." : "Today’s index is ready."
         case .agingPace:
             return day.inputs.ageYears == nil ? "Needs your date of birth in Health." : "Your pace against the calendar."
         case .strengthLoad:

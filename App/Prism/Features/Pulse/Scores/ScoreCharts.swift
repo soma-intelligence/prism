@@ -39,13 +39,16 @@ struct ScoreEmptyPlot: View {
 // MARK: - Daily bars
 
 /// One thin bar a day over the usual band in faint green, the average as a
-/// dashed rule. The last bar is today's, in full colour.
+/// dashed rule. The last bar is today's, in full colour, when the span ends
+/// today.
 struct ScoreDayBars: View {
     let values: [Double?]
     let aspect: SomaAspect
     var band: ClosedRange<Double>?
     var ceiling: Double = 100
     var labels: [String] = []
+    /// False on a span paged back from today: no bar there is today's.
+    var endsToday = true
 
     @Environment(\.somaTheme) private var theme
 
@@ -55,6 +58,7 @@ struct ScoreDayBars: View {
         let average = ScoreMath.mean(values)
         let values = values
         let band = band
+        let endsToday = endsToday
 
         SomaPlot(scale: SomaPlotScale(fixed: 0...top), xLabels: labels, height: theme.metrics.scorePlotHeight) { context, space, pen in
             if let band {
@@ -64,7 +68,7 @@ struct ScoreDayBars: View {
             for (index, value) in values.enumerated() {
                 let x = space.slot(index, of: values.count)
                 guard let value else { continue }
-                let isLast = index == values.count - 1
+                let isLast = endsToday && index == values.count - 1
                 pen.bar(context, x: x, top: space.y(value), floor: space.floor, pitch: pitch,
                         color: hue.opacity(isLast ? 1 : pen.contextOpacity))
             }
@@ -75,6 +79,79 @@ struct ScoreDayBars: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text("Daily values"))
         .accessibilityValue(Text(average.map { "Average \(Int($0.rounded()))" } ?? "No values yet"))
+    }
+}
+
+// MARK: - Paged days
+
+/// A daily series paged one whole range at a time: two weeks back is the
+/// two weeks before, never a stretch between two. The series ends today;
+/// the oldest page is filled out with empty days so it is whole too. The
+/// pager draws only the pages near the screen, and its header carries the
+/// span, a calendar to jump to any day the series holds, and the way back to
+/// today.
+struct ScoreDayPager<Page: View>: View {
+    /// How many days the series holds, the last one today.
+    let days: Int
+    /// How many days one page shows.
+    let length: Int
+    /// One page: the indices of its days in the series (below zero for the
+    /// empty days that fill out the oldest page), and its axis labels.
+    @ViewBuilder let page: (_ indices: Range<Int>, _ labels: [String], _ endsToday: Bool) -> Page
+
+    /// The page on screen; nil is the latest.
+    @State private var selection: Int?
+
+    private var pages: [DateInterval] {
+        let calendar = Calendar.current
+        let end = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: .now)) ?? .now
+        let count = max(1, Int((Double(max(days, 1)) / Double(max(length, 1))).rounded(.up)))
+        return (0..<count).reversed().compactMap { back in
+            guard let close = calendar.date(byAdding: .day, value: -back * length, to: end),
+                  let open = calendar.date(byAdding: .day, value: -length, to: close) else { return nil }
+            return DateInterval(start: open, end: close)
+        }
+    }
+
+    var body: some View {
+        let pages = pages
+        let last = pages.count - 1
+
+        SomaPeriodPager(
+            pages: pages,
+            selection: Binding(get: { min(selection ?? last, last) }, set: { selection = $0 == last ? nil : $0 })
+        ) { index in
+            pageView(index, of: pages)
+                .environment(\.somaPlotPart, .plot)
+        } fixed: { index in
+            // The scale of the page on screen, held still while the pages
+            // slide under it.
+            pageView(index, of: pages)
+                .environment(\.somaPlotPart, .scale)
+        }
+        .onChange(of: length) { selection = nil }
+    }
+
+    private func pageView(_ index: Int, of pages: [DateInterval]) -> Page {
+        let back = pages.count - 1 - index
+        let upper = days - back * length
+        return page((upper - length)..<upper, Self.labels(pages[index], length: length, endsToday: back == 0), back == 0)
+    }
+
+    /// The span's first day, its middle and its last ("Today" on the latest).
+    static func labels(_ span: DateInterval, length: Int, endsToday: Bool) -> [String] {
+        let calendar = Calendar.current
+        let format = Date.FormatStyle().month(.abbreviated).day()
+        let first = span.start
+        let middle = calendar.date(byAdding: .day, value: (length - 1) / 2, to: first) ?? first
+        let lastDay = calendar.date(byAdding: .day, value: length - 1, to: first) ?? first
+        return [first.formatted(format), middle.formatted(format), endsToday ? "Today" : lastDay.formatted(format)]
+    }
+
+    /// The values of `indices` in `series`, an index outside it read as an
+    /// empty day.
+    static func slice(_ series: [Double?], _ indices: Range<Int>) -> [Double?] {
+        indices.map { series.indices.contains($0) ? series[$0] : nil }
     }
 }
 
@@ -245,7 +322,7 @@ struct ScoreStageColumns: View {
     }
 
     private func legend(_ title: String, _ color: Color?) -> some View {
-        HStack(spacing: 5) {
+        HStack(spacing: theme.metrics.spaceXS) {
             if let color {
                 Circle().fill(color)
                     .frame(width: theme.metrics.chartPointDiameter, height: theme.metrics.chartPointDiameter)
@@ -389,7 +466,7 @@ struct ScoreDayLanes: View {
             ("Stress", aspect, peaks.map { ScoringNightWindow(start: $0, end: $0.addingTimeInterval(1800)) }),
         ]
 
-        VStack(spacing: 6) {
+        VStack(spacing: theme.metrics.spaceS) {
             HStack(spacing: 8) {
                 VStack(alignment: .leading, spacing: 0) {
                     ForEach(Array(lanes.enumerated()), id: \.offset) { _, lane in

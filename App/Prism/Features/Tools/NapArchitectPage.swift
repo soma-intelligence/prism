@@ -5,6 +5,7 @@
 
 import SwiftUI
 import SomaUI
+import SomaWidgetKit
 
 /// Nap Architect: the afternoon window where a short nap helps, how long it
 /// should be, and the cutoff after which a nap takes from tonight.
@@ -17,6 +18,7 @@ struct NapArchitectPage: View {
     @Environment(HealthDashboard.self) private var health
     @Environment(JournalStore.self) private var journal
     @Environment(\.somaTheme) private var theme
+    @State private var napping = SomaLiveActivities.shared.isRunning(.nap)
 
     private var model: ToolsModel { .shared }
     private var store: ToolsStore { .shared }
@@ -60,6 +62,19 @@ struct NapArchitectPage: View {
                 ToolNoteCard(title: "Why \(ToolFormat.clock(hour: plan.windowStartHour)) to \(ToolFormat.clock(hour: plan.hardCutoffHour))",
                              lead: "It sits on your afternoon dip, where sleep pressure and your body clock line up.",
                              rest: "Twenty minutes clears fatigue without reaching deep sleep, so you wake sharp rather than groggy.")
+            }
+            if let plan, plan.recommendedMinutes > 0, SomaLiveActivities.shared.isAvailable {
+                ToolButtonRow(title: napping ? "End the nap" : "Start a \(plan.recommendedMinutes) minute nap",
+                              detail: napping ? "On your lock screen" : "Counts down on your lock screen, rings at the end") {
+                    if napping {
+                        NapTimer.cancel()
+                        napping = false
+                    } else {
+                        if !napLogged { journal.toggle("nap", on: Date()) }
+                        napping = true
+                        Task { await NapTimer.start(minutes: plan.recommendedMinutes) }
+                    }
+                }
             }
             ToolButtonRow(title: "Naps today", detail: napLogged ? "One logged" : "None logged") {
                 journal.toggle("nap", on: Date())

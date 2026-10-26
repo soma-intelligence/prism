@@ -55,7 +55,7 @@ struct TrackFoodView: View {
             }
 
             SomaCard {
-                VStack(alignment: .leading, spacing: metrics.cardSpacing * 0.5) {
+                VStack(alignment: .leading, spacing: metrics.spaceS) {
                     TrackEyebrow("One portion holds")
                     stepper("Protein", value: $protein)
                     TrackHairline()
@@ -65,7 +65,7 @@ struct TrackFoodView: View {
                 }
             }
 
-            HStack(spacing: metrics.cardSpacing * 0.5) {
+            HStack(spacing: metrics.spaceS) {
                 ForEach(Self.portionChoices, id: \.0) { choice in
                     SomaChoiceChip(choice.1, isOn: portions == choice.0) { portions = choice.0 }
                 }
@@ -150,12 +150,13 @@ struct TrackFoodView: View {
         )
         log.addMeal(entry)
         Task {
-            await TrackHealthWriter.save([
+            let reached = await TrackHealthWriter.save([
                 .energy(kilocalories: entry.kilocalories),
                 .protein(grams: protein * portions),
                 .carbohydrates(grams: carbs * portions),
                 .fat(grams: fat * portions),
             ], at: now)
+            Confirmations.shared.logged(entry.name.isEmpty ? "Meal" : entry.name, reachedHealth: reached)
         }
         dismiss()
     }

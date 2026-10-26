@@ -2,7 +2,7 @@
 -- Runs under `supabase db test` (pgTAP) or, without Docker, with
 -- supabase/scripts/local-test/run.sh on a plain Postgres 17.
 begin;
-select plan(49);
+select plan(53);
 
 -- Two people. Their profiles come from the trigger on auth.users.
 insert into auth.users (id, email, raw_user_meta_data) values
@@ -126,16 +126,21 @@ select throws_ok($$select public.sync_pull('journal_days', null, 10)$$, '42501',
 reset role;
 set local role authenticated;
 set local request.jwt.claims to '{"sub":"00000000-0000-4000-8000-00000000000a","role":"authenticated"}';
--- Storage objects are removed through the Storage API before this call.
+-- Closing the account erases nothing: storage objects and rows stay.
+select lives_ok($$update public.profiles set status = 'deleted' where id = auth.uid()$$, 'A may try to set her own status');
 reset role;
-delete from storage.objects where name like '00000000-0000-4000-8000-00000000000a/%';
+select is((select status from public.profiles where id = '00000000-0000-4000-8000-00000000000a'), 'active',
+    'only closing the account moves the status');
 set local role authenticated;
-select lives_ok($$select public.delete_my_account()$$, 'A deletes her account');
+select lives_ok($$select public.delete_my_account()$$, 'A closes her account');
 reset role;
-select is((select count(*)::int from public.health_samples where user_id = '00000000-0000-4000-8000-00000000000a')
-    + (select count(*)::int from public.journal_days where user_id = '00000000-0000-4000-8000-00000000000a')
-    + (select count(*)::int from public.profiles where id = '00000000-0000-4000-8000-00000000000a'), 0,
-    'everything of hers goes with it');
+select is((select status from public.profiles where id = '00000000-0000-4000-8000-00000000000a'), 'deleted',
+    'her profile is marked deleted');
+select is((select banned_until from auth.users where id = '00000000-0000-4000-8000-00000000000a'), 'infinity'::timestamptz,
+    'she can no longer sign in');
+select ok((select count(*)::int from public.journal_days where user_id = '00000000-0000-4000-8000-00000000000a')
+    + (select count(*)::int from public.profiles where id = '00000000-0000-4000-8000-00000000000a') >= 2,
+    'nothing of hers is erased');
 
 select * from finish();
 rollback;

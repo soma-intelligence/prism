@@ -74,7 +74,7 @@ struct SoundExposurePage: View {
         }
         .navigationTitle(kind == .environment ? "Environmental sound" : "Headphone audio")
         .task { await load() }
-        .refreshable { await load() }
+        .somaRefreshable { await load() }
     }
 
     private func load() async {

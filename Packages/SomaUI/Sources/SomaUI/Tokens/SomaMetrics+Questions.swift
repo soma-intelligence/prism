@@ -43,6 +43,17 @@ public extension SomaMetrics {
     /// the Mac and the headset. About half a phone, like the medium detent.
     var questionSheetWidth: CGFloat { 440 }
     var questionSheetHeight: CGFloat { 440 }
+
+    /// A check-in row: its glyph column, the gap between the question and an
+    /// answer laid under it, and its padding top and foot.
+    var questionGlyphColumn: CGFloat { 22 }
+    var questionRowGap: CGFloat { 12 }
+    var questionRowPadding: CGFloat { 14 }
+    /// The height of the five step track a scale question answers in.
+    var questionTrackHeight: CGFloat { 32 }
+    /// The progress over a check-in: the height of its segments and the gap
+    /// between them.
+    var questionProgressHeight: CGFloat { 3 }
 }
 
 public extension SomaTypography {

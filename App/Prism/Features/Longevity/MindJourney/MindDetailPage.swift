@@ -50,6 +50,7 @@ struct MindDetailPage: View {
                     ) { row in
                         if row.kind == .hrv {
                             NavigationLink(value: MindRoute.hrv) { MindSignalRowView(row: row) }
+                                .zoomSource(MindRoute.hrv)
                                 .buttonStyle(.plain)
                         } else {
                             MindSignalRowView(row: row)
@@ -75,7 +76,7 @@ struct MindDetailPage: View {
                         actionTitle: "Start",
                         action: { isBreathing = true }
                     ) {
-                        SomaOrb(aspect: .mind, scale: .mini)
+                        SomaObjectIcon(aspect: .mind, size: .row)
                     }
 
                     MindHealthStatus(status: health.status)
@@ -86,13 +87,14 @@ struct MindDetailPage: View {
             .frame(maxWidth: metrics.pageMaxWidth, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
+        .softScrollEdges()
         .aspectWash(.mind)
         .navigationTitle("Mind")
 #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
 #endif
         .task { await load() }
-        .refreshable { await load() }
+        .somaRefreshable { await load() }
         .sheet(isPresented: $isBreathing) { MindBreatheSession() }
     }
 
@@ -159,7 +161,7 @@ struct MindGauge: View {
         .accessibilityValue(score.map { "\($0) of 100, \(word)" } ?? "Not read yet")
         .onAppear {
             if reduceMotion { shown = share } else {
-                withAnimation(.easeOut(duration: theme.motion.pressDuration * 6)) { shown = share }
+                withAnimation(theme.motion.reveal) { shown = share }
             }
         }
         .onChange(of: score) { _, _ in shown = share }

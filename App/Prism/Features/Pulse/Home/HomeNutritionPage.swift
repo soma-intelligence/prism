@@ -45,7 +45,7 @@ struct HomeNutritionPage: View {
             ) {
                 if !measured.isEmpty {
                     HomeMealCurves(responses: measured, highlighted: lastIndex)
-                        .padding(.top, 8)
+                        .padding(.top, theme.metrics.spaceS)
                 }
             }
 

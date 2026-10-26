@@ -32,7 +32,12 @@ struct ModelAskAnswering: AskAnswering {
                 } catch let error as AskClientError {
                     switch error {
                     case .signedOut, .offline: continuation.finish(throwing: AskAnsweringError.offline)
-                    default: continuation.finish(throwing: error)
+                    case .rateLimited(let message):
+                        // "That's 60 questions this hour": used up, so 60 of 60.
+                        let total = message.split(separator: " ").compactMap { Int($0) }.first
+                        continuation.finish(throwing: AskFailure.limitReached(used: total, of: total, retry: "in a little while"))
+                    case .refused(let message): continuation.finish(throwing: AskFailure.refused(message))
+                    case .server(let status): continuation.finish(throwing: AskFailure.server(.soma, status: status))
                     }
                 } catch {
                     continuation.finish(throwing: error)

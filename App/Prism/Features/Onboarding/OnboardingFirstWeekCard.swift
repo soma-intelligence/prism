@@ -41,14 +41,13 @@ struct OnboardingFirstWeekCard: View {
                     .somaFont(type.caption)
                     .foregroundStyle(colors.inkSecondary.color)
                     .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 6)
+                    .padding(.top, theme.metrics.spaceS)
 
-                Text("What Soma needs to learn you")
+                Text("What Soma needs from you")
                     .somaFont(type.eyebrow)
-                    .textCase(.uppercase)
                     .foregroundStyle(colors.inkSecondary.color)
                     .padding(.top, metrics.leadSpacing)
-                    .padding(.bottom, 4)
+                    .padding(.bottom, theme.metrics.spaceXS)
 
                 row(title: "Apple Health", detail: healthDetail) {
                     if health.status == .ready { check }
@@ -107,7 +106,7 @@ struct OnboardingFirstWeekCard: View {
             Spacer()
             trailing()
         }
-        .padding(.vertical, 10)
+        .padding(.vertical, theme.metrics.spaceM)
     }
 }
 

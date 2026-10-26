@@ -41,7 +41,7 @@ struct WeatherPage: View {
                     }
                     .somaFont(type.body)
                     .foregroundStyle(colors.inkPrimary.color)
-                    .padding(.horizontal, 12)
+                    .padding(.horizontal, theme.metrics.spaceM)
                     .frame(minHeight: theme.metrics.chromeCapsuleHeight)
                     .background(Capsule().fill(colors.surface.color))
                 }
@@ -149,16 +149,16 @@ struct CityPickerSheet: View {
         let colors = theme.colors
 
         ScoreSheet(eyebrow: eyebrow, title: title) {
-            HStack(spacing: 8) {
+            HStack(spacing: theme.metrics.spaceS) {
                 Image(systemName: "magnifyingglass").foregroundStyle(colors.inkSecondary.color)
                 TextField(isPrecise ? "Search an address or a city" : "Search a city", text: $query)
                     .somaFont(type.body)
                     .autocorrectionDisabled()
                     .onSubmit { Task { await search() } }
             }
-            .padding(.horizontal, 12)
+            .padding(.horizontal, theme.metrics.spaceM)
             .frame(minHeight: theme.metrics.browseRowMinHeight)
-            .background(RoundedRectangle(cornerRadius: theme.metrics.browseGroupCornerRadius, style: .continuous)
+            .background(RoundedRectangle(cornerRadius: theme.metrics.controlCornerRadius, style: .continuous)
                 .fill(colors.surface.color))
 
             if let here, results.isEmpty, here != current {
@@ -189,10 +189,9 @@ struct CityPickerSheet: View {
     }
 
     private func section(_ heading: String, _ places: [SleepPlaceStore.Place], clears: Bool = false) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: theme.metrics.spaceS) {
             Text(heading)
                 .somaFont(theme.typography.eyebrow)
-                .textCase(.uppercase)
                 .foregroundStyle(theme.colors.inkSecondary.color)
             SomaBrowseGroup(places, hasGlyphs: false) { place in
                 SomaBrowseRow(title: place.name, detail: clears ? "Clear" : nil, opensSomething: false, action: {

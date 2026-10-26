@@ -30,7 +30,7 @@ struct EnvironmentMeasureRow: View {
         let valueColour = isWorse ? colors.danger.color : colors.inkPrimary.color
 
         HStack(alignment: .top, spacing: theme.metrics.cardSpacing) {
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: theme.metrics.spaceXS) {
                 Text(name)
                     .somaFont(type.body)
                     .foregroundStyle(colors.inkPrimary.color)

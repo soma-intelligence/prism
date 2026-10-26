@@ -63,9 +63,9 @@ struct LongevityLedgerPage: View {
             }
             LabFootnote("Group averages, not a promise.")
         }
-        .navigationTitle("Longevity Ledger")
+        .labPageTitle(Text("Longevity Ledger"))
         .task { await load() }
-        .refreshable { await load() }
+        .somaRefreshable { await load() }
         .sheet(isPresented: $isShowingMethod) { LedgerMethodSheet(today: today) }
     }
 
@@ -100,7 +100,7 @@ struct LongevityLedgerPage: View {
                 title: "Walk after dinner",
                 detail: "\(toGo.formatted()) more steps take you to 10,000 and earn \(LabMath.format(LongevityLedger.stepMinutes(10_000) - LongevityLedger.stepMinutes(steps), decimals: 0) ?? "") more minutes."
             ) {
-                SomaOrb(aspect: .activity, scale: .mini)
+                SomaObjectIcon(aspect: .activity, size: .row)
             }
         } else if (day?.sleepHours ?? 0) < 7 {
             SomaActionCard(
@@ -108,7 +108,7 @@ struct LongevityLedgerPage: View {
                 title: "Seven hours in bed",
                 detail: "A night between seven and nine hours earns two minutes; under six spends three."
             ) {
-                SomaOrb(aspect: .sleep, scale: .mini)
+                SomaObjectIcon(aspect: .sleep, size: .row)
             }
         }
     }

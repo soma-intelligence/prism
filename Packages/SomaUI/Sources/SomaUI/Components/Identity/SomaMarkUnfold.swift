@@ -35,6 +35,9 @@ public struct SomaMarkUnfold: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var start = Date.now
     @State private var settled = false
+    /// False while the mark is off screen. A wait the reader has scrolled
+    /// past still loops, but it stops drawing at the display's full rate.
+    @State private var isOnScreen = true
 
     public init(accessibilityLabel: LocalizedStringResource, mode: Mode = .loop) {
         self.accessibilityLabel = accessibilityLabel
@@ -48,11 +51,12 @@ public struct SomaMarkUnfold: View {
             if reduceMotion || settled {
                 SomaMarkShape().fill(ink, style: FillStyle(eoFill: true))
             } else {
-                TimelineView(.animation) { context in
+                TimelineView(.animation(paused: !isOnScreen)) { context in
                     SomaMarkUnfoldFrame(time: context.date.timeIntervalSince(start), ink: ink)
                 }
             }
         }
+        .somaOnScreen($isOnScreen)
         .accessibilityElement()
         .accessibilityLabel(Text(accessibilityLabel))
         .accessibilityAddTraits(.isImage)

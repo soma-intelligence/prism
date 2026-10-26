@@ -27,16 +27,16 @@ struct CheckInWriter {
             setTag(tag, on: date(day, now: now), to: true)
         case (.journalTag(let tag, let day), .no):
             setTag(tag, on: date(day, now: now), to: false)
-        case (.journalFeeling, .scale(let step)):
-            journal?.setFeeling(CheckInEngine.feelingStop(fromStep: step), on: now)
+        case (.journalFeeling, _):
+            if let step = answer.step { journal?.setFeeling(CheckInEngine.feelingStop(fromStep: step), on: now) }
         case (.homeEnergy, _), (.homeStress, _), (.homeBody, _):
             if let checkIn = CheckInEngine.homeCheckIn(from: answers, over: home.checkIn(on: now), on: now) {
                 home.addCheckIn(checkIn)
             }
-        case (.wakeRating, .scale(let step)):
-            track.setWakeFeel(step, on: now)
         case (.wakeRating, .number(let rating)):
             track.setWakeRating(rating, on: now)
+        case (.wakeRating, _):
+            if let step = answer.step { track.setWakeFeel(step, on: now) }
         default:
             break
         }
@@ -52,8 +52,8 @@ struct CheckInWriter {
         var asked: [(String, MindCheckIn.Answer)] = []
         for (question, answer) in answered {
             switch (question.destination, answer) {
-            case (.mindEnergy, .scale(let step)): energy = CheckInEngine.mindStep(fromStep: step)
-            case (.mindFocus, .scale(let step)): focus = CheckInEngine.mindStep(fromStep: step)
+            case (.mindEnergy, _): if let step = answer.step { energy = CheckInEngine.mindStep(fromStep: step) }
+            case (.mindFocus, _): if let step = answer.step { focus = CheckInEngine.mindStep(fromStep: step) }
             case (.bodyQuestion, .yes): asked.append((question.text, .yes))
             case (.bodyQuestion, .no): asked.append((question.text, .no))
             default: continue

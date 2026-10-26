@@ -24,12 +24,22 @@ public struct SomaMark: View {
 
     private let accessibilityLabel: LocalizedStringResource
     private let role: Role
+    private let fixedSide: CGFloat?
 
     @Environment(\.somaTheme) private var theme
 
     public init(accessibilityLabel: LocalizedStringResource, role: Role = .standard) {
         self.accessibilityLabel = accessibilityLabel
         self.role = role
+        self.fixedSide = nil
+    }
+
+    /// The mark in the primary ink at `side` points, drawn at that size rather
+    /// than scaled up from a glyph, so it stays sharp as a hero.
+    public init(accessibilityLabel: LocalizedStringResource, side: CGFloat) {
+        self.accessibilityLabel = accessibilityLabel
+        self.role = .standard
+        self.fixedSide = side
     }
 
     public var body: some View {
@@ -42,7 +52,8 @@ public struct SomaMark: View {
     }
 
     private var side: CGFloat {
-        switch role {
+        if let fixedSide { return fixedSide }
+        return switch role {
         case .standard: theme.metrics.markSize
         case .caption: theme.metrics.markCaptionSize
         }

@@ -89,6 +89,7 @@ private struct FuelBar: View {
     let label: String
     let value: Double?
     let fraction: Double?
+    let aspect: SomaAspect
     let freshness: Freshness
 
     @Environment(\.somaTheme) private var theme
@@ -97,31 +98,43 @@ private struct FuelBar: View {
     var body: some View {
         VStack(alignment: .leading, spacing: theme.metrics.widgetRowSpacing) {
             HStack(alignment: .firstTextBaseline) {
-                ValueLabel(label)
+                ValueLabel(label, aspect: aspect)
                 Spacer(minLength: 0)
                 Text(FuelText.kcal(value))
                     .somaFont(theme.typography.widgetRowValue)
                     .foregroundStyle(WidgetInk(theme: theme, mode: mode).value(freshness))
                     .lineLimit(1)
             }
-            ThinBar(fraction: fraction, dimmed: freshness != .fresh)
+            ThinBar(fraction: fraction, dimmed: freshness != .fresh, aspect: aspect)
                 .frame(height: theme.metrics.widgetBarHeight)
         }
     }
 }
 
-/// The two bars, burned over eaten.
+/// The two bars, burned over eaten, or side by side on the medium widget.
+/// Burned wears the activity hue and eaten the gut's, so the two sides read
+/// apart at a glance.
 private struct FuelBars: View {
     let snapshot: SomaWidgetSnapshot
     let freshness: Freshness
+    var sideBySide = false
 
     @Environment(\.somaTheme) private var theme
 
     var body: some View {
         let shares = FuelText.fractions(burned: snapshot.burnedKcal, eaten: snapshot.eatenKcal)
-        VStack(alignment: .leading, spacing: theme.metrics.widgetLabelSpacing) {
-            FuelBar(label: FuelText.burnedLabel, value: snapshot.burnedKcal, fraction: shares.burned, freshness: freshness)
-            FuelBar(label: FuelText.eatenLabel, value: snapshot.eatenKcal, fraction: shares.eaten, freshness: freshness)
+        let burned = FuelBar(label: FuelText.burnedLabel, value: snapshot.burnedKcal, fraction: shares.burned, aspect: .activity, freshness: freshness)
+        let eaten = FuelBar(label: FuelText.eatenLabel, value: snapshot.eatenKcal, fraction: shares.eaten, aspect: .gut, freshness: freshness)
+        if sideBySide {
+            HStack(alignment: .bottom, spacing: theme.metrics.widgetColumnSpacing) {
+                burned
+                eaten
+            }
+        } else {
+            VStack(alignment: .leading, spacing: theme.metrics.widgetLabelSpacing) {
+                burned
+                eaten
+            }
         }
     }
 }
@@ -161,8 +174,8 @@ public struct FuelSmall: View {
     }
 }
 
-/// The medium Fuel widget: the net figure on the leading side, the two bars
-/// beside it.
+/// The medium Fuel widget: the net figure large at the top, and burned and
+/// eaten side by side along the foot, as Fitness lays out its summary.
 public struct FuelMedium: View {
     private let snapshot: SomaWidgetSnapshot?
     private let now: Date
@@ -182,16 +195,16 @@ public struct FuelMedium: View {
             case .data(let freshness):
                 if let snapshot = snapshot.map({ FuelText.today($0, now: now) }) {
                     let metrics = theme.metrics
-                    VStack(spacing: metrics.widgetLabelSpacing) {
-                        HStack(alignment: .center, spacing: metrics.widgetColumnSpacing) {
+                    VStack(alignment: .leading, spacing: metrics.widgetLabelSpacing) {
+                        HStack(alignment: .top) {
                             NetFigure(snapshot: snapshot, freshness: freshness)
-                                .frame(width: metrics.widgetLargeLabelColumn, alignment: .leading)
-                            FuelBars(snapshot: snapshot, freshness: freshness)
-                                .frame(maxWidth: .infinity)
+                            Spacer(minLength: 0)
+                            StaleAge(freshness)
                         }
-                        .frame(maxHeight: .infinity)
-                        StaleFooter(freshness: freshness)
+                        Spacer(minLength: 0)
+                        FuelBars(snapshot: snapshot, freshness: freshness, sideBySide: true)
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .accessibilityElement(children: .ignore)
                     .accessibilityLabel(Text(FuelText.accessibility(snapshot, freshness)))
                 }

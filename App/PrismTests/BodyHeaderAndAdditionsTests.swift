@@ -13,15 +13,6 @@ import UIKit
 
 @Suite("Body: the header photographs and adding to the biomarkers")
 struct BodyHeaderAndAdditionsTests {
-    @Test("A blood test can always be added; readings only where this build writes to Health")
-    func additions() {
-        #expect(BodyAddition.offered(canWrite: false) == [.bloodTest])
-        let all = BodyAddition.offered(canWrite: true)
-        #expect(all.first == .bloodTest)
-        #expect(all.count == 5)
-        #expect(Set(all.map(\.id)).count == all.count)
-    }
-
     @Test("One credited photograph per aspect, none of the old landscapes left")
     func credits() {
         let credits = PhotoCredit.all

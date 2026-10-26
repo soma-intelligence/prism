@@ -10,10 +10,11 @@ import HealthExportCore
 /// time in daylight and the sound around you and in your headphones, as the
 /// watch recorded them into Apple Health.
 ///
-/// UV comes from Apple Health when an app or sensor writes it there. Air
-/// quality and the temperature need a weather source the app does not have
-/// (no WeatherKit entitlement), so neither is here: the pages show a dash.
-/// Sunrise and sunset are worked out on the device (``EnvironmentSun``).
+/// UV comes from Apple Health when an app or sensor writes it there. The
+/// weather, air quality and the forecast UV are not Health readings: the lens
+/// reads them from Open-Meteo for the place it knows
+/// (``EnvironmentWeatherClient``), so they are not here. Sunrise and sunset
+/// are worked out on the device (``EnvironmentSun``).
 struct EnvironmentInputs: Sendable, Equatable {
     var now: Date
     /// Time in daylight samples since midnight, each a stretch outside.
@@ -61,7 +62,7 @@ struct EnvironmentInputs: Sendable, Equatable {
         async let sound = samples(Metric.sound, from: monthAgo)
         async let headphones = samples(Metric.headphones, from: monthAgo)
         async let uv = samples(Metric.uv, from: monthAgo)
-        async let byDay = dailyTotals(Metric.daylight, from: daylightFrom, now: now, source: source, calendar: calendar)
+        async let byDay = HealthDailyTotals.read(Metric.daylight, from: daylightFrom, now: now, source: source, calendar: calendar)
 
         return EnvironmentInputs(
             now: now,
@@ -71,43 +72,5 @@ struct EnvironmentInputs: Sendable, Equatable {
             headphones: await headphones,
             uv: await uv
         )
-    }
-
-    /// One total per day from `start` to today, a handful in flight at a time.
-    private static func dailyTotals(
-        _ identifier: String,
-        from start: Date,
-        now: Date,
-        source: any HealthSampleSource,
-        calendar: Calendar
-    ) async -> [Date: Double] {
-        guard let metric = HealthMetricCatalog.metric(for: identifier) else { return [:] }
-        var days: [Date] = []
-        var day = calendar.startOfDay(for: start)
-        while day <= now {
-            days.append(day)
-            guard let next = calendar.date(byAdding: .day, value: 1, to: day) else { break }
-            day = next
-        }
-
-        return await withTaskGroup(of: (Date, Double?).self) { group in
-            var result: [Date: Double] = [:]
-            var pending = days.makeIterator()
-
-            func add(_ day: Date) {
-                let end = min(calendar.date(byAdding: .day, value: 1, to: day) ?? now, now)
-                group.addTask { (day, (try? await source.total(metric, from: day, to: end))?.value) }
-            }
-
-            for _ in 0..<12 {
-                guard let next = pending.next() else { break }
-                add(next)
-            }
-            for await (day, value) in group {
-                if let value { result[day] = value }
-                if let next = pending.next() { add(next) }
-            }
-            return result
-        }
     }
 }

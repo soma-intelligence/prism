@@ -21,6 +21,8 @@ final class SomaNotificationRouter: NSObject, UNUserNotificationCenterDelegate {
         let center = UNUserNotificationCenter.current()
         guard !(center.delegate is SomaNotificationRouter) else { return }
         center.delegate = shared
+        // The actions a reminder carries: "Taken" on a dose.
+        center.setNotificationCategories([MedicationReminders.category])
     }
 
     nonisolated func userNotificationCenter(
@@ -29,8 +31,10 @@ final class SomaNotificationRouter: NSObject, UNUserNotificationCenterDelegate {
     ) async {
         let delivered = DeliveredNotification(response.notification)
         let isDefaultTap = response.actionIdentifier == UNNotificationDefaultActionIdentifier
+        let isTaken = response.actionIdentifier == MedicationReminders.takenAction
         await MainActor.run {
-            SomaNotifications.shared.record(delivered, isRead: isDefaultTap)
+            SomaNotifications.shared.record(delivered, isRead: isDefaultTap || isTaken)
+            if isTaken { MedicationReminders.logTaken(identifier: delivered.id, in: .shared, at: .now) }
             CheckInPresenter.shared.openFromNotification(identifier: delivered.id)
             guard isDefaultTap else { return }
             let link = delivered.link ?? Self.fallbackLink(for: delivered.id)
@@ -50,7 +54,8 @@ final class SomaNotificationRouter: NSObject, UNUserNotificationCenterDelegate {
         let delivered = DeliveredNotification(notification)
         await MainActor.run { SomaNotifications.shared.record(delivered) }
         let kind = SomaNotificationKind.kind(forIdentifier: delivered.id)
-        return kind == .test || kind == .dataAlert ? [.banner, .list, .sound] : [.list]
+        // A dose reminder is for its minute, open app or not.
+        return kind == .test || kind == .dataAlert || kind == .dose ? [.banner, .list, .sound] : [.list]
     }
 
     /// Where a notification sent before links were attached opens.
@@ -61,7 +66,11 @@ final class SomaNotificationRouter: NSObject, UNUserNotificationCenterDelegate {
         case .bedtime: .sleep
         case .weeklySummary: .trends
         case .dataAlert, .test: .inbox
+        case .screeningDue: .screeningLedger
+        case .appointment: .medicalRecord
         case .lastMeal, .stand, .other: .today
+        case .dose: .journal
+        case .assessment: .mindAssessments
         }
     }
 }

@@ -8,9 +8,10 @@ import SwiftUI
 /// A 24 hour clock with one span drawn on it: a fast, a window. Midnight sits
 /// at the top, noon at the foot.
 ///
-/// Drag the start knob to move the span, the end knob to lengthen or shorten
-/// it. A second, thinner band inside the track marks a window to set it
-/// against (the usual night's sleep), and a dot on the rim says where now is.
+/// One thin track inside a watch bezel of fine ticks. Drag the start knob to
+/// move the span, the end knob to lengthen or shorten it. A hairline band
+/// inside the track marks a window to set it against (the usual night's
+/// sleep), and a dot on the track says where now is.
 /// Once the span is running, `progress` fills the part already behind.
 public struct SomaDayClock<Center: View>: View {
     @Binding private var start: Double
@@ -70,30 +71,36 @@ public struct SomaDayClock<Center: View>: View {
         GeometryReader { proxy in
             let side = min(proxy.size.width, proxy.size.height)
             let middle = CGPoint(x: proxy.size.width / 2, y: proxy.size.height / 2)
-            let radius = side / 2 - metrics.cardSpacing * 3.5
+            let bezel = metrics.bezelGap + metrics.bezelMajorTick
+            let radius = side / 2 - track / 2 - bezel - metrics.spaceXL * 1.6
             let end = start + length
+            let ring = radius + track / 2 + metrics.bezelGap
 
             ZStack {
-                // Hour ticks round the outside.
+                // A watch's bezel: a fine tick every quarter hour, a longer
+                // one on the hour, the longest every six.
                 Canvas { context, _ in
-                    for hour in 0..<24 {
-                        let isQuarter = hour % 6 == 0
+                    for quarter in 0..<96 {
+                        let hour = Double(quarter) / 4
+                        let isHour = quarter % 4 == 0
+                        let isQuarterDay = quarter % 24 == 0
+                        let length = isQuarterDay ? metrics.bezelMajorTick : (isHour ? metrics.bezelTick : metrics.bezelTick * 0.5)
+                        let ink = isQuarterDay ? metrics.inputTickStrong : (isHour ? metrics.inputTickMedium : metrics.inputTickFaint)
                         var tick = Path()
-                        let outer = radius + track + metrics.cardSpacing * (isQuarter ? 1.6 : 1.3)
-                        tick.move(to: point(middle, radius + track + metrics.cardSpacing * 0.8, Double(hour)))
-                        tick.addLine(to: point(middle, outer, Double(hour)))
-                        context.stroke(tick, with: .color(colors.inkSecondary.color.opacity(0.6)), lineWidth: 1)
+                        tick.move(to: point(middle, ring, hour))
+                        tick.addLine(to: point(middle, ring + length, hour))
+                        context.stroke(tick, with: .color(colors.inkPrimary.color.opacity(ink)), lineWidth: metrics.inputHairline)
                     }
                 }
 
                 Circle()
-                    .stroke(colors.surface.color, lineWidth: track)
+                    .stroke(colors.inkPrimary.color.opacity(metrics.hairlineOpacity), lineWidth: track)
                     .frame(width: radius * 2, height: radius * 2)
                     .position(middle)
 
                 if let progress {
                     arc(middle, radius, from: start, to: end)
-                        .stroke(hue.opacity(0.35), style: StrokeStyle(lineWidth: track, lineCap: .round))
+                        .stroke(hue.opacity(0.3), style: StrokeStyle(lineWidth: track, lineCap: .round))
                     arc(middle, radius, from: start, to: start + length * progress)
                         .stroke(hue, style: StrokeStyle(lineWidth: track, lineCap: .round))
                 } else {
@@ -102,15 +109,15 @@ public struct SomaDayClock<Center: View>: View {
                 }
 
                 if let band {
-                    arc(middle, radius - track - metrics.cardSpacing, from: band.lowerBound, to: band.upperBound)
-                        .stroke(theme.aspects[.sleep].identity.color, style: StrokeStyle(lineWidth: metrics.clockBandWidth, lineCap: .round))
+                    arc(middle, radius - track / 2 - metrics.bezelGap, from: band.lowerBound, to: band.upperBound)
+                        .stroke(theme.aspects[.sleep].identity.color.opacity(0.7), style: StrokeStyle(lineWidth: metrics.clockBandWidth, lineCap: .round))
                 }
 
                 ForEach([0, 6, 12, 18], id: \.self) { hour in
                     Text(String(format: "%02d", hour))
                         .somaFont(theme.typography.captionValue)
                         .foregroundStyle(colors.inkSecondary.color)
-                        .position(point(middle, radius - track - metrics.cardSpacing * 2.6, Double(hour)))
+                        .position(point(middle, radius - track / 2 - metrics.bezelGap - metrics.spaceL - metrics.spaceXS, Double(hour)))
                 }
 
                 if let now, !Self.near(now, start), !Self.near(now, end) {
@@ -121,11 +128,11 @@ public struct SomaDayClock<Center: View>: View {
                     Text("Now")
                         .somaFont(theme.typography.tabLabel)
                         .foregroundStyle(colors.inkSecondary.color)
-                        .position(point(middle, radius + track + metrics.cardSpacing * 3, now))
+                        .position(point(middle, ring + bezel + metrics.spaceS, now))
                 }
 
-                timeLabel(start).position(point(middle, radius + track + metrics.cardSpacing * 3.4, start))
-                timeLabel(end).position(point(middle, radius + track + metrics.cardSpacing * 3.4, end))
+                timeLabel(start).position(point(middle, ring + bezel + metrics.spaceL, start))
+                timeLabel(end).position(point(middle, ring + bezel + metrics.spaceL, end))
 
                 knob(at: point(middle, radius, start), around: middle) { hour in
                     start = snapped(hour)

@@ -55,7 +55,7 @@ struct PeakWindowPage: View {
                 SomaChartCard(eyebrow: "Rhythm", value: ScoreMath.clock(day.windDownHour), unit: "wind down",
                               note: "Usual sleep window \(ScoreMath.clock(day.bedHour)) to \(ScoreMath.clock(day.wakeHour)). Morning light before 09:00 keeps it early.") {
                     ScoreClockRing(sleepStart: day.bedHour, sleepEnd: day.wakeHour, windDown: day.windDownHour, now: day.nowHour)
-                        .padding(.vertical, 8)
+                        .padding(.vertical, theme.metrics.spaceS)
                 }
                 ScoreMoveCard(move: ScorePages.Move(eyebrow: "Tonight", title: "Wind down at \(ScoreMath.clock(day.windDownHour))",
                                                     detail: "An hour before your usual bedtime.", remindAt: day.windDownHour),

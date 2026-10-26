@@ -83,7 +83,7 @@ private struct StressBandsCard: View {
                 if let minutes {
                     GeometryReader { proxy in
                         let usable = proxy.size.width - 6
-                        HStack(spacing: 3) {
+                        HStack(spacing: theme.metrics.spaceXS) {
                             ForEach(0..<3, id: \.self) { index in
                                 Capsule().fill(hue.opacity(0.35 + 0.325 * Double(index)))
                                     .frame(width: max(0, usable * minutes[index] / total))
@@ -91,7 +91,7 @@ private struct StressBandsCard: View {
                         }
                     }
                     .frame(height: 8)
-                    .padding(.vertical, 12)
+                    .padding(.vertical, theme.metrics.spaceM)
                     ScoreRows(Array(0..<3).map { ScoreBandRow(index: $0) }) { row in
                         HStack {
                             Circle().fill(hue.opacity(0.35 + 0.325 * Double(row.index)))
@@ -116,7 +116,7 @@ private struct StressBandsCard: View {
                     Text("No readings yet")
                         .somaFont(type.caption)
                         .foregroundStyle(colors.inkSecondary.color)
-                        .padding(.top, 10)
+                        .padding(.top, theme.metrics.spaceM)
                 }
             }
         }
@@ -160,13 +160,13 @@ struct StressArticleSheet: View {
     }
 
     private func section(_ title: String, _ lead: String, _ rest: String) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: theme.metrics.spaceS) {
             Text(title)
                 .somaFont(theme.typography.cardTitle)
                 .foregroundStyle(theme.colors.inkPrimary.color)
                 .accessibilityAddTraits(.isHeader)
             ScoreParagraph(lead: lead, rest: rest)
         }
-        .padding(.top, 8)
+        .padding(.top, theme.metrics.spaceS)
     }
 }

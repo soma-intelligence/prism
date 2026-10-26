@@ -46,8 +46,8 @@ enum PulseLinksInputs {
 
         async let hrv = samples(Metric.hrv)
         async let resting = samples(Metric.restingHeartRate)
-        async let steps = PulseTrendsInputs.dailyTotals(Metric.steps, from: first, now: now, source: source, calendar: calendar)
-        async let daylight = PulseTrendsInputs.dailyTotals(Metric.daylight, from: first, now: now, source: source, calendar: calendar)
+        async let steps = HealthDailyTotals.read(Metric.steps, from: first, now: now, source: source, calendar: calendar)
+        async let daylight = HealthDailyTotals.read(Metric.daylight, from: first, now: now, source: source, calendar: calendar)
         return Health(hrv: await hrv, resting: await resting, steps: await steps, daylight: await daylight)
     }
 

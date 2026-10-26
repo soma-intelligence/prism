@@ -92,6 +92,7 @@ nonisolated enum CheckInEngine {
             question.windows.contains(window)
                 && !record.isSettled(question.id)
                 && isOpen(question, context: context)
+                && isDue(question, now: now, calendar: calendar, context: context)
                 && seen.insert(question.id).inserted
         }
         return Array(run.prefix(sessionLimit))
@@ -114,6 +115,14 @@ nonisolated enum CheckInEngine {
         guard let window = CheckInWindow.at(now, calendar: calendar) else { return nil }
         let when = now.addingTimeInterval(snooze)
         return when < window.end(on: now, calendar: calendar) ? when : nil
+    }
+
+    /// Whether a question asked less than daily has waited its days: a
+    /// weekly one settled on Saturday comes back the next Saturday.
+    static func isDue(_ question: CheckInQuestion, now: Date, calendar: Calendar, context: CheckInContext) -> Bool {
+        guard question.everyDays > 1, let last = context.lastSettled[question.id] else { return true }
+        let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: last), to: calendar.startOfDay(for: now)).day ?? 0
+        return days >= question.everyDays
     }
 
     /// Whether `question` still has something to learn, given what is already
@@ -165,8 +174,8 @@ nonisolated enum CheckInEngine {
         for question in catalog {
             guard let answer = answers[question.id] else { continue }
             switch (question.destination, answer) {
-            case (.homeEnergy, .scale(let step)): energy = min(max(step, 1), 5)
-            case (.homeStress, .scale(let step)): stress = min(max(step, 1), 5)
+            case (.homeEnergy, _): if let step = answer.step { energy = min(max(step, 1), 5) }
+            case (.homeStress, _): if let step = answer.step { stress = min(max(step, 1), 5) }
             case (.homeBody, .yes): body = .sore
             case (.homeBody, .no): body = existing?.body == .fresh ? .fresh : .normal
             default: continue

@@ -29,7 +29,6 @@ struct AskLogHub: View {
                     VStack(alignment: .leading, spacing: theme.metrics.cardHeaderSpacing) {
                         Text("Tell Soma")
                             .somaFont(theme.typography.eyebrow)
-                            .textCase(.uppercase)
                             .foregroundStyle(theme.colors.inkSecondary.color)
                         Text("Log something")
                             .somaFont(theme.typography.display)
@@ -57,6 +56,7 @@ struct AskLogHub: View {
                 }
                 .padding(theme.metrics.pagePadding)
             }
+            .softScrollEdges()
             .background(theme.colors.canvas.color.ignoresSafeArea())
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
@@ -68,7 +68,7 @@ struct AskLogHub: View {
     }
 
     private func tile(_ shortcut: LogShortcut) -> some View {
-        VStack(alignment: .leading, spacing: theme.metrics.scoreLabelSpacing * 2) {
+        VStack(alignment: .leading, spacing: theme.metrics.spaceXS) {
             LogShortcutGlyph(shortcut: shortcut)
             Spacer(minLength: theme.metrics.cardSpacing)
             Text(shortcut.title)

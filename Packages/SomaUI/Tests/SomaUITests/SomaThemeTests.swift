@@ -155,15 +155,26 @@ struct SomaScaleTests {
         )
     }
 
-    @Test("Headlines and values are set regular and tight, labels wide, like the site")
+    @Test("Headlines and values are set regular and tight, labels at the face's own tracking")
     func headlinesAreRegularAndTight() {
         for scale in [SomaTypography.touch, SomaTypography.pointer] {
             for role in [scale.display, scale.title, scale.metric] {
                 #expect(role.weight == .regular)
                 #expect(role.tracking < 0)
             }
-            #expect(scale.eyebrow.tracking > 0)
+            // A wide tracked kicker read as generated; the label is quiet now.
+            #expect(scale.eyebrow.tracking == 0)
+            #expect(scale.body.tracking == 0)
         }
+    }
+
+    /// Apple's iOS text styles at the Large size, and nothing between them.
+    @Test("Every touch role is one of Apple's text style sizes")
+    func touchSizesAreAppleTextStyles() {
+        let apple: Set<CGFloat> = [34, 28, 22, 20, 17, 16, 15, 13, 12, 11]
+        let sizes = Set(SomaTypography.touch.allRoles.map(\.size))
+        #expect(sizes.isSubset(of: apple))
+        #expect(sizes.count <= 8)
     }
 
     @Test("The folded header title reads between a caption and the page title")
@@ -221,8 +232,30 @@ struct SomaStandardThemeTests {
         #expect(EnvironmentValues().somaTheme == SomaTheme.standard)
     }
 
-    /// Sixteen on a phone, so cards take the whole width.
-    @Test("Phone pages use a narrow gutter, and a hairline is a tenth of the ink")
+    /// Sixteen on a phone, the reference design's gutter: the owner asked for cards that
+    /// take the whole width (2026-10-03).
+    /// The card's corner holds its contents concentrically: a control set in
+    /// by the control's own radius, a chip set in by four.
+    @Test("Card, control and chip radii are concentric on both scales")
+    func radiiAreConcentric() {
+        for metrics in [SomaMetrics.touch, SomaMetrics.pointer] {
+            #expect(metrics.controlCornerRadius < metrics.cardCornerRadius)
+            #expect(metrics.chipCornerRadius < metrics.controlCornerRadius)
+            #expect(metrics.browseGroupCornerRadius == metrics.cardCornerRadius)
+            #expect(metrics.cardCornerRadius - metrics.cardPadding == metrics.chipCornerRadius)
+        }
+    }
+
+    @Test("Spacing tokens sit on the four point scale")
+    func spacingIsOnTheScale() {
+        let m = SomaMetrics.touch
+        for value in [m.cardPadding, m.cardSpacing, m.pagePadding, m.browseSectionSpacing,
+                      m.browseHeadingSpacing, m.moveRowSpacing, m.timelineRowSpacing, m.leadSpacing] {
+            #expect(value.truncatingRemainder(dividingBy: 4) == 0)
+        }
+    }
+
+    @Test("Phone pages use the reference design's narrow gutter, and a hairline is a tenth of the ink")
     func gutterAndHairline() {
         #expect(SomaMetrics.touch.pagePadding == 16)
         #expect(SomaMetrics.touch.hairlineOpacity == 0.10)

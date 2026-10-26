@@ -7,13 +7,14 @@ import Foundation
 import SyncCore
 import SyncSupabase
 
-/// "Delete my data": removes the Soma account and everything stored with it
-/// on the server, then signs out.
+/// "Close my account": closes the Soma account on the server, then signs out.
+/// Nothing is erased anywhere (owner rule 2026-10-03, restated 2026-10-24).
 ///
 /// The work runs in the Edge Function `delete-account` with the service role:
-/// it removes the person's folders in both buckets, then deletes the auth
-/// user, which cascades to every table. The app only asks, with the person's
-/// own session, so nobody can delete anyone else.
+/// it marks the profile deleted and bans the auth user, so sign in is refused
+/// and sync stops; every row and stored file stays and an admin can reopen
+/// the account. The app only asks, with the person's own session, so nobody
+/// can close anyone else's.
 ///
 /// Call it after the person confirmed on screen (the Settings row owns that
 /// dialog; ``confirmationTitle`` and ``confirmationMessage`` are its words).
@@ -48,8 +49,8 @@ enum AccountDeletion {
         do {
             try WellnessSession.eraseLocalData(userID: UserID(user.id))
         } catch {
-            // The server copy is gone; a leftover local database is harmless
-            // and is replaced on the next sign in.
+            // A leftover local sync database is harmless: nothing pushes to a
+            // closed account, and it is replaced on the next sign in.
         }
     }
 }

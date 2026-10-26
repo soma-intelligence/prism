@@ -19,6 +19,8 @@ final class ToolsModel {
 
     /// Nil until the first read finishes; the pages show dashes meanwhile.
     private(set) var inputs: ToolsInputs?
+    /// The weather where the person is, for Sun Budget and Skin Forecast.
+    private(set) var weather: ToolWeather?
     private var readAt: Date?
     private var running: Task<Void, Never>?
 
@@ -42,10 +44,24 @@ final class ToolsModel {
                 self.inputs = ToolsInputs(now: now)
             }
             await health.loadScores(force: force)
+            self.weather = await Self.weather()
             self.readAt = now
         }
         running = task
         await task.value
         running = nil
+    }
+
+    /// The weather at the place the Environment lens knows: the device's own
+    /// when Location is allowed, else the city picked on the Weather page.
+    /// Nothing here asks for Location; the lens does that, in context.
+    private static func weather() async -> ToolWeather? {
+        let location = EnvironmentLocation.shared
+        if location.place == nil { await location.refresh() }
+        guard let place = location.place,
+              let conditions = await EnvironmentWeatherClient.shared.conditions(latitude: place.latitude, longitude: place.longitude)
+        else { return nil }
+        return ToolWeather(place: place.name ?? String(localized: "your area"), latitude: place.latitude,
+                           longitude: place.longitude, conditions: conditions)
     }
 }

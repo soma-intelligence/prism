@@ -75,7 +75,7 @@ struct StrainPerformancePage: View {
         }
         .navigationTitle("Strain performance")
         .task { await health.loadScores() }
-        .refreshable { await health.loadScores(force: true) }
+        .somaRefreshable { await health.loadScores(force: true) }
     }
 
     /// Today's strain against today's target, in a few words.

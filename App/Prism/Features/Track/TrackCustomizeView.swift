@@ -139,7 +139,7 @@ struct TrackCustomizeView: View {
             }
         }
         .task { await load() }
-        .refreshable { await load() }
+        .somaRefreshable { await load() }
     }
 
     private var healthRows: [HealthRow] {
@@ -258,7 +258,7 @@ struct TrackCustomizeView: View {
     }
 
     private func load() async {
-        let source = health.reader is EmptyHealthSource ? nil : await health.prepare([])
+        let source = health.readsEmptyStore ? nil : await health.prepare([])
         access = await TrackHealthAccess.read(from: source, now: .now, calendar: .current)
     }
 }

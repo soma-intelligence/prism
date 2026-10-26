@@ -6,8 +6,10 @@
 import SwiftUI
 import SomaUI
 
-/// Water, add a drink: the glass is the control. Drag it up to pour, or pick
-/// one of the usual glasses under it; the day's glasses fill along the foot.
+/// Water, add a drink: the page is the drink. A drag anywhere raises or lowers
+/// the level that fills the screen; the usual amounts sit as pills, and the
+/// day's total as one line. The drawn glass it replaced looked like clip art
+/// (owner, 2026-10-24).
 ///
 /// Saved to Apple Health as dietary water, with the caffeine of a coffee or a
 /// tea as dietary caffeine, and kept in ``TrackLogStore`` with its time so the
@@ -34,34 +36,37 @@ struct TrackWaterView: View {
         let today = logged ?? 0
         let goal = log.waterGoalMl
 
-        TrackEntryPage(title: drink.title, scrolls: false) {
-            SomaVesselInput(value: $ml, capacity: drink.capacity, step: drink.step, aspect: aspect, label: drink.title)
-                .frame(height: metrics.vesselHeight)
+        GeometryReader { proxy in
+        TrackEntryPage(title: drink.title, scrolls: false, backdrop: AnyView(
+            SomaLiquidFill(fill: drink.capacity > 0 ? ml / drink.capacity : 0, aspect: aspect)
+        )) {
+            // The number, large and light, over the rising level; the whole
+            // page pours.
+            VStack(spacing: metrics.spaceS) {
+                SomaReadout("\(Int(ml))", unit: "ml",
+                            caption: drink == .water ? "Drag up or down" : "\(Int(drink.caffeine(ml: ml))) mg caffeine")
+            }
+            .frame(maxWidth: .infinity, minHeight: proxy.size.height * 0.42)
 
-            SomaReadout("\(Int(ml))", unit: "ml",
-                        caption: drink == .water ? nil : "\(Int(drink.caffeine(ml: ml))) mg caffeine")
-
-            HStack(spacing: metrics.cardSpacing * 0.5) {
+            HStack(spacing: metrics.spaceS) {
                 ForEach(drink.presets, id: \.self) { preset in
                     Button {
                         ml = preset
                     } label: {
-                        VStack(spacing: metrics.scoreLabelSpacing * 2) {
-                            SomaVessel(fill: preset / drink.capacity * 1.6, aspect: aspect, isGlyph: true)
-                                .frame(height: metrics.vesselGlyphHeight * (0.7 + 0.6 * preset / drink.capacity))
-                            Text("\(Int(preset)) ml")
-                                .somaFont(type.captionValue)
-                                .foregroundStyle(ml == preset ? colors.accent.color : colors.inkSecondary.color)
-                        }
-                        .frame(maxWidth: .infinity, minHeight: metrics.minimumTapTarget * 1.6, alignment: .bottom)
-                        .padding(.vertical, metrics.cardSpacing * 0.5)
-                        .background {
-                            if ml == preset {
-                                RoundedRectangle(cornerRadius: metrics.browseGroupCornerRadius, style: .continuous)
-                                    .fill(colors.surface.color)
+                        Text("\(Int(preset)) ml")
+                            .somaFont(type.captionValue)
+                            .foregroundStyle(ml == preset ? colors.onAccent.color : colors.inkPrimary.color)
+                            .frame(maxWidth: .infinity, minHeight: metrics.minimumTapTarget)
+                            .background {
+                                // Glass over the water, as visionOS sets its
+                                // controls over the room; the chosen one ink.
+                                if ml == preset {
+                                    Capsule().fill(colors.inkPrimary.color)
+                                } else {
+                                    Color.clear.somaGlass(in: .capsule)
+                                }
                             }
-                        }
-                        .contentShape(.rect)
+                            .contentShape(.capsule)
                     }
                     .buttonStyle(.somaGlassPress)
                     .accessibilityLabel(Text("\(Int(preset)) millilitres"))
@@ -69,7 +74,7 @@ struct TrackWaterView: View {
                 }
             }
 
-            VStack(spacing: metrics.cardSpacing * 0.75) {
+            VStack(alignment: .leading, spacing: metrics.spaceS) {
                 HStack {
                     TrackEyebrow("Today")
                     Spacer()
@@ -77,20 +82,27 @@ struct TrackWaterView: View {
                         .somaFont(type.captionValue)
                         .foregroundStyle(colors.inkSecondary.color)
                 }
-                HStack(spacing: metrics.cardSpacing * 0.75) {
-                    ForEach(Array(TrackIntake.glasses(total: today, goal: goal).enumerated()), id: \.offset) { _, fill in
-                        SomaVessel(fill: fill, aspect: .mind, isGlyph: true)
-                            .frame(height: metrics.vesselGlyphHeight)
+                GeometryReader { bar in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(colors.inkPrimary.color.opacity(metrics.hairlineOpacity))
+                        Capsule().fill(colors.inkPrimary.color)
+                            .frame(width: bar.size.width * CGFloat(goal > 0 ? min(today / goal, 1) : 0))
                     }
                 }
+                .frame(height: 4)
                 .accessibilityElement()
                 .accessibilityLabel(Text("\(TrackIntake.litres(today)) of \(TrackIntake.litres(goal)) litres today"))
             }
+            .padding(metrics.cardPadding)
+            .somaGlass(in: .rect(cornerRadius: metrics.cardCornerRadius, style: .continuous))
         } footer: {
             SomaActionButton("Add \(Int(ml)) ml") {
                 let now = Date.now
                 let entry = log.addDrink(drink, ml: ml, at: now)
-                Task { await TrackHealthWriter.saveDrink(entry) }
+                Task {
+                    let reached = await TrackHealthWriter.saveDrink(entry)
+                    Confirmations.shared.logged(drink.title, reachedHealth: reached)
+                }
                 dismiss()
             }
             .disabled(ml <= 0)
@@ -99,6 +111,8 @@ struct TrackWaterView: View {
                 segments: TrackDrink.allCases.map { SomaSegment(id: $0, title: LocalizedStringResource(stringLiteral: $0.title)) },
                 selection: Binding(get: { drink }, set: { drink = $0; ml = $0.usual })
             )
+        }
+        .somaLiquidPour(value: $ml, capacity: drink.capacity, step: drink.step, height: proxy.size.height * 0.8)
         }
     }
 

@@ -26,15 +26,15 @@ nonisolated struct SomaScores: Equatable, Sendable {
     static let seriesDays = 30
 
     /// One moment on today's energy curve.
-    struct EnergyPoint: Equatable, Sendable {
+    struct EnergyPoint: Equatable, Sendable, Codable {
         var date: Date
         /// 0 to 100.
         var level: Double
     }
 
     /// One signed term of today's recovery, for the explanation.
-    struct RecoveryTerm: Equatable, Sendable {
-        enum Kind: String, Sendable { case hrv, rhr, sleep, rest }
+    struct RecoveryTerm: Equatable, Sendable, Codable {
+        enum Kind: String, Sendable, Codable { case hrv, rhr, sleep, rest }
         var kind: Kind
         var points: Double
         var value: Double?
@@ -82,7 +82,7 @@ nonisolated struct SomaScores: Equatable, Sendable {
 
     /// The whole window the engine read (ninety days, oldest first, ending
     /// today), gated like the 30 day series, and last night taken apart.
-    struct Detail: Equatable, Sendable {
+    struct Detail: Equatable, Sendable, Codable {
         var sleep: [Double?] = []
         var recovery: [Double?] = []
         var strain: [Double?] = []
@@ -245,3 +245,6 @@ nonisolated extension SomaScores {
         return Array(repeating: nil, count: seriesDays - last.count) + last
     }
 }
+
+// Written to disk by HealthSnapshotStore so the pages draw at launch.
+extension SomaScores: Codable {}

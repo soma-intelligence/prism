@@ -79,7 +79,7 @@ struct ECGPage: View {
         }
         .navigationTitle("ECG")
         .task { await load() }
-        .refreshable { await load() }
+        .somaRefreshable { await load() }
     }
 
     /// The average heart rate of each day's last recording, the last thirty

@@ -57,6 +57,28 @@ nonisolated struct NotificationPreferences: Codable, Equatable, Sendable {
     var quietUntil = ClockTime(hour: 7)
 }
 
+nonisolated extension NotificationPreferences {
+    /// Field by field: a reminder added in a later build starts on its
+    /// default and leaves every other choice as it was.
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let defaults = Self()
+        morningCheckIn = container.value(.morningCheckIn, or: defaults.morningCheckIn)
+        morningTime = container.value(.morningTime, or: defaults.morningTime)
+        eveningCheckIn = container.value(.eveningCheckIn, or: defaults.eveningCheckIn)
+        eveningTime = container.value(.eveningTime, or: defaults.eveningTime)
+        eveningNudges = container.value(.eveningNudges, or: defaults.eveningNudges)
+        podVisits = container.value(.podVisits, or: defaults.podVisits)
+        bloodTests = container.value(.bloodTests, or: defaults.bloodTests)
+        tools = container.value(.tools, or: defaults.tools)
+        sourceQuiet = container.value(.sourceQuiet, or: defaults.sourceQuiet)
+        afterSession = container.value(.afterSession, or: defaults.afterSession)
+        quietHours = container.value(.quietHours, or: defaults.quietHours)
+        quietFrom = container.value(.quietFrom, or: defaults.quietFrom)
+        quietUntil = container.value(.quietUntil, or: defaults.quietUntil)
+    }
+}
+
 // MARK: - Customization
 
 nonisolated enum AnswerLength: String, Codable, CaseIterable, Identifiable, Sendable {
@@ -97,6 +119,21 @@ nonisolated struct CustomizationPreferences: Codable, Equatable, Sendable {
     static let zoneTwoTargets = Array(stride(from: 60, through: 300, by: 15))
     static let waterTargets = Array(stride(from: 1000, through: 4000, by: 100))
     static let mealCutoffs = stride(from: 17 * 60, through: 23 * 60, by: 30).map { ClockTime(minutes: $0) }
+}
+
+nonisolated extension CustomizationPreferences {
+    /// Field by field, so one target this build cannot read costs only itself.
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let defaults = Self()
+        usualWindowDays = container.value(.usualWindowDays, or: defaults.usualWindowDays)
+        moveGoalKilocalories = container.value(.moveGoalKilocalories, or: defaults.moveGoalKilocalories)
+        zoneTwoMinutesPerWeek = container.value(.zoneTwoMinutesPerWeek, or: defaults.zoneTwoMinutesPerWeek)
+        waterMillilitres = container.value(.waterMillilitres, or: defaults.waterMillilitres)
+        lastMealBy = container.value(.lastMealBy, or: defaults.lastMealBy)
+        answers = container.value(.answers, or: defaults.answers)
+        skinType = try? container.decodeIfPresent(SkinType.self, forKey: .skinType)
+    }
 }
 
 // MARK: - Units
@@ -164,6 +201,21 @@ nonisolated struct UnitPreferences: Codable, Equatable, Sendable {
     }
 }
 
+nonisolated extension UnitPreferences {
+    /// Field by field; a unit missing from the file starts from the phone's
+    /// region, as it did on the first launch.
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let defaults = Self()
+        measures = container.value(.measures, or: defaults.measures)
+        temperature = container.value(.temperature, or: defaults.temperature)
+        glucose = container.value(.glucose, or: defaults.glucose)
+        energy = container.value(.energy, or: defaults.energy)
+        clock = container.value(.clock, or: defaults.clock)
+        weekStart = container.value(.weekStart, or: defaults.weekStart)
+    }
+}
+
 // MARK: - Shortcuts (the log hub)
 
 /// The six things the plus in Ask's composer offers.
@@ -223,11 +275,29 @@ nonisolated struct ShortcutPreferences: Codable, Equatable, Sendable {
     }
 }
 
+nonisolated extension ShortcutPreferences {
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let defaults = Self()
+        order = container.value(.order, or: defaults.order)
+        hidden = container.value(.hidden, or: defaults.hidden)
+    }
+}
+
 // MARK: - Diagnostics
 
 nonisolated struct DiagnosticsPreferences: Codable, Equatable, Sendable {
     var shareCrashReports = false
     var shareUsage = false
+}
+
+nonisolated extension DiagnosticsPreferences {
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let defaults = Self()
+        shareCrashReports = container.value(.shareCrashReports, or: defaults.shareCrashReports)
+        shareUsage = container.value(.shareUsage, or: defaults.shareUsage)
+    }
 }
 
 // MARK: - Store
@@ -249,6 +319,11 @@ final class GlobalSettings {
     var programs: [ProgramEnrollment] { didSet { save() } }
 
     private let url: URL?
+    /// True when a settings file is there but could not be opened, as while
+    /// the phone is still locked: nothing is written over it then, so a
+    /// change made before it opens never replaces the person's settings with
+    /// the defaults.
+    private let isUnopened: Bool
 
     private struct Stored: Codable {
         var notifications: NotificationPreferences?
@@ -257,13 +332,40 @@ final class GlobalSettings {
         var shortcuts: ShortcutPreferences?
         var diagnostics: DiagnosticsPreferences?
         var programs: [ProgramEnrollment]?
+
+        init(
+            notifications: NotificationPreferences?, customization: CustomizationPreferences?, units: UnitPreferences?,
+            shortcuts: ShortcutPreferences?, diagnostics: DiagnosticsPreferences?, programs: [ProgramEnrollment]?
+        ) {
+            self.notifications = notifications
+            self.customization = customization
+            self.units = units
+            self.shortcuts = shortcuts
+            self.diagnostics = diagnostics
+            self.programs = programs
+        }
+
+        /// Each section is read on its own. One this build cannot read (a
+        /// field added since the file was written, a case since dropped)
+        /// falls back to its defaults alone, rather than taking every other
+        /// section down with it.
+        init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            notifications = try? container.decodeIfPresent(NotificationPreferences.self, forKey: .notifications)
+            customization = try? container.decodeIfPresent(CustomizationPreferences.self, forKey: .customization)
+            units = try? container.decodeIfPresent(UnitPreferences.self, forKey: .units)
+            shortcuts = try? container.decodeIfPresent(ShortcutPreferences.self, forKey: .shortcuts)
+            diagnostics = try? container.decodeIfPresent(DiagnosticsPreferences.self, forKey: .diagnostics)
+            programs = try? container.decodeIfPresent([ProgramEnrollment].self, forKey: .programs)
+        }
     }
 
     /// - Parameter url: nil keeps everything in memory, for previews and tests.
     init(url: URL? = GlobalSettings.defaultURL) {
         self.url = url
-        let stored = url.flatMap { try? Data(contentsOf: $0) }
-            .flatMap { try? JSONDecoder().decode(Stored.self, from: $0) }
+        let data = url.flatMap { try? Data(contentsOf: $0) }
+        isUnopened = data == nil && url.map { FileManager.default.fileExists(atPath: $0.path) } == true
+        let stored = data.flatMap { try? JSONDecoder().decode(Stored.self, from: $0) }
         notifications = stored?.notifications ?? NotificationPreferences()
         customization = stored?.customization ?? CustomizationPreferences()
         units = stored?.units ?? UnitPreferences()
@@ -278,13 +380,13 @@ final class GlobalSettings {
     }
 
     private func save() {
-        guard let url else { return }
+        guard let url, !isUnopened else { return }
         let stored = Stored(
             notifications: notifications, customization: customization, units: units,
             shortcuts: shortcuts, diagnostics: diagnostics, programs: programs
         )
         guard let data = try? JSONEncoder().encode(stored) else { return }
         try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try? data.write(to: url, options: .atomic)
+        try? data.write(to: url, options: SomaFileStorage.protectedAtomicOptions)
     }
 }

@@ -35,8 +35,11 @@ public enum SomaScoringEngine {
     /// With no age on record the original read an age of zero, which gives
     /// 208. Kept, rather than inventing an age.
     public static func maxHeartRate(ageYears: Double?) -> Double {
-        let tanaka = (208 - 0.7 * (ageYears ?? 0)).rounded()
-        return Double(min(220, max(120, Int(tanaka))))
+        // An age that is not a finite number (a bad date of birth in Health)
+        // reads as no age, rather than trapping on the conversion.
+        let age = ageYears.flatMap { $0.isFinite ? $0 : nil } ?? 0
+        let tanaka = (208 - 0.7 * age).rounded()
+        return min(220, max(120, tanaka))
     }
 
     /// Last night as the sessionizer sees it, before anything is scored: what

@@ -53,6 +53,13 @@ public extension SomaTypography {
     var widgetGlance: SomaFontSpec { SomaFontSpec(size: 20, tracking: -0.4, digits: .tabular) }
     /// The one word under a value, and the age of a stale snapshot.
     var widgetLabel: SomaFontSpec { caption }
+    /// A measure's word when it wears its hue: the same size, one step
+    /// heavier, the way Health sets its coloured titles.
+    var widgetLabelStrong: SomaFontSpec {
+        var spec = caption
+        spec.weight = .semibold
+        return spec
+    }
     /// A number on a lock screen row.
     var widgetRowValue: SomaFontSpec { captionValue }
 }

@@ -24,77 +24,162 @@ struct SettingsSheet: View {
     /// The page of the website open over the sheet, when a row leads there.
     @State private var website: WebsiteLink?
 
+    /// Whether the sheet is wide enough to keep the settings beside the page
+    /// they open, the way Settings reads on an iPad: read off the sheet's own
+    /// width, so the inner screen of a foldable on its side gets it too.
+    @State private var widthClass = SomaWidthClass.compact
+    /// What the pane shows while the Vault holds the column, on a roomy
+    /// screen: the Vault's categories on the left and the one picked on the
+    /// right, as Apple Health's Browse reads on an iPad. `nil` keeps the
+    /// settings in the column.
+    @State private var vaultPane: VaultRoute?
+
     var body: some View {
-        NavigationStack(path: $path) {
-            SomaPageScroll {
-                VStack(alignment: .leading, spacing: theme.metrics.leadSpacing) {
-                    VStack(spacing: theme.metrics.cardSpacing) {
-                        accountRow
-                        summary
+        // Both shapes drive the one `path`, so a sheet that crosses the line
+        // (a foldable opening, a window resized) keeps the page it was on.
+        Group {
+            if widthClass == .regular {
+                HStack(spacing: 0) {
+                    NavigationStack {
+                        if vaultPane != nil {
+                            vaultColumn
+                        } else {
+                            column
+                        }
                     }
-                    vaultRow
-                    dayGroup
-                    generalGroup
-                    dataGroup
-                    signOutGroup
-                    supportGroup
-                    developerGroup
-                    footer
-                }
-                .padding(.horizontal, theme.metrics.pagePadding)
-                .padding(.top, theme.metrics.cardSpacing)
-                .padding(.bottom, theme.metrics.pagePadding)
-                .frame(maxWidth: theme.metrics.settingsContentWidth, alignment: .leading)
-                .frame(maxWidth: .infinity)
-            }
-            .background(theme.colors.canvas.color.ignoresSafeArea())
-            // The bar's own title and nothing above the account: the sheet
-            // opens on what a person came to change, not on a heading, a mark
-            // and a line of copy that push the first row halfway down.
-            .navigationTitle("Settings")
-            .toolbarTitleDisplayMode(.inline)
-            // The Vault's pages fade into the sheet's ground under the bar, as a
-            // pushed page on a tab does.
-            .navigationDestination(for: VaultRoute.self) { $0.page.somaScrollEdgeFade() }
-            .navigationDestination(for: GlobalRoute.self) { $0.page }
-            .navigationDestination(for: SettingsRoute.self) { route in
-                switch route {
-                case .developerTools:
-                    DeveloperToolsPage(reveal: reveal) { path.append($0) }
-                case .about:
-                    AboutPage(reveal: reveal) { open($0) }
-                default:
-                    route.page
-                }
-            }
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button { dismiss() } label: {
-                        Image(systemName: "xmark")
-                            .foregroundStyle(theme.colors.inkPrimary.color)
+                    .frame(width: theme.metrics.listPaneWidth)
+
+                    Rectangle()
+                        .fill(theme.colors.inkPrimary.color.opacity(theme.metrics.hairlineOpacity))
+                        .frame(width: 0.5)
+                        .ignoresSafeArea()
+
+                    NavigationStack(path: $path) {
+                        withDestinations(SettingsPaneRest())
                     }
-                    .accessibilityLabel("Close settings")
+                }
+            } else {
+                NavigationStack(path: $path) {
+                    withDestinations(column)
                 }
             }
-            .task { await notifications.apply() }
+        }
+        .somaWidthClass($widthClass)
+        .onChange(of: vaultPane) { _, route in
+            guard let route else { return }
+            path = NavigationPath()
+            path.append(route)
+        }
+        .onChange(of: widthClass) { _, width in
+            // Folded or narrowed with the Vault in the column: the stack
+            // takes the browser back under the page it showed.
+            guard width == .compact, let route = vaultPane else { return }
+            vaultPane = nil
+            path = NavigationPath()
+            path.append(VaultRoute.browser)
+            path.append(route)
         }
         .somaTheme(settingsTheme)
         .presentationBackground(theme.colors.canvas.color)
+        // Roomy on an iPad, so the two panes have the width they need.
+        .presentationSizing(.page)
         .sheet(item: $website) { WebsiteSheet(link: $0) }
+    }
+
+    /// The settings themselves: the account, the summary, and every group.
+    private var column: some View {
+        SomaPageScroll {
+            VStack(alignment: .leading, spacing: theme.metrics.leadSpacing) {
+                VStack(spacing: theme.metrics.cardSpacing) {
+                    accountRow
+                    summary
+                }
+                VStack(spacing: theme.metrics.cardSpacing) {
+                    vaultRow
+                    recordRow
+                    reportRow
+                }
+                dayGroup
+                generalGroup
+                dataGroup
+                signOutGroup
+                supportGroup
+                developerGroup
+                footer
+            }
+            .padding(.horizontal, theme.metrics.pagePadding)
+            .padding(.top, theme.metrics.cardSpacing)
+            .padding(.bottom, theme.metrics.pagePadding)
+            .frame(maxWidth: theme.metrics.settingsContentWidth, alignment: .leading)
+            .frame(maxWidth: .infinity)
+        }
+        .softScrollEdges()
+        .background(theme.colors.canvas.color.ignoresSafeArea())
+        // The bar's own title and nothing above the account: the sheet
+        // opens on what a person came to change, not on a heading, a mark
+        // and a line of copy that push the first row halfway down.
+        .navigationTitle("Settings")
+        .toolbarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .confirmationAction) {
+                Button { dismiss() } label: {
+                    Image(systemName: "xmark")
+                        .foregroundStyle(theme.colors.inkPrimary.color)
+                }
+                .accessibilityLabel("Close settings")
+            }
+        }
+        .task { await notifications.apply() }
+    }
+
+    /// Every page the sheet opens. Beside the settings, the page a row opened
+    /// is the first one on its side and carries no way back to the empty pane.
+    private func withDestinations(_ root: some View) -> some View {
+        let isPaneRoot = widthClass == .regular && path.count == 1
+        return root
+            .navigationDestination(for: VaultRoute.self) { route in
+                route.page
+                    .navigationBarBackButtonHidden(isPaneRoot)
+                    // A large title in the pane sits flush on the divider:
+                    // the pane names its page in the bar, as the column does.
+                    .modifier(PaneTitle(isPane: widthClass == .regular))
+            }
+            .navigationDestination(for: GlobalRoute.self) { route in
+                route.page.navigationBarBackButtonHidden(isPaneRoot)
+            }
+            .navigationDestination(for: SettingsRoute.self) { route in
+                Group {
+                    switch route {
+                    case .developerTools:
+                        DeveloperToolsPage(reveal: reveal) { path.append($0) }
+                    case .about:
+                        AboutPage(reveal: reveal) { open($0) }
+                    default:
+                        route.page
+                    }
+                }
+                .navigationBarBackButtonHidden(isPaneRoot)
+            }
+    }
+
+    /// Opens a row's page from the settings column: pushed over the column on
+    /// its own, or in place of whatever the pane beside it showed.
+    private func show(_ route: some Hashable) {
+        if widthClass == .regular { path = NavigationPath() }
+        path.append(route)
     }
 
     private var settingsTheme: SomaTheme {
         var value = theme
         value.metrics.browseRowMinHeight = theme.metrics.settingsRowHeight
         value.metrics.browseGlyphSize = theme.metrics.settingsGlyphSize
-        value.metrics.browseGroupCornerRadius = theme.metrics.cardCornerRadius
         value.metrics.browseSeparatorOpacity = theme.metrics.hairlineOpacity
         return value
     }
 
     /// One full card is the hit target, including the avatar and chevron.
     private var accountRow: some View {
-        Button { path.append(SettingsRoute.account) } label: {
+        Button { show(SettingsRoute.account) } label: {
             SomaCard {
                 HStack(spacing: theme.metrics.browseRowSpacing) {
                     ProfileAvatar(diameter: theme.metrics.minimumTapTarget)
@@ -113,7 +198,7 @@ struct SettingsSheet: View {
                     Spacer(minLength: theme.metrics.cardSpacing)
 
                     Image(systemName: "chevron.right")
-                        .font(.system(size: theme.metrics.browseChevronSize, weight: .medium))
+                        .font(.system(size: theme.metrics.browseChevronSize, weight: .semibold))
                         .foregroundStyle(theme.colors.inkSecondary.color)
                 }
                 .frame(minHeight: theme.metrics.minimumTapTarget)
@@ -138,20 +223,20 @@ struct SettingsSheet: View {
         ) {
             SettingsSummaryTile(symbol: "heart", isOn: health.status == .ready, label: String(localized: "Health"),
                                 value: healthValue, caption: healthCaption) {
-                path.append(SettingsRoute.healthAccess)
+                show(SettingsRoute.healthAccess)
             }
             SettingsSummaryTile(symbol: notifications.isOn ? "bell" : "bell.slash", isOn: notifications.isOn,
                                 label: String(localized: "Notifications"), value: notificationsValue,
                                 caption: notificationsCaption) {
-                path.append(SettingsRoute.notifications)
+                show(SettingsRoute.notifications)
             }
             SettingsSummaryTile(symbol: status.symbol, label: String(localized: "Status"),
                                 value: status.title, caption: nil) {
-                path.append(GlobalRoute.activityStatus)
+                show(GlobalRoute.activityStatus)
             }
             SettingsSummaryTile(symbol: "arrow.triangle.2.circlepath", label: String(localized: "Last sync"),
                                 value: syncValue, caption: nil) {
-                path.append(SettingsRoute.dataDiagnostics)
+                show(SettingsRoute.dataDiagnostics)
             }
         }
     }
@@ -184,16 +269,67 @@ struct SettingsSheet: View {
     /// and where it came from. Second only to the account, because the sheet
     /// is the personal side of Soma and this is the person's data.
     private var vaultRow: some View {
-        NavigationLink(value: VaultRoute.browser) {
+        cardRow(symbol: "archivebox", title: "Vault", detail: String(localized: "All your data, with its source")) {
+            if widthClass == .regular {
+                vaultPane = .category(BodyCatalog.categories[0])
+            } else {
+                show(VaultRoute.browser)
+            }
+        }
+    }
+
+    /// The Vault's categories in the settings column, with the way back to
+    /// the settings where the bar puts a back button.
+    private var vaultColumn: some View {
+        BodyBrowserView()
+            .environment(\.vaultPane, $vaultPane)
+            .navigationBarBackButtonHidden()
+            .toolbar {
+                ToolbarItem(placement: .navigation) {
+                    Button {
+                        vaultPane = nil
+                        path = NavigationPath()
+                    } label: {
+                        Label("Settings", systemImage: "chevron.left")
+                    }
+                }
+            }
+    }
+
+    /// The medical record, under the Vault: what the person keeps for a
+    /// doctor, typed in by them rather than read from Health.
+    private var recordRow: some View {
+        let next = MedicalRecordStore.shared.upcoming().first
+        return cardRow(symbol: "heart.text.clipboard", title: "Medical record",
+                       detail: next.map { String(localized: "Next visit \(MedicalRecordPage.day($0.date)) at \(ScoreMath.clock($0.date))") }
+                           ?? String(localized: "Conditions, allergies, vaccines, appointments")) {
+            show(GlobalRoute.medicalRecord)
+        }
+    }
+
+    /// The PDF for a visit, under the record it is mostly made of.
+    private var reportRow: some View {
+        cardRow(symbol: "doc.text", title: "Report for my doctor",
+                detail: String(localized: "A PDF to share, made on this phone")) {
+            show(GlobalRoute.doctorReport)
+        }
+    }
+
+    /// A row of its own card under the account: the Vault, the record.
+    private func cardRow(symbol: String, title: LocalizedStringKey, detail: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
             SomaCard {
                 HStack(spacing: theme.metrics.browseRowSpacing) {
-                    SettingsGlyph(symbol: "archivebox", scale: theme.metrics.minimumTapTarget / theme.metrics.browseGlyphColumn)
+                    // The glyph at the rows' size, centred in the avatar's
+                    // width, so the title lines up with the account's above.
+                    SettingsGlyph(symbol: symbol)
+                        .frame(width: theme.metrics.minimumTapTarget)
 
                     VStack(alignment: .leading, spacing: theme.metrics.cardHeaderSpacing) {
-                        Text("Vault")
+                        Text(title)
                             .somaFont(theme.typography.cardTitle)
                             .foregroundStyle(theme.colors.inkPrimary.color)
-                        Text("All your data, with its source")
+                        Text(detail)
                             .somaFont(theme.typography.caption)
                             .foregroundStyle(theme.colors.inkSecondary.color)
                     }
@@ -201,7 +337,7 @@ struct SettingsSheet: View {
                     Spacer(minLength: theme.metrics.cardSpacing)
 
                     Image(systemName: "chevron.right")
-                        .font(.system(size: theme.metrics.browseChevronSize, weight: .medium))
+                        .font(.system(size: theme.metrics.browseChevronSize, weight: .semibold))
                         .foregroundStyle(theme.colors.inkSecondary.color)
                 }
                 .frame(minHeight: theme.metrics.minimumTapTarget)
@@ -223,7 +359,7 @@ struct SettingsSheet: View {
                     symbol: row == .status ? ActivityStatusStore.shared.current.symbol : row.symbol,
                     detail: row == .status ? ActivityStatusStore.shared.current.title : nil
                 ) {
-                    path.append(row.route)
+                    show(row.route)
                 }
             }
         }
@@ -262,11 +398,12 @@ struct SettingsSheet: View {
                 SettingsRow(.notifications, String(localized: "Notifications"), "bell"),
                 SettingsRow(.language, String(localized: "Language and units"), "globe"),
                 SettingsRow(.customization, String(localized: "Customization"), "slider.horizontal.3"),
+                SettingsRow(.askModel, String(localized: "Ask Soma"), "sparkle"),
                 SettingsRow(.shortcuts, String(localized: "Shortcuts"), "plus.circle"),
                 SettingsRow(.programs, String(localized: "Programs"), "calendar.badge.clock"),
             ]) { row in
                 SettingsTileRow(row.title, symbol: row.symbol, detail: detail(row.route)) {
-                    path.append(row.route)
+                    show(row.route)
                 } trailing: {
                     if row.route == .appearance { currentIcon }
                 }
@@ -278,6 +415,7 @@ struct SettingsSheet: View {
         switch route {
         case .appearance: appearanceTitle
         case .notifications: notificationsValue
+        case .askModel: AskProviderSettings.shared.effective.title
         case .healthAccess: health.status == .ready ? String(localized: "Connected") : nil
         default: nil
         }
@@ -307,16 +445,13 @@ struct SettingsSheet: View {
                 SettingsRow(.healthAccess, String(localized: "Health access"), "heart.text.square"),
                 SettingsRow(.dataDiagnostics, String(localized: "Data and diagnostics"), "arrow.triangle.2.circlepath"),
                 SettingsRow(.exportData, String(localized: "Export my data"), "square.and.arrow.up"),
-                // With no account there is nothing online: the row erases
-                // what is on the phone, and says so.
-                SettingsRow(.deleteData, account.isSignedIn ? String(localized: "Delete my data")
-                                                            : String(localized: "Erase data on this iPhone"), "trash"),
+                SettingsRow(.deleteData, String(localized: "Close my account"), "person.crop.circle.badge.xmark"),
             ]) { row in
                 SettingsTileRow(
                     row.title, symbol: row.symbol, detail: detail(row.route),
                     role: row.route == .deleteData ? .destructive : .standard
                 ) {
-                    path.append(row.route)
+                    show(row.route)
                 }
             }
         }
@@ -342,7 +477,9 @@ struct SettingsSheet: View {
                 SettingsRow(.bugReport, String(localized: "Report a bug"), "ladybug"),
                 SettingsRow(.about, String(localized: "About Soma"), "info.circle"),
             ]) { row in
-                SettingsTileRow(row.title, symbol: row.symbol) { open(row.route) }
+                SettingsTileRow(row.title, symbol: row.symbol) {
+                    if row.route.websiteURL == nil { show(row.route) } else { open(row.route) }
+                }
             }
             if let url = IMessageBeta.url {
                 SomaBrowseGroup([IMessageBeta.Row()]) { _ in
@@ -361,7 +498,6 @@ struct SettingsSheet: View {
         VStack(alignment: .leading, spacing: theme.metrics.browseHeadingSpacing) {
             Text(title)
                 .somaFont(theme.typography.eyebrow)
-                .textCase(.uppercase)
                 .foregroundStyle(theme.colors.inkSecondary.color)
                 .padding(.leading, theme.metrics.browseRowPadding)
                 .accessibilityAddTraits(.isHeader)
@@ -395,7 +531,7 @@ struct SettingsSheet: View {
         if reveal.isRevealed {
             section("Developer") {
                 SomaBrowseGroup([SettingsRow(.developerTools, String(localized: "Developer tools"), "hammer")]) { row in
-                    SettingsTileRow(row.title, symbol: row.symbol) { path.append(row.route) }
+                    SettingsTileRow(row.title, symbol: row.symbol) { show(row.route) }
                 }
             }
         }
@@ -500,6 +636,20 @@ struct SettingsRow: Identifiable, Hashable {
     }
 }
 
+/// The pane beside the settings before a row is chosen: the canvas and the
+/// mark, quiet, rather than a page nobody asked for.
+private struct SettingsPaneRest: View {
+    @Environment(\.somaTheme) private var theme
+
+    var body: some View {
+        SomaMark(accessibilityLabel: "Soma", role: .caption)
+            .opacity(theme.metrics.chartContextOpacity)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(theme.colors.canvas.color.ignoresSafeArea())
+            .accessibilityHidden(true)
+    }
+}
+
 #Preview("Settings") {
     SettingsSheet()
         .environment(AppRouter())
@@ -521,5 +671,22 @@ enum IMessageBeta {
 
     struct Row: Identifiable {
         var id: String { "imessage" }
+    }
+}
+
+/// The bar's inline title for a page shown in the settings pane.
+private struct PaneTitle: ViewModifier {
+    let isPane: Bool
+
+    func body(content: Content) -> some View {
+#if os(iOS)
+        if isPane {
+            content.navigationBarTitleDisplayMode(.inline)
+        } else {
+            content
+        }
+#else
+        content
+#endif
     }
 }

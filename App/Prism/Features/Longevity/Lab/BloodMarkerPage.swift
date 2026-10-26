@@ -55,11 +55,11 @@ struct BloodMarkerPage: View {
                 actionTitle: "Add",
                 action: { isAdding = true }
             ) {
-                SomaOrb(aspect: .heart, scale: .mini)
+                SomaObjectIcon(aspect: .heart, size: .row)
             }
             LabRowGroup(rows: related)
         }
-        .navigationTitle(definition.name)
+        .labPageTitle(Text(definition.name))
         .sheet(isPresented: $isAdding) { AddBloodTestSheet() }
     }
 

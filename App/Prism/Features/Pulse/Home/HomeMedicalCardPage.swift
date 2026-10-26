@@ -12,6 +12,10 @@ import HealthExportCore
 /// and weight from the latest readings, and what the person wrote themselves:
 /// allergies, medications, conditions, organ donation and who to call.
 ///
+/// Allergies and conditions read from the medical record once the card's
+/// free text has moved there (`MedicalRecord.migrate(from:)`); the card then
+/// links to the record to change them.
+///
 /// Everything written here stays on this phone. The lock screen's Medical ID
 /// is Apple's and is edited in the Health app; this page says so rather than
 /// pretending to switch it.
@@ -28,6 +32,7 @@ struct HomeMedicalCardPage: View {
 
     var body: some View {
         let card = log.medical
+        let record = MedicalRecordStore.shared.record
 
         HomePage("Medical card") {
             VStack(alignment: .leading, spacing: 8) {
@@ -45,11 +50,11 @@ struct HomeMedicalCardPage: View {
                     HomeHairline()
                     field("Sex", clinical.sex, fallback: "Not set in Apple Health")
                     HomeHairline()
-                    field("Allergies", card.allergies)
+                    field("Allergies", record.migratedFromCard ? record.allergies.map(\.substance).joined(separator: ", ") : card.allergies)
                     HomeHairline()
                     field("Medications", card.medications)
                     HomeHairline()
-                    field("Conditions", card.conditions)
+                    field("Conditions", record.migratedFromCard ? record.conditions.map(\.name).joined(separator: ", ") : card.conditions)
                     HomeHairline()
                     field("Organ donor", card.organDonor.map { $0 ? "Registered" : "Not registered" })
                 }
@@ -59,7 +64,7 @@ struct HomeMedicalCardPage: View {
                 .padding(.top, theme.metrics.cardSpacing)
             SomaCard {
                 HStack(spacing: theme.metrics.cardSpacing) {
-                    VStack(alignment: .leading, spacing: 3) {
+                    VStack(alignment: .leading, spacing: theme.metrics.spaceXS) {
                         Text(card.contactName.isEmpty ? "No one yet" : card.contactName)
                             .somaFont(theme.typography.body)
                             .foregroundStyle(theme.colors.inkPrimary.color)
@@ -76,6 +81,13 @@ struct HomeMedicalCardPage: View {
                     }
                 }
             }
+
+            NavigationLink(value: GlobalRoute.medicalRecord) {
+                SettingsTileRow(String(localized: "Medical record"), symbol: "heart.text.clipboard",
+                                detail: String(localized: "Allergies, conditions, visits"))
+            }
+            .buttonStyle(.plain)
+            .padding(.top, theme.metrics.cardSpacing)
 
             HomeEyebrow("On the lock screen")
                 .padding(.top, theme.metrics.cardSpacing)
@@ -127,7 +139,7 @@ struct HomeMedicalCardPage: View {
 
     private func read() async {
         let wanted = HomeClinical.characteristics + [HomeMetric.height, HomeMetric.bodyMass]
-        guard let source = await health.prepare(wanted), !(source is EmptyHealthSource) else { return }
+        guard !health.readsEmptyStore, let source = await health.prepare(wanted) else { return }
         clinical = HomeClinical.read()
         height = await source.homeLatest(HomeMetric.height)?.value
         if let reading = await source.homeLatest(HomeMetric.bodyMass) {
@@ -145,9 +157,15 @@ struct HomeMedicalEditSheet: View {
     var body: some View {
         HomeInputSheet(title: "Medical card", actionTitle: "Save", action: { log.medical = card }) {
             HomeTextField(title: "Name", text: $card.name)
-            HomeTextField(title: "Allergies", text: $card.allergies, prompt: "Penicillin, a rash")
+            if !MedicalRecordStore.shared.record.migratedFromCard {
+                HomeTextField(title: "Allergies", text: $card.allergies, prompt: "Penicillin, a rash")
+            }
             HomeTextField(title: "Medications", text: $card.medications, prompt: "Vitamin D, 1,000 IU a day")
-            HomeTextField(title: "Conditions", text: $card.conditions, prompt: "None known")
+            if MedicalRecordStore.shared.record.migratedFromCard {
+                HomeReason("Allergies and conditions live in your medical record, one by one.")
+            } else {
+                HomeTextField(title: "Conditions", text: $card.conditions, prompt: "None known")
+            }
             HomeChipGroup(
                 title: "Organ donor",
                 options: ["Registered", "Not registered"],
@@ -176,7 +194,7 @@ struct HomeTextField: View {
     @Environment(\.somaTheme) private var theme
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: theme.metrics.spaceS) {
             Text(title)
                 .somaFont(theme.typography.caption)
                 .foregroundStyle(theme.colors.inkSecondary.color)

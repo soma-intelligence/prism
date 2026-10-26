@@ -5,12 +5,12 @@
 
 import SwiftUI
 
-/// The weather of an aspect behind the head of a page: its orb's colours as a
-/// soft field that fades into the canvas before the first card.
+/// What sits behind the head of a page: the aspect's landscape photograph,
+/// melting into the canvas before the first card, when the person chose the
+/// Landscape style; otherwise nothing, and the canvas shows.
 ///
 /// It is ground, not content: it takes no layout, never catches a tap and sits
-/// under everything the page draws. It drifts slowly; with Reduce Motion on it
-/// holds still.
+/// under everything the page draws. It never moves.
 public struct SomaAspectBackdrop: View {
     private let aspect: SomaAspect
 
@@ -18,18 +18,56 @@ public struct SomaAspectBackdrop: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.somaBackdropStyle) private var style
     @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.somaPartIsShown) private var partIsShown
+    @Environment(\.scenePhase) private var scenePhase
+    /// False while the page behind it is hidden or the head of the page is
+    /// scrolled away: the drift then stops drawing.
+    @State private var isOnScreen = true
+    /// False for the first moments after the page appears: the drift waits
+    /// until the push or zoom that brought the page in has landed. A mesh
+    /// under a blur redrawn on its own clock while the page is scaled every
+    /// frame costs the transition its frames.
+    @State private var hasSettled = false
+    private var power = SomaPowerState.shared
+    @Environment(\.displayScale) private var displayScale
+    /// The Landscape photograph, decoded at the backdrop's width, with the
+    /// aspect and width it was decoded for.
+    @State private var loaded: (key: String, image: Image)?
+    @State private var width: CGFloat = 0
 
     public init(aspect: SomaAspect) {
         self.aspect = aspect
     }
 
     public var body: some View {
-        if style == .landscape, let photo = SomaLandscapePhoto.image(for: aspect) {
-            landscape(photo)
+        if style == .landscape, SomaLandscapePhoto.hasPhoto(for: aspect) {
+            Group {
+                if let photo = SomaLandscapePhoto.cached(for: aspect, pixelWidth: photoWidth)
+                    ?? (loaded?.key == photoKey ? loaded?.image : nil) {
+                    landscape(photo)
+                } else {
+                    Color.clear
+                }
+            }
+            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
+            .task(id: photoKey) {
+                guard photoWidth > 0 else { return }
+                let key = photoKey
+                if let image = await SomaLandscapePhoto.load(for: aspect, pixelWidth: photoWidth) {
+                    loaded = (key, image)
+                }
+            }
         } else {
             gradient
         }
+    }
+
+    private var photoKey: String { "\(aspect.rawValue)@\(photoWidth)" }
+
+    /// The width the photograph is decoded at: the backdrop's, in pixels,
+    /// rounded up to a step of 128 so a small change of width reuses it.
+    private var photoWidth: Int {
+        let pixels = Int((width * displayScale).rounded(.up))
+        return pixels <= 0 ? 0 : ((pixels + 127) / 128) * 128
     }
 
     /// The Landscape theme: the aspect's photograph, darkened toward the
@@ -47,9 +85,11 @@ public struct SomaAspectBackdrop: View {
                 let veil = theme.metrics.backdropVeilOpacities
                 LinearGradient(
                     stops: [
-                        .init(color: theme.colors.canvas.color.opacity(veil.top), location: 0),
-                        .init(color: theme.colors.canvas.color.opacity(veil.third), location: 0.3),
-                        .init(color: theme.colors.canvas.color.opacity(veil.lower), location: 0.62),
+                        // Heavier at the top than it once was: the bar's
+                        // segments and the stats sit there, and on a pale sky
+                        // their secondary ink all but vanished.
+                        .init(color: theme.colors.canvas.color.opacity(theme.metrics.landscapeScrimTop), location: 0),
+                        .init(color: theme.colors.canvas.color.opacity(theme.metrics.landscapeScrimMiddle), location: 0.6),
                         .init(color: theme.colors.canvas.color, location: 1),
                     ],
                     startPoint: .top, endPoint: .bottom
@@ -71,7 +111,10 @@ public struct SomaAspectBackdrop: View {
             isLight ? stop.color.mix(with: canvas, by: 0.62) : stop.color
         }
 
-        TimelineView(.animation(minimumInterval: 1.0 / 15.0, paused: reduceMotion || !partIsShown)) { context in
+        // Held still in Low Power Mode and whenever nobody can see it, the
+        // way Reduce Motion holds it.
+        let isPaused = reduceMotion || power.isLowPower || !isOnScreen || scenePhase != .active || !hasSettled
+        TimelineView(.animation(minimumInterval: 1.0 / 15.0, paused: isPaused)) { context in
             let t = reduceMotion ? 0 : context.date.timeIntervalSinceReferenceDate / 9
             MeshGradient(
                 width: 3,
@@ -80,13 +123,13 @@ public struct SomaAspectBackdrop: View {
                 colors: Self.colors(stops, canvas: canvas)
             )
         }
-        .blur(radius: theme.metrics.backdropFieldBlur)
-        .opacity(colorScheme == .light ? theme.metrics.backdropFieldOpacityLight : theme.metrics.backdropFieldOpacityDark)
+        .blur(radius: 30)
+        .opacity(colorScheme == .light ? 0.55 : 0.7)
         .mask(
             LinearGradient(
                 stops: [
                     .init(color: .black, location: 0),
-                    .init(color: .black.opacity(theme.metrics.backdropFadeMiddleOpacity), location: 0.45),
+                    .init(color: .black.opacity(0.8), location: 0.45),
                     .init(color: .clear, location: 1),
                 ],
                 startPoint: .top,
@@ -95,6 +138,12 @@ public struct SomaAspectBackdrop: View {
         )
         .allowsHitTesting(false)
         .accessibilityHidden(true)
+        .somaOnScreen($isOnScreen)
+        .task {
+            guard !hasSettled else { return }
+            try? await Task.sleep(for: .seconds(theme.motion.settleDelay))
+            hasSettled = true
+        }
     }
 
     /// A three by three mesh whose inner points wander on slow circles.

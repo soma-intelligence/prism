@@ -73,7 +73,7 @@ struct EnergyBankColumn: View {
                         .somaFont(theme.typography.cardTitle)
                         .foregroundStyle(theme.colors.inkPrimary.color)
                         .accessibilityAddTraits(.isHeader)
-                        .padding(.bottom, 2)
+                        .padding(.bottom, theme.metrics.spaceXXS)
                     ScoreRows(day.entries) { entry in
                         SomaBankEntryRow(mark: entry.mark, symbol: entry.symbol, title: entry.title,
                                          span: entry.span, points: entry.points, scale: day.scale)
@@ -169,38 +169,81 @@ private struct EnergyFact: View {
 
 // MARK: - Links
 
-/// History, how the bank is built, the peak window and stress, as one group
-/// of small rows.
+/// The peak window and stress as two readings side by side, each a tile that
+/// opens its page, then history and how the bank is built as a quiet list
+/// under them. One list of four mixed readings with links read as a menu
+/// (owner, 2026-10-24).
 private struct EnergyLinks: View {
     let peak: String?
     let stress: Int?
     let showsHistory: () -> Void
     let showsInfo: () -> Void
 
+    @Environment(\.somaTheme) private var theme
+
     private enum Row: String, Identifiable {
-        case history, info, peak, stress
+        case history, info
         var id: String { rawValue }
     }
 
     var body: some View {
-        SomaBrowseGroup([Row.history, .info, .peak, .stress]) { row in
-            switch row {
-            case .history:
-                SomaBrowseRow(symbol: "chart.bar.fill", title: "History", action: showsHistory)
-            case .info:
-                SomaBrowseRow(symbol: "info.circle", title: "How it’s built", action: showsInfo)
-            case .peak:
-                NavigationLink(value: ScoreRoute.peakWindow) {
-                    SomaBrowseRow(symbol: "sparkles", title: "Peak window", detail: peak ?? "-")
+        let spacing = theme.metrics.cardSpacing
+
+        VStack(spacing: spacing) {
+            HStack(spacing: spacing) {
+                EnergyReadingTile(route: .peakWindow, title: "Peak window", value: peak)
+                EnergyReadingTile(route: .stress, title: "Stress", value: stress.map(String.init))
+            }
+            .fixedSize(horizontal: false, vertical: true)
+
+            SomaBrowseGroup([Row.history, .info]) { row in
+                switch row {
+                case .history:
+                    SomaBrowseRow(symbol: "chart.bar", title: "History", action: showsHistory)
+                case .info:
+                    SomaBrowseRow(symbol: "info.circle", title: "How it\u{2019}s built", action: showsInfo)
                 }
-                .buttonStyle(.plain)
-            case .stress:
-                NavigationLink(value: ScoreRoute.stress) {
-                    SomaBrowseRow(symbol: "waveform.path.ecg", title: "Stress", detail: stress.map(String.init) ?? "-")
-                }
-                .buttonStyle(.plain)
             }
         }
+    }
+}
+
+/// One reading the Energy page points to: its name small, its value set
+/// large, a quiet arrow, and the page it opens zooming out of it.
+private struct EnergyReadingTile: View {
+    let route: ScoreRoute
+    let title: LocalizedStringResource
+    let value: String?
+
+    @Environment(\.somaTheme) private var theme
+
+    var body: some View {
+        let metrics = theme.metrics
+        let colors = theme.colors
+
+        TileLink(value: route) {
+            VStack(alignment: .leading, spacing: metrics.cardHeaderSpacing) {
+                HStack {
+                    Text(title)
+                        .somaFont(theme.typography.caption)
+                        .foregroundStyle(colors.inkSecondary.color)
+                    Spacer(minLength: 0)
+                    Image(systemName: "arrow.up.right")
+                        .font(.system(size: metrics.browseChevronSize, weight: .semibold))
+                        .foregroundStyle(colors.inkSecondary.color)
+                }
+                Text(value ?? "-")
+                    .somaFont(theme.typography.cardTitle)
+                    .foregroundStyle(colors.inkPrimary.color)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+            }
+            .padding(metrics.cardPadding)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .background(colors.surface.color, in: .rect(cornerRadius: metrics.cardCornerRadius, style: .continuous))
+        }
+        .accessibilityLabel(Text(title))
+        .accessibilityValue(Text(value ?? "Not measured"))
     }
 }
 

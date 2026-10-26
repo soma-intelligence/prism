@@ -544,7 +544,7 @@ struct MindStressZones: View {
                         .frame(width: metrics.miniOrbDiameter, alignment: .trailing)
                 }
                 .padding(.horizontal, metrics.cardPadding)
-                .padding(.vertical, metrics.cardPadding * 0.75)
+                .padding(.vertical, metrics.spaceM)
                 .background(colors.surface.color, in: .rect(cornerRadius: metrics.cardCornerRadius, style: .continuous))
                 .accessibilityElement(children: .combine)
             }
@@ -563,6 +563,7 @@ struct MindStressZones: View {
         }
         .padding()
     }
+    .softScrollEdges()
     .somaTheme(.standard)
 }
 #endif

@@ -133,8 +133,9 @@ public struct SomaSwitchToggleStyle: ToggleStyle {
 }
 
 public extension ToggleStyle where Self == SomaSwitchToggleStyle {
-    /// The Soma switch: a cross and a check under a sliding knob.
-    static var soma: SomaSwitchToggleStyle { SomaSwitchToggleStyle() }
+    /// The Soma switch with a cross and a check under a sliding knob.
+    /// ``SomaSwitchStyle`` owns `.soma`.
+    static var somaCrossCheck: SomaSwitchToggleStyle { SomaSwitchToggleStyle() }
 }
 
 #Preview("Switch") {

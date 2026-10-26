@@ -51,10 +51,19 @@ struct PulseWording {
 
     // MARK: - The day's parts
 
-    /// The title over the moves: they are for what is left of the person's
-    /// own day.
-    func movesTitle(_ part: NextMoveDayPart) -> String {
-        part == .evening || part == .night ? "Tonight" : "For today"
+    enum Part { case morning, afternoon, evening }
+
+    func part(of date: Date) -> Part {
+        switch calendar.component(.hour, from: date) {
+        case ..<12: .morning
+        case ..<17: .afternoon
+        default: .evening
+        }
+    }
+
+    /// The title over the moves: they are for what is left of the day.
+    func movesTitle(at date: Date) -> String {
+        part(of: date) == .evening ? "Tonight" : "For today"
     }
 
     // MARK: - The orb
@@ -160,12 +169,10 @@ struct PulseWording {
         return line
     }
 
-    /// The body card's line: where fitness age sits against your age, read
-    /// off the watch's VO2 max, or what it needs.
-    func bodySummary(_ fitness: BodyFitnessAge.Stat) -> String {
-        guard fitness.value != nil else { return "Fitness age needs a VO2 max from your watch." }
-        guard let cue = fitness.cue else { return "Read off your watch’s VO2 max." }
-        return "\(cue), read off your watch’s VO2 max."
+    func bodySummary(age: Int?) -> String {
+        let base = "Measured at the pod. No visit yet."
+        guard let age else { return base }
+        return base + " You are \(age)."
     }
 
     /// A 0 to 100 score as the row prints it.

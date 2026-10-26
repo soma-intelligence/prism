@@ -83,7 +83,7 @@ public struct SomaCategoryTile: View {
                     SomaCategoryTile(symbol: "ear", title: "Hearing", caption: "5 measures", aspect: nil)
                 }
             }
-            .padding(16)
+            .padding(SomaMetrics.standard.spaceL)
         }
     }
 }

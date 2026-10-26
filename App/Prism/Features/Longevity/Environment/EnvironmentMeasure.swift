@@ -198,8 +198,19 @@ struct EnvironmentSky: Equatable {
     var day: EnvironmentSun.Day?
     var place: EnvironmentSun.Place?
 
+    var progress: Double? { day?.progress(at: now) }
+
     func rise(_ words: PulseWording) -> String? { day.map { words.time($0.rise) } }
     func set(_ words: PulseWording) -> String? { day.map { words.time($0.set) } }
+
+    /// Daylight left before sunset, hours and minutes: "2 h 10".
+    var left: String? {
+        guard let day else { return nil }
+        let seconds = day.set.timeIntervalSince(now)
+        guard seconds > 0 else { return "0 min" }
+        let minutes = Int((seconds / 60).rounded())
+        return minutes < 60 ? "\(minutes) min" : "\(minutes / 60) h \(String(format: "%02d", minutes % 60))"
+    }
 
     static func make(now: Date, place: EnvironmentSun.Place?, calendar: Calendar = .current) -> EnvironmentSky {
         EnvironmentSky(
@@ -221,4 +232,45 @@ struct EnvironmentBedroom: Equatable {
     var isDark: Bool?
     /// Where last night was slept, as set by hand.
     var place: String?
+}
+
+/// One place slept in over the last thirty days, for the Sleep places map.
+struct EnvironmentSleepPlace: Identifiable, Equatable {
+    var id: String
+    var name: String
+    var latitude: Double
+    var longitude: Double
+    var nights: Int
+    /// The average sleep score of those nights.
+    var score: Double?
+    var isLastNight: Bool
+
+    /// Groups thirty nights by place. `scores` runs oldest first and ends
+    /// today, as ``SomaScores`` keeps them.
+    @MainActor
+    static func make(store: SleepPlaceStore, scores: [Double?], now: Date, calendar: Calendar = .current) -> [EnvironmentSleepPlace] {
+        let today = calendar.startOfDay(for: now)
+        let byNight = Array(scores.reversed())
+        var groups: [String: (place: SleepPlaceStore.Place, scores: [Double])] = [:]
+        var nights: [String: Int] = [:]
+        for offset in 0..<30 {
+            guard let day = calendar.date(byAdding: .day, value: -offset, to: today),
+                  let place = store.place(forNightEnding: day) else { continue }
+            nights[place.id, default: 0] += 1
+            var group = groups[place.id] ?? (place, [])
+            if byNight.indices.contains(offset), let score = byNight[offset] { group.scores.append(score) }
+            groups[place.id] = group
+        }
+        let last = store.place(forNightEnding: today)?.id
+        return groups.map { id, group in
+            EnvironmentSleepPlace(
+                id: id, name: group.place.name,
+                latitude: group.place.latitude, longitude: group.place.longitude,
+                nights: nights[id] ?? 0,
+                score: group.scores.isEmpty ? nil : group.scores.reduce(0, +) / Double(group.scores.count),
+                isLastNight: id == last
+            )
+        }
+        .sorted { $0.nights > $1.nights }
+    }
 }

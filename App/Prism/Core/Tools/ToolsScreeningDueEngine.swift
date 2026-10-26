@@ -70,12 +70,16 @@ extension SomaTools {
         ///     a colonoscopy 45 years overdue.
         ///   - sex: nil when unknown. Only `.any` items are then returned; the
         ///     caller says so rather than silently dropping mammography.
+        ///   - birthday: when known, the age a screening was done at is read
+        ///     from it exactly; without it, from `age` less the whole years
+        ///     since. Only an item whose cadence changes with age reads it.
         static func statuses(age: Int,
                              sex: ScreeningEligibility?,
                              today: Date = Date(),
                              records: [ScreeningDone],
                              risk: [ScreeningRisk],
                              catalog: [ScreeningItem] = ScreeningCatalog.items,
+                             birthday: Date? = nil,
                              calendar: Calendar = .current) -> [Status] {
             guard age > 0 else { return [] }
 
@@ -89,7 +93,7 @@ extension SomaTools {
                 .filter { $0.eligibility.applies(to: sex) }
                 .map { item in
                     status(for: item, age: age, today: today, lastRecord: latest[item.id],
-                           presentFlags: presentFlags, calendar: calendar)
+                           presentFlags: presentFlags, birthday: birthday, calendar: calendar)
                 }
 
             return all.sorted { lhs, rhs in
@@ -114,10 +118,11 @@ extension SomaTools {
                                    today: Date,
                                    lastRecord: ScreeningDone?,
                                    presentFlags: [ScreeningRiskFlag: ScreeningRisk],
+                                   birthday: Date?,
                                    calendar: Calendar) -> Status {
             let applied = item.modifiers.map(\.flag).filter { presentFlags[$0] != nil }
             let startAge = effectiveStartAge(item: item, presentFlags: presentFlags)
-            let interval = effectiveIntervalMonths(item: item, presentFlags: presentFlags)
+            let interval = effectiveIntervalMonths(item: item, presentFlags: presentFlags, age: age)
 
             func status(_ state: State, nextDue: Date? = nil) -> Status {
                 Status(item: item, state: state, lastDone: lastRecord?.performedOn,
@@ -146,10 +151,15 @@ extension SomaTools {
                 return status(.due(monthsLate: max(0, (age - startAge) * 12)))
             }
 
+            // The cadence of the age the screening was done at: a cytology at
+            // 29 comes back in three years even once 30 has passed.
+            let ageAtRecord = birthday.flatMap { born in
+                calendar.dateComponents([.year], from: born, to: last.performedOn).year
+            } ?? (age - wholeMonths(from: last.performedOn, to: today, calendar: calendar) / 12)
             let next: Date
             if let override = last.nextDueOverride {
                 next = override
-            } else if let interval {
+            } else if let interval = effectiveIntervalMonths(item: item, presentFlags: presentFlags, age: ageAtRecord) {
                 next = calendar.date(byAdding: .month, value: interval, to: last.performedOn)
                     ?? last.performedOn
             } else {
@@ -186,11 +196,13 @@ extension SomaTools {
             return max(0, start)
         }
 
-        /// The shortest cadence any answered flag argues for. A once in a
-        /// lifetime item stays once in a lifetime.
+        /// The shortest cadence any answered flag argues for, from the catalog
+        /// cadence at `age` (nil reads the base cadence). A once in a lifetime
+        /// item stays once in a lifetime.
         static func effectiveIntervalMonths(item: ScreeningItem,
-                                            presentFlags: [ScreeningRiskFlag: ScreeningRisk]) -> Int? {
-            guard var interval = item.intervalMonths else { return nil }
+                                            presentFlags: [ScreeningRiskFlag: ScreeningRisk],
+                                            age: Int? = nil) -> Int? {
+            guard var interval = item.intervalMonths(atAge: age) else { return nil }
             for modifier in item.modifiers {
                 guard presentFlags[modifier.flag] != nil,
                       let override = modifier.intervalMonthsOverride else { continue }
@@ -363,6 +375,157 @@ extension SomaTools {
                 parts.append("Earlier because of your family history")
             }
             return parts.isEmpty ? nil : parts.joined(separator: " \u{00B7} ")
+        }
+    }
+}
+
+// MARK: - Calendar
+
+extension SomaTools {
+
+    /// One screening on the calendar: when it comes due, and where it stands.
+    nonisolated struct ScreeningDue: Sendable, Equatable, Identifiable {
+        enum State: String, Sendable, Equatable {
+            /// The due date has passed, or it never was done and the age is
+            /// reached.
+            case overdue
+            /// Comes due inside the next ninety days.
+            case soon
+            /// An age not reached yet, past ninety days.
+            case later
+            /// Done, and not due again for more than ninety days (or never).
+            case done
+        }
+
+        let item: ScreeningItem
+        /// nil for a once in a lifetime screening that is done.
+        let dueDate: Date?
+        let state: State
+        let lastDone: Date?
+
+        var id: String { item.id }
+
+        init(item: ScreeningItem, dueDate: Date?, state: State, lastDone: Date?) {
+            self.item = item
+            self.dueDate = dueDate
+            self.state = state
+            self.lastDone = lastDone
+        }
+    }
+
+    /// The due engine read against a profile: a date per screening instead of
+    /// a status, for the calendar and its reminders.
+    ///
+    /// Only what can come due is listed: a `.discuss` item, an item gated on
+    /// an unanswered risk, and an item past its stop age never reach the
+    /// calendar, the same guarantees as the engine.
+    nonisolated enum ScreeningSchedule {
+
+        /// - Returns: nothing without a birthday. Without a sex, the items for
+        ///   everyone only.
+        static func due(for profile: SomaProfile,
+                        ledger: ScreeningLedger,
+                        now: Date = Date(),
+                        calendar: Calendar = .current) -> [ScreeningDue] {
+            guard let birthday = profile.birthday,
+                  let age = profile.age(on: now, calendar: calendar), age > 0 else { return [] }
+            let statuses = ledger.statuses(age: age, sex: eligibility(profile.sex), today: now,
+                                           birthday: birthday, calendar: calendar)
+            return statuses
+                .compactMap { entry($0, birthday: birthday, now: now, calendar: calendar) }
+                .sorted { lhs, rhs in
+                    let l = rank(lhs.state), r = rank(rhs.state)
+                    if l != r { return l < r }
+                    switch (lhs.dueDate, rhs.dueDate) {
+                    case let (a?, b?) where a != b: return a < b
+                    case (.some, nil): return true
+                    case (nil, .some): return false
+                    default: return lhs.item.id < rhs.item.id
+                    }
+                }
+        }
+
+        /// The catalog's side of a profile's sex. "Other, or prefer not to
+        /// say" picks no side, like an unknown one.
+        static func eligibility(_ sex: BiologicalSex?) -> ScreeningEligibility? {
+            switch sex {
+            case .male: .male
+            case .female: .female
+            case .other, nil: nil
+            }
+        }
+
+        /// What the page still has to ask, once.
+        static func missing(_ profile: SomaProfile) -> (age: Bool, sex: Bool) {
+            (profile.birthday == nil, profile.sex == nil)
+        }
+
+        /// The profile the schedule reads: the person's own profile first,
+        /// what the ledger asked to fill its gaps, then the age Apple Health
+        /// holds as a last resort for the birthday.
+        static func resolved(_ base: SomaProfile,
+                             askedSex: String?,
+                             askedBirthday: Date?,
+                             healthAgeYears: Double?,
+                             now: Date = Date(),
+                             calendar: Calendar = .current) -> SomaProfile {
+            var profile = base
+            if profile.sex == nil, let askedSex {
+                profile.sex = BiologicalSex(rawValue: askedSex.lowercased())
+                    ?? eligibility(fromLedger: askedSex)
+            }
+            if profile.birthday == nil {
+                if let askedBirthday {
+                    profile.birthday = askedBirthday
+                } else if let years = healthAgeYears, years > 0 {
+                    profile.birthday = calendar.date(byAdding: .day, value: -Int((years * 365.25).rounded()), to: now)
+                }
+            }
+            return profile
+        }
+
+        private static func eligibility(fromLedger sex: String) -> BiologicalSex? {
+            switch ScreeningEligibility.from(profileSex: sex) {
+            case .male: .male
+            case .female: .female
+            case .any, nil: nil
+            }
+        }
+
+        // MARK: One status
+
+        private static func entry(_ status: ScreeningDueEngine.Status,
+                                  birthday: Date,
+                                  now: Date,
+                                  calendar: Calendar) -> ScreeningDue? {
+            let horizon = calendar.date(byAdding: .day, value: ScreeningDueEngine.upcomingHorizonDays, to: now) ?? now
+            func reaching(_ age: Int) -> Date? { calendar.date(byAdding: .year, value: age, to: birthday) }
+            func due(_ date: Date?, _ state: ScreeningDue.State) -> ScreeningDue {
+                ScreeningDue(item: status.item, dueDate: date, state: state, lastDone: status.lastDone)
+            }
+            switch status.state {
+            case .due:
+                // Never done: due since the birthday that made it apply.
+                return due(status.nextDue ?? reaching(status.effectiveStartAge), .overdue)
+            case .upcoming(let date):
+                return due(date, .soon)
+            case .upToDate(let until):
+                return due(until < .distantFuture ? until : nil, .done)
+            case .notYetEligible(let startsAtAge):
+                let date = reaching(startsAtAge)
+                return due(date, (date.map { $0 <= horizon } ?? false) ? .soon : .later)
+            case .pastStopAge, .discussOnly:
+                return nil
+            }
+        }
+
+        private static func rank(_ state: ScreeningDue.State) -> Int {
+            switch state {
+            case .overdue: 0
+            case .soon: 1
+            case .later: 2
+            case .done: 3
+            }
         }
     }
 }

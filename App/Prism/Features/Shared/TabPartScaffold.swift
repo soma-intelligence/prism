@@ -8,7 +8,9 @@ import SomaUI
 
 /// The shape the tab parts and their deeper pages share: the aspect's weather
 /// behind the head of the page, an optional headline, a row of three stats,
-/// then the cards in one column.
+/// then the cards, in one column on a phone and two where the width holds
+/// them. A child that belongs to the whole page (a control, a status line, a
+/// footnote) is marked `.somaColumnSpan(.full)`.
 ///
 /// The lenses lead with the stats and no headline (owner, 2026-10-03: fewer
 /// words, the numbers and charts say it); the deeper pages still carry one.
@@ -63,7 +65,9 @@ struct TabPartScaffold<Cards: View>: View {
                     SomaStatRow(stats)
                         .padding(.top, hero == nil ? metrics.heroTopPadding : 0)
                 }
-                VStack(alignment: .leading, spacing: metrics.cardSpacing) {
+                // One column on a phone, two where the width holds them:
+                // the inner screen of a foldable, an iPad, a Mac window.
+                SomaCardColumns {
                     cards
                 }
             }
@@ -72,6 +76,7 @@ struct TabPartScaffold<Cards: View>: View {
             .frame(maxWidth: metrics.pageMaxWidth, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
+        .softScrollEdges()
         .aspectWash(aspect)
     }
 }

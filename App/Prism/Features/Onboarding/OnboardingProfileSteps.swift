@@ -70,7 +70,7 @@ struct OnboardingAboutView: View {
                                 .foregroundStyle(colors.inkPrimary.color)
                             sexChips(fills: true)
                         }
-                        .padding(.vertical, 10)
+                        .padding(.vertical, theme.metrics.spaceM)
                     }
                     separator
                     Button { isAskingClock = true } label: {
@@ -113,7 +113,7 @@ struct OnboardingAboutView: View {
     }
 
     private func sexChips(fills: Bool) -> some View {
-        HStack(spacing: 6) {
+        HStack(spacing: theme.metrics.spaceS) {
             ForEach(BiologicalSex.allCases) { sex in
                 OnboardingChip(title: sex.shortTitle, isOn: model.sex == sex, fills: fills) {
                     model.sex = sex
@@ -189,7 +189,7 @@ struct OnboardingChronotypeSheet: View {
                     )
 
                     ForEach(Array(RMEQCatalog.items.enumerated()), id: \.offset) { index, item in
-                        VStack(alignment: .leading, spacing: 10) {
+                        VStack(alignment: .leading, spacing: theme.metrics.spaceM) {
                             Text(item.prompt)
                                 .somaFont(type.callout)
                                 .foregroundStyle(colors.inkPrimary.color)
@@ -211,6 +211,7 @@ struct OnboardingChronotypeSheet: View {
                 }
                 .padding(metrics.pagePadding)
             }
+            .softScrollEdges()
             .background(colors.canvas.color.ignoresSafeArea())
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

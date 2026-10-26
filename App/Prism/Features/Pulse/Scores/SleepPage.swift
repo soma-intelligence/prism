@@ -7,143 +7,57 @@ import SwiftUI
 import SomaUI
 import HealthScoring
 
-/// Sleep, the score's page: the score with its ring, a month of nights
-/// against the usual, last night as a card that opens its own page, the
-/// averages of the last week against the month, how regular the nights
-/// were, what moved the score, and the readings behind it.
-///
-/// Everything about one night lives on ``LastNightPage``; this page reads
-/// sleep over time (owner, 2026-10-20: two sleep pages). The score and the
-/// night card each open one, and each links to the other.
+/// Last night as Apple Health's sleep data view lays it out: time in bed
+/// and time asleep large, the night's stages, then the night in three parts
+/// (heart, stages, context) the way the reference design sets them under its hypnogram.
+/// The score and the long run are ``SleepTrendsPage``, which opens this one.
 struct SleepPage: View {
     @Environment(HealthDashboard.self) private var health
+    @Environment(\.somaTheme) private var theme
     @State private var inputs: ScoreDetailInputs?
     @State private var sheet: Sheet?
 
     enum Sheet: String, Identifiable {
-        case debt, built
+        case debt, dip, breathing, environment, built, history
         var id: String { rawValue }
     }
 
     var body: some View {
-        let scores = health.scores
-        let page = ScorePages.sleep(scores, inputs)
-        let detail = scores?.detail ?? SomaScores.Detail()
+        let page = ScorePages.sleep(health.scores, inputs)
+        let night = SleepNightSummary.make(scoring: page.stages, inBedStart: inputs?.inBedStart, parts: page.parts)
 
-        ScorePageScaffold(aspect: .sleep, title: "Sleep") {
-            ScoreStage(aspect: .sleep, lead: page.lead, series: scores?.sleepSeries ?? [], caption: "Last night")
-            ScoreHead(page.lead)
-            TileLink(value: ScoreRoute.lastNight) { PulseSleepCard(scores: scores) }
-                .accessibilityHint(Text("Opens last night"))
-            SleepAveragesCard(averages: SleepAverages.make(detail))
-            SleepRhythmCard(nights: SleepAverages.windows(detail, nights: 14, calendar: .current),
-                            note: SleepAverages.rhythmNote(detail))
+        ScorePageScaffold(aspect: .sleep, title: "Last night") {
+            SomaSleepTotals(inBed: night?.inBed, asleep: night?.asleep)
+                .padding(.top, theme.metrics.heroTopPadding)
+                .somaColumnSpan(.full)
+
+            SomaCard {
+                if let night, !night.runs.isEmpty {
+                    SomaHypnogram(runs: night.runs,
+                                  bed: ScoreMath.clock(night.bed),
+                                  wake: ScoreMath.clock(night.wake))
+                } else {
+                    ScoreEmptyPlot(message: "Stages draw here from a night your watch records.")
+                }
+            }
+            .somaColumnSpan(.full)
+
+            SleepNightFacts(night: night, dip: ScorePages.nightDip(health.scores, inputs), inputs: inputs)
+
             ScoreUsualCard(title: "What moved it", aspect: .sleep, lines: page.lines)
-            ScoreLinks(links: [
-                ScoreLink(title: "Sleep debt", detail: page.debt ?? "-") { sheet = .debt },
-                ScoreLink(title: "How your score is built") { sheet = .built },
-            ])
             if let move = page.move {
                 ScoreMoveCard(move: move, aspect: .sleep)
             }
-            AspectReadings(aspect: .sleep, identifiers: AspectReadingKind.sleepReadings, category: .aspect(.sleep))
         }
         .scoreInputs([.nights, .heart, .nightHeart, .breathing, .sound], into: $inputs)
-        .sheet(item: $sheet) { sheet in
-            switch sheet {
-            case .debt: SleepDebtSheet(scores: health.scores)
-            case .built: SleepBuiltSheet(score: health.scores?.sleep, parts: page.parts)
-            }
-        }
     }
 }
 
-/// The nights in numbers: the last seven against the thirty, and the
-/// windows they were slept in.
-enum SleepAverages {
-    struct Row: Identifiable, Equatable {
-        var id: String { title }
-        var title: String
-        var week: String?
-        var month: String?
-    }
-
-    /// Asleep, deep and REM as durations; bedtime and waking as clock times.
-    static func make(_ detail: SomaScores.Detail) -> [Row] {
-        func hours(_ values: [Double?]) -> (String?, String?) {
-            (ScoreMath.mean(values.suffix(7)).map(ScoreMath.hoursMinutes),
-             ScoreMath.mean(values.suffix(30)).map(ScoreMath.hoursMinutes))
-        }
-        func clock(_ values: [Double?]) -> (String?, String?) {
-            (circularMean(values.suffix(7)).map(ScoreMath.clock), circularMean(values.suffix(30)).map(ScoreMath.clock))
-        }
-        let asleep = hours(detail.sleepHours)
-        let deep = hours(detail.deepHours)
-        let rem = hours(detail.remHours)
-        let bed = clock(detail.bedHour)
-        let wake = clock(detail.wakeHour)
-        return [
-            Row(title: "Asleep", week: asleep.0, month: asleep.1),
-            Row(title: "Deep", week: deep.0, month: deep.1),
-            Row(title: "REM", week: rem.0, month: rem.1),
-            Row(title: "Bedtime", week: bed.0, month: bed.1),
-            Row(title: "Woke up", week: wake.0, month: wake.1),
-        ]
-    }
-
-    /// The last `nights` windows, oldest first, labelled by weekday letter.
-    static func windows(_ detail: SomaScores.Detail, nights: Int, calendar: Calendar, now: Date = Date()) -> [SomaSleepWindow] {
-        let beds = Array(detail.bedHour.suffix(nights))
-        let wakes = Array(detail.wakeHour.suffix(nights))
-        let count = min(beds.count, wakes.count)
-        let today = calendar.startOfDay(for: now)
-        var style = Date.FormatStyle.dateTime.weekday(.narrow)
-        style.timeZone = calendar.timeZone
-        return (0..<count).map { index in
-            let day = calendar.date(byAdding: .day, value: index - count + 1, to: today) ?? today
-            return SomaSleepWindow(id: index, label: day.formatted(style), bed: beds[index], wake: wakes[index])
-        }
-    }
-
-    /// One plain line on how steady the bedtimes were over a fortnight:
-    /// how far a usual night strays from the middle bedtime.
-    static func rhythmNote(_ detail: SomaScores.Detail) -> String? {
-        let beds = detail.bedHour.suffix(14).compactMap { $0 }.map(SomaSleepWindowClock.pastNoon)
-        guard beds.count >= 5 else { return nil }
-        let sorted = beds.sorted()
-        let middle = sorted[sorted.count / 2]
-        let strays = beds.map { abs($0 - middle) }.sorted()
-        let typical = strays[strays.count / 2] * 60
-        let minutes = max(5, Int((typical / 5).rounded()) * 5)
-        return minutes <= 30
-            ? "Bedtime within \(minutes) min on most nights"
-            : "Bedtime moves about \(minutes) min from night to night"
-    }
-
-    /// The mean of clock hours across midnight: 23:30 and 00:30 average to
-    /// midnight, not to noon.
-    static func circularMean(_ hours: ArraySlice<Double?>) -> Double? {
-        let known = hours.compactMap { $0 }
-        guard !known.isEmpty else { return nil }
-        let past = known.map(SomaSleepWindowClock.pastNoon)
-        let mean = past.reduce(0, +) / Double(past.count)
-        return (mean + 12).truncatingRemainder(dividingBy: 24)
-    }
-}
-
-/// Clock hours as hours past noon, so a night reads in one run.
-enum SomaSleepWindowClock {
-    static func pastNoon(_ hour: Double) -> Double {
-        let h = hour.truncatingRemainder(dividingBy: 24)
-        let wrapped = h < 0 ? h + 24 : h
-        return wrapped >= 12 ? wrapped - 12 : wrapped + 12
-    }
-}
-
-/// The last week against the month: one row per average, the week's value
-/// in the ink and the month's beside it in the secondary.
-private struct SleepAveragesCard: View {
-    let averages: [SleepAverages.Row]
+/// Last night's time asleep, large, and one sentence against your need.
+private struct SleepLead: View {
+    let asleepHours: Double?
+    let needHours: Double?
+    let night: SleepNightSummary?
 
     @Environment(\.somaTheme) private var theme
 
@@ -151,57 +65,94 @@ private struct SleepAveragesCard: View {
         let type = theme.typography
         let colors = theme.colors
 
-        SomaCard {
-            VStack(alignment: .leading, spacing: 0) {
-                HStack {
-                    SomaCardHeader("Averages", caption: "Last 7 nights")
-                    Spacer()
-                    Text("30 nights")
-                        .somaFont(type.caption)
-                        .foregroundStyle(colors.inkSecondary.color)
-                        .frame(width: theme.metrics.bodyRowValueWidth, alignment: .trailing)
-                }
-                ScoreRows(averages) { row in
-                    HStack {
-                        Text(row.title)
-                            .somaFont(type.body)
-                            .foregroundStyle(colors.inkPrimary.color)
-                        Spacer()
-                        Text(row.week ?? "-")
-                            .somaFont(type.rowValue)
-                            .foregroundStyle(colors.inkPrimary.color)
-                        Text(row.month ?? "-")
-                            .somaFont(type.rowValue)
-                            .foregroundStyle(colors.inkSecondary.color)
-                            .frame(width: theme.metrics.bodyRowValueWidth, alignment: .trailing)
-                    }
-                    .accessibilityElement(children: .combine)
-                }
-            }
+        VStack(alignment: .leading, spacing: theme.metrics.cardHeaderSpacing) {
+            Text("Last night")
+                .somaFont(type.callout)
+                .foregroundStyle(colors.inkSecondary.color)
+            SomaNumber(asleepHours.map { TodayFormat.duration(seconds: $0 * 3600) }, type.metric)
+                .foregroundStyle(colors.inkPrimary.color)
+            Text(sentence)
+                .somaFont(type.body)
+                .foregroundStyle(colors.inkSecondary.color)
+                .fixedSize(horizontal: false, vertical: true)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, theme.metrics.cardSpacing)
+        .accessibilityElement(children: .combine)
+    }
+
+    private var sentence: String {
+        guard let asleepHours else {
+            return "No sleep was recorded last night. Wear your Apple Watch to bed with at least 30% battery."
+        }
+        var words = ""
+        if let night {
+            words = "Asleep from \(ScoreMath.clock(night.bed)) to \(ScoreMath.clock(night.wake)). "
+        }
+        guard let needHours else { return words }
+        let gap = (needHours - asleepHours) * 3600
+        let need = TodayFormat.duration(seconds: needHours * 3600)
+        if abs(gap) < 5 * 60 { return words + "That meets the \(need) you need." }
+        return words + "That is \(TodayFormat.span(seconds: abs(gap))) \(gap > 0 ? "under" : "over") the \(need) you need."
     }
 }
 
-/// How regular the nights were: a fortnight of windows and one line.
-private struct SleepRhythmCard: View {
-    let nights: [SomaSleepWindow]
-    let note: String?
+/// When to be in bed tonight, from your usual waking time and your need, and
+/// the one reminder this page can set. Notifications are asked for here, the
+/// first time someone taps it, never before.
+private struct SleepTonightCard: View {
+    let day: ScoringPeakDay
+    let needHours: Double?
 
     @Environment(\.somaTheme) private var theme
+    @State private var reminded: Bool?
 
     var body: some View {
-        SomaCard {
-            VStack(alignment: .leading, spacing: theme.metrics.cardSpacing) {
-                SomaCardHeader("Rhythm", caption: "Last 14 nights")
-                if nights.contains(where: { $0.bed != nil }) {
-                    SomaSleepWindows(nights)
-                } else {
-                    ScoreEmptyPlot(message: "Your nights line up here after a few of them.")
-                }
-                if let note {
-                    Text(note)
-                        .somaFont(theme.typography.callout)
-                        .foregroundStyle(theme.colors.inkSecondary.color)
+        let type = theme.typography
+        let colors = theme.colors
+        let today = Calendar.current.startOfDay(for: .now)
+        let bed = today.addingTimeInterval((day.bedHour < 12 ? day.bedHour + 24 : day.bedHour) * 3600)
+        let windDown = today.addingTimeInterval((day.windDownHour < 12 ? day.windDownHour + 24 : day.windDownHour) * 3600)
+        let wake = TodayFormat.clock(hour: day.wakeHour, on: .now, calendar: .current)
+
+        ScoreSection(title: "Tonight") {
+            SomaCard {
+                VStack(alignment: .leading, spacing: theme.metrics.cardSpacing) {
+                    Text(needHours.map { "Be in bed by \(bed.formatted(date: .omitted, time: .shortened)) to get your \(TodayFormat.duration(seconds: $0 * 3600))." }
+                         ?? "Be in bed by \(bed.formatted(date: .omitted, time: .shortened)).")
+                        .somaFont(type.title)
+                        .foregroundStyle(colors.inkPrimary.color)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text("You usually wake at \(wake). A reminder at \(windDown.formatted(date: .omitted, time: .shortened)) leaves time to wind down.")
+                        .somaFont(type.callout)
+                        .foregroundStyle(colors.inkSecondary.color)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Button {
+                        Task {
+                            reminded = await ToolNotifier.remind(
+                                id: "sleep.windDown",
+                                title: String(localized: "Time to wind down"),
+                                body: String(localized: "In bed by \(bed.formatted(date: .omitted, time: .shortened)) gets you the sleep you need."),
+                                at: windDown
+                            )
+                        }
+                    } label: {
+                        Text(reminded == true ? "Reminder set for \(windDown.formatted(date: .omitted, time: .shortened))"
+                             : "Remind me at \(windDown.formatted(date: .omitted, time: .shortened))")
+                            .somaFont(type.headerTitle)
+                            .foregroundStyle(colors.onAccent.color)
+                            .frame(maxWidth: .infinity, minHeight: theme.metrics.minimumTapTarget + theme.metrics.cardHeaderSpacing)
+                            .background(Capsule().fill(colors.accent.color))
+                            .contentShape(Capsule())
+                    }
+                    .buttonStyle(.somaGlassPress)
+                    .disabled(reminded == true)
+                    .sensoryFeedback(.success, trigger: reminded == true)
+                    if reminded == false {
+                        Text("Notifications are off for Soma, or the time has passed. You can turn them on in Settings.")
+                            .somaFont(type.caption)
+                            .foregroundStyle(colors.inkSecondary.color)
+                    }
                 }
             }
         }
@@ -241,7 +192,7 @@ struct SleepDebtSheet: View {
             SomaCard {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Asleep against your need")
-                        .somaFont(theme.typography.eyebrow).textCase(.uppercase)
+                        .somaFont(theme.typography.eyebrow)
                         .foregroundStyle(theme.colors.inkSecondary.color)
                     ScoreFigure(value: average.map(ScoreMath.hoursMinutes), unit: "a night, on average")
                     ScoreStageColumns(nights: columns, need: scores?.sleepNeedHours ?? 8, aspect: .sleep)
@@ -360,9 +311,9 @@ struct BreathingSheet: View {
             ScoreParagraph(lead: page.headline,
                            rest: page.usual.map { "Your usual is \(ScoreMath.number($0.low, decimals: 1)) to \(ScoreMath.number($0.high, decimals: 1)). " + page.reason } ?? page.reason)
             SomaCard {
-                VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: theme.metrics.spaceM) {
                     Text("Overnight signals")
-                        .somaFont(theme.typography.eyebrow).textCase(.uppercase)
+                        .somaFont(theme.typography.eyebrow)
                         .foregroundStyle(theme.colors.inkSecondary.color)
                     ScoreFigure(value: "\(page.inRange) of \(page.signals.count)", unit: "in range")
                     ForEach(page.signals) { signal in

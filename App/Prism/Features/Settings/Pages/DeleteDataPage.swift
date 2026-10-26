@@ -115,9 +115,18 @@ struct DeleteDataPage: View {
             }
 
             SettingsSection("What stays") {
-                SomaBrowseGroup([SettingsItem].items("health")) { _ in
-                    SomaBrowseRow(symbol: "heart.text.square", title: String(localized: "Apple Health"),
-                                  detail: String(localized: "Untouched"), opensSomething: false)
+                SomaBrowseGroup([SettingsItem].items("online", "phone", "health")) { item in
+                    switch item.id {
+                    case "online":
+                        SomaBrowseRow(symbol: "icloud", title: String(localized: "What Soma keeps online"),
+                                      detail: String(localized: "Kept, not erased"), opensSomething: false)
+                    case "phone":
+                        SomaBrowseRow(symbol: "iphone", title: String(localized: "Everything on this phone"),
+                                      detail: String(localized: "Kept"), opensSomething: false)
+                    default:
+                        SomaBrowseRow(symbol: "heart.text.square", title: String(localized: "Apple Health"),
+                                      detail: String(localized: "Untouched"), opensSomething: false)
+                    }
                 }
                 SettingsFootnote("Soma never deletes from Apple Health. Take its access back in the Health app, under your picture, then Apps.")
             }
@@ -128,7 +137,7 @@ struct DeleteDataPage: View {
                         if isDeleting {
                             ProgressView()
                         } else {
-                            Text("Delete my data")
+                            Text("Close my account")
                                 .somaFont(theme.typography.body)
                                 .foregroundStyle(theme.colors.danger.color)
                         }
@@ -149,7 +158,7 @@ struct DeleteDataPage: View {
             }
         }
         .confirmationDialog(AccountDeletion.confirmationTitle, isPresented: $confirming, titleVisibility: .visible) {
-            Button("Delete my data", role: .destructive) {
+            Button("Close my account", role: .destructive) {
                 Task { await delete() }
             }
             Button("Cancel", role: .cancel) {}

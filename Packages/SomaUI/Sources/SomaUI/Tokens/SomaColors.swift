@@ -61,9 +61,9 @@ public struct SomaColors: Sendable, Equatable {
         danger: SomaColorValue,
         record: SomaColorValue = SomaColorValue(light: 0xFF3B30, dark: 0xFF453A),
         onOrb: SomaColorValue = SomaColorValue(0xFFFFFF),
-        statusNormal: SomaColorValue = SomaColorValue(light: 0x248A3D, dark: 0x34C759),
+        statusNormal: SomaColorValue = SomaColorValue(light: 0x1F7F38, dark: 0x34C759),
         statusOut: SomaColorValue = SomaColorValue(light: 0xC93400, dark: 0xFF9F0A),
-        statusAlert: SomaColorValue = SomaColorValue(light: 0xD70015, dark: 0xFF453A),
+        statusAlert: SomaColorValue = SomaColorValue(light: 0xD70015, dark: 0xFF6961),
         sleepStages: SomaSleepStagePalette = .standard
     ) {
         self.canvas = canvas

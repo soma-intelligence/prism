@@ -7,7 +7,8 @@ import Foundation
 
 /// The weather where you are, from Open-Meteo's free forecast and air
 /// quality services: no key, no account, only a place rounded to about ten
-/// kilometres leaves the device.
+/// kilometres leaves the device. The air quality service also carries the
+/// pollen forecast (CAMS, Europe only).
 ///
 /// The app has no WeatherKit capability, so this is the weather source
 /// (owner, 2026-10-03). Thirty days back come with today, so the detail
@@ -16,6 +17,8 @@ import Foundation
 nonisolated struct EnvironmentConditions: Sendable, Equatable, Codable {
     var temperature: Double?
     var humidity: Double?
+    /// Wind at ten metres, in kilometres per hour.
+    var wind: Double?
     var uv: Double?
     var aqi: Double?
     var weatherCode: Int?
@@ -31,6 +34,10 @@ nonisolated struct EnvironmentConditions: Sendable, Equatable, Codable {
     var aqiDays: [Double?] = []
     /// Every hour's temperature, for the outdoor temperature over a night.
     var hourly: [Date: Double] = [:]
+    /// Today's highest hour of each pollen, in grains per cubic metre. Nil
+    /// when the service sent no pollen at all: its pollen map covers Europe
+    /// only, and a place outside it gets nulls. A kind left out was null.
+    var pollen: [PollenKind: Double]?
 
     /// The mean outdoor temperature over a stretch, a night say.
     func mean(from start: Date, to end: Date) -> Double? {
@@ -121,7 +128,7 @@ actor EnvironmentWeatherClient {
         parts?.queryItems = [
             URLQueryItem(name: "latitude", value: String(latitude)),
             URLQueryItem(name: "longitude", value: String(longitude)),
-            URLQueryItem(name: "current", value: "temperature_2m,relative_humidity_2m,uv_index,weather_code,is_day"),
+            URLQueryItem(name: "current", value: "temperature_2m,relative_humidity_2m,wind_speed_10m,uv_index,weather_code,is_day"),
             URLQueryItem(name: "daily", value: "temperature_2m_max,temperature_2m_min,uv_index_max,sunrise,sunset"),
             URLQueryItem(name: "hourly", value: "temperature_2m"),
             URLQueryItem(name: "past_days", value: "30"),
@@ -137,7 +144,7 @@ actor EnvironmentWeatherClient {
             URLQueryItem(name: "latitude", value: String(latitude)),
             URLQueryItem(name: "longitude", value: String(longitude)),
             URLQueryItem(name: "current", value: "us_aqi"),
-            URLQueryItem(name: "hourly", value: "us_aqi"),
+            URLQueryItem(name: "hourly", value: (["us_aqi"] + PollenKind.allCases.map(\.field)).joined(separator: ",")),
             URLQueryItem(name: "past_days", value: "30"),
             URLQueryItem(name: "forecast_days", value: "1"),
             URLQueryItem(name: "timezone", value: "auto"),
@@ -157,6 +164,7 @@ actor EnvironmentWeatherClient {
             let current = forecast["current"] as? [String: Any] ?? [:]
             result.temperature = number(current["temperature_2m"])
             result.humidity = number(current["relative_humidity_2m"])
+            result.wind = number(current["wind_speed_10m"])
             result.uv = number(current["uv_index"])
             result.weatherCode = number(current["weather_code"]).map { Int($0) }
             result.isDay = number(current["is_day"]).map { $0 > 0 }
@@ -191,8 +199,23 @@ actor EnvironmentWeatherClient {
                 if let value { byDay[day] = max(byDay[day] ?? 0, value) }
             }
             result.aqiDays = order.map { byDay[$0] }
+            result.pollen = pollen(hourly)
         }
         return result
+    }
+
+    /// The highest hour of each pollen on the last day the service sent,
+    /// which is today: the request asks for no day ahead.
+    static func pollen(_ hourly: [String: Any]) -> [PollenKind: Double]? {
+        let times = hourly["time"] as? [String] ?? []
+        guard let today = times.last.map({ String($0.prefix(10)) }) else { return nil }
+        var peaks: [PollenKind: Double] = [:]
+        for kind in PollenKind.allCases {
+            let values = zip(times, series(hourly[kind.field]))
+                .compactMap { time, value in time.hasPrefix(today) ? value : nil }
+            if let peak = values.max() { peaks[kind] = peak }
+        }
+        return peaks.isEmpty ? nil : peaks
     }
 
     private static func number(_ any: Any?) -> Double? {

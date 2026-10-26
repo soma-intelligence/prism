@@ -40,14 +40,13 @@ public struct SomaChartCard<Chart: View>: View {
         let colors = theme.colors
 
         SomaCard {
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: theme.metrics.spaceS) {
                 Text(eyebrow)
                     .somaFont(type.cardTitle)
                     .foregroundStyle(colors.inkPrimary.color)
 
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text(value ?? "-")
-                        .somaFont(type.metric)
+                    SomaNumber(value, type.metric)
                         .foregroundStyle(colors.inkPrimary.color)
                         .somaRollingNumber(value, holdsWidth: unit != nil)
                     if let unit, value != nil {

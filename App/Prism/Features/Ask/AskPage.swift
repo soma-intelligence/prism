@@ -41,6 +41,9 @@ struct AskPage: View {
     @State private var profile = SomaProfileStore.shared
     /// The reply being written, cancelled by the stop button.
     @State private var streaming: Task<Void, Never>?
+    /// Ask's model settings, opened from a failure that is fixed there.
+    @State private var isShowingModels = false
+    @State private var providers = AskProviderSettings.shared
     @FocusState private var isFieldFocused: Bool
 
     private var isStreaming: Bool { streaming != nil }
@@ -86,6 +89,10 @@ struct AskPage: View {
             }
         }
         .sheet(isPresented: $isShowingSettings) { SettingsSheet() }
+        .sheet(isPresented: $isShowingModels) {
+            NavigationStack { AskModelPage() }
+                .presentationDetents([.large])
+        }
     }
 
     private var stack: some View {
@@ -96,16 +103,16 @@ struct AskPage: View {
                         if turns.isEmpty {
                             AskReadyView(name: profile.profile.firstName, suggestions: Ask.suggestions(facts), send: send)
                         } else {
-                            AskConversationView(turns: turns, send: send, retry: answer, start: { sheet = .move })
+                            AskConversationView(turns: turns, send: send, retry: answer, start: { sheet = .move }, openModels: { isShowingModels = true })
                         }
                     }
                     .padding(.horizontal, theme.metrics.pagePadding * 1.25)
                     .padding(.bottom, theme.metrics.leadSpacing)
-                    .frame(maxWidth: theme.metrics.pageMaxWidth)
-                    .frame(maxWidth: .infinity)
+                    .somaReadableWidth()
 
                     Color.clear.frame(height: 1).id(AskPage.bottom)
                 }
+                .softScrollEdges()
 #if !os(visionOS)
                 // The headset's keyboard floats apart from the window.
                 .scrollDismissesKeyboard(.interactively)
@@ -187,7 +194,22 @@ struct AskPage: View {
         if let answering { return answering }
         let scores = health.scores
         let profile = SomaProfileStore.shared.profile
-        return ModelAskAnswering { AskContextBuilder.make(scores: scores, insights: [], profile: profile) }
+        let context: @MainActor @Sendable () -> AskContext = { AskContextBuilder.make(scores: scores, insights: [], profile: profile) }
+        let provider = providers.effective
+        switch provider {
+        case .appleIntelligence:
+            return AppleIntelligenceAnswering(context: context)
+        case .soma:
+            return ModelAskAnswering(context: context)
+        default:
+            guard let key = providers.key(for: provider) else { return FailingAskAnswering(failure: .missingKey(provider)) }
+            if let missing = providers.missing(for: provider) {
+                return FailingAskAnswering(failure: AskFailure(kind: .missingKey, title: missing,
+                                                               detail: "Finish \(provider.title) in Ask\u{2019}s settings.", opensSettings: true))
+            }
+            return RemoteAskAnswering(provider: provider, key: key, model: providers.model(for: provider),
+                                      endpoint: providers.endpoint(for: provider), context: context)
+        }
     }
 
     private func answer(_ id: UUID) {
@@ -218,7 +240,8 @@ struct AskPage: View {
                 if Task.isCancelled {
                     finish(id, text: text, followUps: followUps)
                 } else {
-                    update(id) { $0.phase = .failed }
+                    let failure = error as? AskFailure
+                    update(id) { $0.phase = .failed; $0.failure = failure }
                 }
             }
             streaming = nil
@@ -290,7 +313,7 @@ struct AskPage: View {
         let hasDraft = !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         let disc = metrics.iconButtonDiameter * 0.75
 
-        return HStack(spacing: metrics.scoreLabelSpacing * 4) {
+        return HStack(spacing: metrics.spaceS) {
             Button { sheet = .attach } label: {
                 Image(systemName: "plus")
                     .font(.system(size: metrics.browseGlyphSize, weight: .regular))
@@ -348,11 +371,13 @@ struct AskPage: View {
         }
         .animation(reduceMotion ? nil : theme.motion.selection, value: hasDraft)
         .animation(reduceMotion ? nil : theme.motion.selection, value: isStreaming)
-        .padding(.horizontal, metrics.scoreLabelSpacing * 3)
-        .frame(minHeight: metrics.iconButtonDiameter + metrics.scoreLabelSpacing * 4)
+        .padding(.horizontal, metrics.spaceXS)
+        .frame(minHeight: metrics.iconButtonDiameter + metrics.spaceS)
         .somaGlass(.regular, in: .capsule)
         .padding(.horizontal, metrics.pagePadding)
         .padding(.bottom, metrics.cardSpacing)
+        // As wide as the conversation over it, not the window.
+        .somaReadableWidth()
     }
 }
 
@@ -376,6 +401,8 @@ struct AskTurn: Identifiable, Equatable {
     var question: String
     var answer: AskAnswer
     var phase: Phase = .done
+    /// Why the answer failed, worded for the person, when the phase is failed.
+    var failure: AskFailure?
 
     init(id: UUID = UUID(), question: String, answer: AskAnswer, phase: Phase = .done) {
         self.id = id
@@ -459,18 +486,19 @@ struct AskReadyView: View {
         let colors = theme.colors
 
         VStack(alignment: .leading, spacing: metrics.leadSpacing * 1.5) {
-            VStack(alignment: .leading, spacing: metrics.scoreLabelSpacing * 2) {
+            VStack(alignment: .leading, spacing: metrics.spaceXS) {
                 Text(name.map { "Hi \($0)" } ?? String(localized: "Ask Soma"))
                     .somaFont(type.title)
                     .foregroundStyle(colors.inkPrimary.color)
-                Text("What would you like to know?")
-                    .somaFont(type.title)
+                Text("Answers quote your Apple Health readings and say where each number comes from.")
+                    .somaFont(type.callout)
                     .foregroundStyle(colors.inkSecondary.color)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(.isHeader)
 
-            VStack(alignment: .leading, spacing: metrics.cardSpacing * 0.75) {
+            VStack(alignment: .leading, spacing: metrics.spaceS) {
                 ForEach(suggestions.prefix(3)) { suggestion in
                     AskChip(title: suggestion.question) { send(suggestion.question) }
                 }
@@ -499,7 +527,7 @@ private struct AskChip: View {
                 .foregroundStyle(colors.inkPrimary.color)
                 .multilineTextAlignment(.leading)
                 .padding(.horizontal, metrics.cardPadding)
-                .padding(.vertical, metrics.cardSpacing * 0.75)
+                .padding(.vertical, metrics.spaceS)
                 .frame(minHeight: metrics.minimumTapTarget)
                 .overlay(
                     Capsule().strokeBorder(
@@ -520,13 +548,15 @@ struct AskConversationView: View {
     let send: (String) -> Void
     var retry: (UUID) -> Void = { _ in }
     let start: () -> Void
+    var openModels: () -> Void = {}
 
     @Environment(\.somaTheme) private var theme
 
     var body: some View {
         VStack(alignment: .leading, spacing: theme.metrics.leadSpacing * 1.5) {
             ForEach(turns) { turn in
-                AskTurnView(turn: turn, isLast: turn.id == turns.last?.id, send: send, retry: { retry(turn.id) }, start: start)
+                AskTurnView(turn: turn, isLast: turn.id == turns.last?.id, send: send, retry: { retry(turn.id) }, start: start,
+                            openModels: openModels)
             }
         }
         .padding(.top, theme.metrics.leadSpacing)
@@ -541,6 +571,7 @@ private struct AskTurnView: View {
     let send: (String) -> Void
     let retry: () -> Void
     let start: () -> Void
+    var openModels: () -> Void = {}
 
     @Environment(\.somaTheme) private var theme
 
@@ -558,7 +589,7 @@ private struct AskTurnView: View {
                     .somaFont(type.body)
                     .foregroundStyle(colors.inkPrimary.color)
                     .padding(.horizontal, metrics.cardPadding)
-                    .padding(.vertical, metrics.cardSpacing * 0.8)
+                    .padding(.vertical, metrics.spaceS)
                     .background(
                         RoundedRectangle(cornerRadius: metrics.cardCornerRadius * 1.4, style: .continuous)
                             .fill(colors.surfaceRecessed.color)
@@ -573,23 +604,44 @@ private struct AskTurnView: View {
                     .somaFont(type.caption)
                     .foregroundStyle(colors.inkSecondary.color)
             case .failed:
-                HStack(spacing: metrics.cardSpacing * 0.75) {
-                    Text("Soma couldn\u{2019}t answer.")
+                // What happened, then what to do, then the one action that
+                // fixes it: never a code (owner, 2026-10-24).
+                VStack(alignment: .leading, spacing: metrics.spaceXS) {
+                    Text(turn.failure?.title ?? "Soma couldn\u{2019}t answer")
+                        .somaFont(type.callout)
+                        .foregroundStyle(colors.inkPrimary.color)
+                    Text(turn.failure?.detail ?? "Try again in a moment.")
                         .somaFont(type.caption)
                         .foregroundStyle(colors.inkSecondary.color)
-                    Button("Try again", action: retry)
-                        .somaFont(type.caption)
-                        .foregroundStyle(colors.accent.color)
-                        .buttonStyle(.somaGlassPress)
-                        .frame(minHeight: metrics.minimumTapTarget)
-                        .contentShape(.rect)
+                        .fixedSize(horizontal: false, vertical: true)
+                    HStack(spacing: metrics.cardSpacing) {
+                        if turn.failure?.opensSettings == true {
+                            Button("Choose a model", action: openModels)
+                                .somaFont(type.caption)
+                                .foregroundStyle(colors.inkPrimary.color)
+                                .padding(.horizontal, metrics.spaceM)
+                                .padding(.vertical, metrics.spaceS - 2)
+                                .background(Capsule().fill(.fill.quaternary))
+                                .buttonStyle(.somaGlassPress)
+                                .frame(minHeight: metrics.minimumTapTarget)
+                        }
+                        Button("Try again", action: retry)
+                            .somaFont(type.caption)
+                            .foregroundStyle(colors.inkSecondary.color)
+                            .buttonStyle(.somaGlassPress)
+                            .frame(minHeight: metrics.minimumTapTarget)
+                            .contentShape(.rect)
+                    }
                 }
+                .padding(metrics.cardPadding)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(colors.surface.color, in: .rect(cornerRadius: metrics.cardCornerRadius, style: .continuous))
             case .streaming, .done:
                 answerText(answer)
             }
 
             if isSettled && isLast && !answer.followUps.isEmpty {
-                VStack(alignment: .leading, spacing: metrics.cardSpacing * 0.75) {
+                VStack(alignment: .leading, spacing: metrics.spaceS) {
                     ForEach(answer.followUps.prefix(3)) { suggestion in
                         AskChip(title: suggestion.question) { send(suggestion.question) }
                     }
@@ -608,7 +660,7 @@ private struct AskTurnView: View {
 
                 if let move = answer.move {
                     Button(action: start) {
-                        HStack(spacing: metrics.cardSpacing * 0.75) {
+                        HStack(spacing: metrics.spaceS) {
                             Image(systemName: "play.circle.fill")
                                 .font(.system(size: metrics.browseGlyphSize, weight: .regular))
                                 .foregroundStyle(colors.accent.color)
@@ -639,13 +691,16 @@ private struct AskTurnView: View {
 private struct AskTypingIndicator: View {
     @Environment(\.somaTheme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var isOnScreen = true
 
     var body: some View {
         let metrics = theme.metrics
         let dot = metrics.scoreLabelSpacing * 3.5
         let ink = theme.colors.inkSecondary.color
 
-        TimelineView(.animation(paused: reduceMotion)) { context in
+        // Thirty frames a second is plenty for an opacity that takes a whole
+        // beat to swell; the display's full rate redrew the row for nothing.
+        TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: reduceMotion || !isOnScreen)) { context in
             let time = context.date.timeIntervalSinceReferenceDate
             HStack(spacing: dot * 0.75) {
                 ForEach(0..<3, id: \.self) { index in
@@ -657,6 +712,7 @@ private struct AskTypingIndicator: View {
             }
         }
         .frame(minHeight: metrics.minimumTapTarget * 0.6, alignment: .leading)
+        .somaOnScreen($isOnScreen)
         .accessibilityElement()
         .accessibilityLabel("Soma is answering")
     }

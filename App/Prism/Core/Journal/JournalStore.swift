@@ -89,7 +89,11 @@ final class JournalStore {
     private let calendar: Calendar
 
     /// The tags a new Journal starts with: the ones the design offers, the
-    /// last two switched off.
+    /// last two switched off. Floss, mouthwash and bleeding gums feed the
+    /// mouth and teeth page (``OralSummary``); the gums tag is also what the
+    /// weekly evening question writes. The social tags feed Mind's
+    /// connection page (``ConnectionWeek``); time with people is what the
+    /// evening question about people writes.
     static let starterTags: [JournalTag] = [
         ("coffee-late", "Coffee after 14:00", true),
         ("alcohol", "Alcohol", true),
@@ -99,6 +103,13 @@ final class JournalStore {
         ("screens-in-bed", "Screens in bed", true),
         ("meditation", "Meditation", true),
         ("travel", "Travel", true),
+        (OralTag.floss, "Floss", true),
+        (OralTag.mouthwash, "Mouthwash", true),
+        (OralTag.gumsBleed, "Gums bled", true),
+        (SocialTag.sawFriends, "Saw friends", true),
+        (SocialTag.calledFamily, "Called family", true),
+        (SocialTag.volunteered, "Volunteered", true),
+        (SocialTag.timeWithPeople, "Time with people", true),
         ("nap", "Nap", false),
         ("supplements", "Supplements", false),
     ].map { JournalTag(id: $0.0, title: $0.1, isOffered: $0.2) }
@@ -116,7 +127,11 @@ final class JournalStore {
         self.calendar = calendar
         if let url, let data = try? Data(contentsOf: url),
            let stored = try? JSONDecoder().decode(Stored.self, from: data) {
-            tags = stored.tags
+            // A starter tag added after this Journal was written joins it at
+            // the end, as the starter list offers it; the tags already there
+            // keep their order and their switch.
+            let known = Set(stored.tags.map(\.id))
+            tags = stored.tags + Self.starterTags.filter { !known.contains($0.id) }
             days = stored.days
             questions = stored.questions
         } else {
@@ -157,6 +172,11 @@ final class JournalStore {
     var loggedDays: [(date: Date, day: JournalDay)] {
         days.compactMap { key, value in date(from: key).map { ($0, value) } }
             .sorted { $0.date < $1.date }
+    }
+
+    /// The start of the latest day a tag was answered, yes or no.
+    func lastAnswered(_ tagID: String) -> Date? {
+        days.filter { $0.value.answer(tagID) != nil }.keys.compactMap(date(from:)).max()
     }
 
     /// The start of each day a tag was tapped on.

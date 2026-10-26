@@ -68,9 +68,14 @@ public struct SomaFontSpec: Sendable, Equatable {
 /// density, one-handed, and the components handle accessibility sizes by
 /// changing layout rather than by letting the scale run away.
 ///
-/// Headlines and values are set the way the website sets Geist: regular
-/// weight, tight tracking. Labels above a section are set wide, like the site's
-/// section labels.
+/// Every touch size is one of Apple's iOS text styles at the Large Dynamic
+/// Type size (Large Title 34, Title 1 28, Title 2 22, Headline and Body 17,
+/// Callout 16, Subheadline 15, Footnote 13, Caption 2 11), eight sizes in all,
+/// and the pointer scale takes the macOS styles the same way. The system
+/// applies Apple's own tracking table to SF Pro at each size, so a role's
+/// `tracking` is only Soma's offset on top of it: tight on titles and values,
+/// the way the website sets Geist, and zero on running text and labels. The
+/// Figma kit's page `24 Harmony` shows the ramp with Apple's values.
 public struct SomaTypography: Sendable, Equatable {
     /// Hero values and screen titles.
     public var display: SomaFontSpec
@@ -93,7 +98,8 @@ public struct SomaTypography: Sendable, Equatable {
     public var field: SomaFontSpec
     /// The label under a tab glyph.
     public var tabLabel: SomaFontSpec
-    /// The uppercase kicker above a card or a section.
+    /// The quiet label above a card or a section: Footnote, semibold, in
+    /// sentence case at the face's own tracking. Never set in capitals.
     public var eyebrow: SomaFontSpec
     /// The label of a segment in a segmented control.
     ///
@@ -166,22 +172,22 @@ public struct SomaTypography: Sendable, Equatable {
 
     /// Read at arm's length on a handheld screen.
     public static let touch = SomaTypography(
-        display: SomaFontSpec(size: 34, tracking: -0.5),
+        display: SomaFontSpec(size: 34, tracking: -0.4),
         title: SomaFontSpec(size: 22, tracking: -0.2),
-        body: SomaFontSpec(size: 16),
-        metric: SomaFontSpec(size: 36, tracking: -0.8, digits: .tabular),
+        body: SomaFontSpec(size: 17),
+        metric: SomaFontSpec(size: 34, tracking: -0.6, digits: .tabular),
         caption: SomaFontSpec(size: 13),
         rowValue: SomaFontSpec(size: 15, digits: .tabular),
-        field: SomaFontSpec(size: 24, tracking: -0.3),
+        field: SomaFontSpec(size: 22, tracking: -0.2),
         tabLabel: SomaFontSpec(size: 11, weight: .medium),
-        eyebrow: SomaFontSpec(size: 11, weight: .medium, tracking: 3.0),
-        segment: SomaFontSpec(size: 14, weight: .medium),
+        eyebrow: SomaFontSpec(size: 13, weight: .semibold),
+        segment: SomaFontSpec(size: 15, weight: .medium),
         headerTitle: SomaFontSpec(size: 17, weight: .semibold),
-        orbLabel: SomaFontSpec(size: 26, tracking: -0.6),
-        headline: SomaFontSpec(size: 24, tracking: -0.4),
-        callout: SomaFontSpec(size: 15),
+        orbLabel: SomaFontSpec(size: 28, tracking: -0.4),
+        headline: SomaFontSpec(size: 22, tracking: -0.2),
+        callout: SomaFontSpec(size: 16),
         cardTitle: SomaFontSpec(size: 17, weight: .semibold),
-        metricCompact: SomaFontSpec(size: 28, tracking: -0.6, digits: .tabular),
+        metricCompact: SomaFontSpec(size: 28, tracking: -0.4, digits: .tabular),
         captionValue: SomaFontSpec(size: 13, digits: .tabular)
     )
 
@@ -193,17 +199,17 @@ public struct SomaTypography: Sendable, Equatable {
         body: SomaFontSpec(size: 13),
         metric: SomaFontSpec(size: 26, tracking: -0.5, digits: .tabular),
         caption: SomaFontSpec(size: 11),
-        rowValue: SomaFontSpec(size: 12, digits: .tabular),
+        rowValue: SomaFontSpec(size: 13, digits: .tabular),
         field: SomaFontSpec(size: 17, tracking: -0.1),
         tabLabel: SomaFontSpec(size: 10, weight: .medium),
-        eyebrow: SomaFontSpec(size: 10, weight: .medium, tracking: 2.4),
+        eyebrow: SomaFontSpec(size: 11, weight: .semibold),
         segment: SomaFontSpec(size: 12, weight: .medium),
         headerTitle: SomaFontSpec(size: 13, weight: .semibold),
-        orbLabel: SomaFontSpec(size: 20, tracking: -0.4),
-        headline: SomaFontSpec(size: 18, tracking: -0.3),
+        orbLabel: SomaFontSpec(size: 22, tracking: -0.3),
+        headline: SomaFontSpec(size: 17, tracking: -0.1),
         callout: SomaFontSpec(size: 12),
         cardTitle: SomaFontSpec(size: 13, weight: .semibold),
-        metricCompact: SomaFontSpec(size: 21, tracking: -0.4, digits: .tabular),
+        metricCompact: SomaFontSpec(size: 22, tracking: -0.3, digits: .tabular),
         captionValue: SomaFontSpec(size: 11, digits: .tabular)
     )
 

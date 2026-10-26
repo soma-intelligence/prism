@@ -39,10 +39,16 @@ struct MindMoodStrip: View {
         return days.last { $0.valence != nil } ?? days.last
     }
 
+    /// One day as a bar from the midline: up for a pleasant day, down for an
+    /// unpleasant one, as long as the mood was strong, in its colour. A day
+    /// with nothing logged is a dot on the line, so a fortnight reads as a
+    /// tide rather than a row of empty circles.
     private func orb(_ day: MindMoodDay, isSelected: Bool) -> some View {
         let metrics = theme.metrics
         let colors = theme.colors
-        let size = metrics.chartRingDiameter * 1.9
+        let height = metrics.minimumTapTarget * 1.3
+        let half = height / 2 - 2
+        let width = metrics.chartRingDiameter * 0.8
         let letters = Calendar.current.veryShortStandaloneWeekdaySymbols
         let letter = letters[(Calendar.current.component(.weekday, from: day.day) - 1) % letters.count]
 
@@ -51,34 +57,27 @@ struct MindMoodStrip: View {
         } label: {
             VStack(spacing: metrics.chartLabelGap) {
                 ZStack {
+                    Rectangle()
+                        .fill(colors.inkPrimary.color.opacity(metrics.hairlineOpacity))
+                        .frame(height: 0.5)
                     if let valence = day.valence {
-                        let hue = MindMoodPalette.color(valence)
-                        Circle()
-                            .fill(
-                                RadialGradient(
-                                    colors: [hue.mix(with: colors.surface.color, by: 0.35), hue],
-                                    center: UnitPoint(x: 0.35, y: 0.3),
-                                    startRadius: 0, endRadius: size * 0.7
-                                )
-                            )
-                            .shadow(color: hue.opacity(isSelected ? 0.55 : 0.25), radius: isSelected ? size * 0.3 : size * 0.12)
+                        let length = max(width, half * CGFloat(min(abs(valence), 1)))
+                        Capsule()
+                            .fill(MindMoodPalette.color(valence).opacity(isSelected || selection == nil ? 1 : 0.55))
+                            .frame(width: width, height: length)
+                            .offset(y: valence >= 0 ? -length / 2 : length / 2)
                     } else {
                         Circle()
-                            .strokeBorder(colors.inkPrimary.color.opacity(metrics.chartGridOpacity * 1.6), lineWidth: metrics.chartStroke)
-                    }
-                    if isSelected {
-                        Circle()
-                            .strokeBorder(colors.inkPrimary.color, lineWidth: metrics.chartStroke)
-                            .padding(-metrics.chartStroke * 2)
+                            .fill(colors.inkPrimary.color.opacity(0.2))
+                            .frame(width: 4, height: 4)
                     }
                 }
-                .frame(width: size, height: size)
-                .scaleEffect(isSelected && !reduceMotion ? 1.12 : 1)
+                .frame(height: height)
                 .animation(reduceMotion ? nil : theme.motion.selection, value: isSelected)
 
                 Text(verbatim: letter)
                     .somaFont(theme.typography.captionValue)
-                    .foregroundStyle(day.isToday ? colors.inkPrimary.color : colors.inkSecondary.color)
+                    .foregroundStyle(day.isToday || isSelected ? colors.inkPrimary.color : colors.inkSecondary.color)
             }
             .frame(minHeight: metrics.minimumTapTarget)
             .contentShape(.rect)
@@ -143,7 +142,7 @@ struct MindWordChip: View {
         Text(text)
             .somaFont(theme.typography.caption)
             .foregroundStyle(tint ?? colors.inkSecondary.color)
-            .padding(.horizontal, metrics.cardPadding * 0.7)
+            .padding(.horizontal, metrics.spaceM)
             .padding(.vertical, metrics.chartLabelGap)
             .background((tint ?? colors.inkSecondary.color).opacity(metrics.chartBandOpacity), in: .capsule)
     }

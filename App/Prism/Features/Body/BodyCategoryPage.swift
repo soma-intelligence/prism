@@ -70,9 +70,8 @@ struct BodyCategoryPage: View {
                         }
                     }
                 } else if !hasRead {
-                    ProgressView()
-                        .frame(maxWidth: .infinity)
-                        .padding(.top, metrics.leadSpacing)
+                    ReadingRows()
+                        .padding(.top, metrics.cardSpacing)
                 }
             }
             .padding(.horizontal, metrics.pagePadding)
@@ -86,7 +85,7 @@ struct BodyCategoryPage: View {
         .navigationBarTitleDisplayMode(.inline)
 #endif
         .task { await load() }
-        .refreshable { await load() }
+        .somaRefreshable { await load() }
     }
 
     private func section<Content: View>(_ title: LocalizedStringResource, @ViewBuilder content: () -> Content) -> some View {

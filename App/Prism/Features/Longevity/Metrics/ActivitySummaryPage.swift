@@ -62,7 +62,6 @@ struct ActivitySummaryPage: View {
                 VStack(alignment: .leading, spacing: theme.metrics.bodyRowSpacing) {
                     Text("Time by type")
                         .somaFont(theme.typography.eyebrow)
-                        .textCase(.uppercase)
                         .foregroundStyle(theme.colors.inkSecondary.color)
                     if byType.isEmpty {
                         BodyBarRow(title: "No sessions yet", fraction: nil, value: nil, aspect: .activity)
@@ -105,7 +104,7 @@ struct ActivitySummaryPage: View {
         }
         .navigationTitle("Activity summary")
         .task { await load() }
-        .refreshable { await load() }
+        .somaRefreshable { await load() }
         .sheet(isPresented: $isLogging) {
             NotWiredPage(
                 eyebrow: "Something missing?",

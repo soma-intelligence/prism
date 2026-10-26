@@ -103,6 +103,7 @@ struct TilePressStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .scaleEffect(configuration.isPressed && !reduceMotion ? 0.97 : 1)
-            .animation(.easeOut(duration: theme.motion.pressDuration), value: configuration.isPressed)
+            .animation(theme.motion.press, value: configuration.isPressed)
+            .sensoryFeedback(.impact(weight: .light, intensity: 0.7), trigger: configuration.isPressed) { _, pressed in pressed }
     }
 }

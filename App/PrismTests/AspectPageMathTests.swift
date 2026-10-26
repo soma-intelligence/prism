@@ -91,26 +91,6 @@ struct AspectPageMathTests {
         #expect(LastNightHero.span(7.9) == "7h 54m")
     }
 
-    @Test("Sleep averages: durations as hours and minutes, bedtimes averaged across midnight")
-    func sleepAverages() {
-        var detail = SomaScores.Detail()
-        detail.sleepHours = Array(repeating: 7.5, count: 30)
-        detail.deepHours = Array(repeating: 1.2, count: 30)
-        detail.remHours = Array(repeating: nil, count: 30)
-        detail.bedHour = Array(repeating: 23.5, count: 15) + Array(repeating: 0.5, count: 15)
-        detail.wakeHour = Array(repeating: 7, count: 30)
-        let rows = SleepAverages.make(detail)
-        #expect(rows.map(\.title) == ["Asleep", "Deep", "REM", "Bedtime", "Woke up"])
-        #expect(rows[0].week == "7:30")
-        #expect(rows[2].week == nil)
-        #expect(rows[3].month == "00:00")
-        #expect(rows[4].week == "07:00")
-        let windows = SleepAverages.windows(detail, nights: 14, calendar: calendar)
-        #expect(windows.count == 14)
-        #expect(windows.last?.bed == 0.5)
-        #expect(SleepAverages.rhythmNote(detail) == "Bedtime within 5 min on most nights")
-    }
-
     @Test("A category's head counts what read this week; no night means no disturbance rows")
     func countLineAndDisturbances() {
         #expect(LastNightDisturbances.rows(nil, calendar: calendar).isEmpty)

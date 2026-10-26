@@ -35,7 +35,7 @@ nonisolated struct FirstWeek: Equatable, Sendable {
         }
     }
 
-    static let reason = String(localized: "Soma learns your usual from a week of nights and days. Until then, a number you have not earned yet shows as a dash, not a guess.")
+    static let reason = String(localized: "Soma learns your usual range from 7 nights with your watch. Until then, a reading without a usual shows as a dash.")
 
     static func word(_ number: Int) -> String {
         switch number {

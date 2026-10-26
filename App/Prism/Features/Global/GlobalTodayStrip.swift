@@ -20,7 +20,7 @@ struct GlobalTodayStrip: View {
         let metrics = theme.metrics
         HStack(spacing: metrics.cardSpacing) {
             Button { sheet = .activityStatus } label: {
-                HStack(spacing: metrics.scoreLabelSpacing * 2) {
+                HStack(spacing: metrics.spaceXS) {
                     Image(systemName: statuses.current.symbol)
                         .font(.system(size: metrics.browseChevronSize, weight: .semibold))
                     Text(statuses.current.title)
@@ -29,7 +29,7 @@ struct GlobalTodayStrip: View {
                 }
                 .fixedSize()
                 .foregroundStyle(theme.colors.inkPrimary.color)
-                .padding(.horizontal, metrics.cardPadding * 0.8)
+                .padding(.horizontal, metrics.spaceM)
                 .frame(minHeight: metrics.minimumTapTarget * 0.8)
                 .background(Capsule().fill(theme.colors.surface.color))
                 .frame(minHeight: metrics.minimumTapTarget)

@@ -18,7 +18,7 @@ struct PulseMiniOrb: View {
     var body: some View {
         var sized = theme
         sized.metrics.miniOrbDiameter = diameter
-        return SomaOrb(aspect: aspect, scale: .mini)
+        return SomaObjectIcon(aspect: aspect, size: .row)
             .environment(\.somaTheme, sized)
             .frame(width: diameter, height: diameter)
     }

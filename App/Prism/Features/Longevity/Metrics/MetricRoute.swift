@@ -5,7 +5,7 @@
 
 import SwiftUI
 
-/// The fitness and metric pages: steps, ECG, sound, territory, activity summary, cardio load, heart rate recovery, training.
+/// The fitness and metric pages: steps, ECG, heart rhythm, mobility, mouth and teeth, sound, territory, activity summary, cardio load, heart rate recovery, training.
 ///
 /// Registered on every tab's stack by `journeyDestinations()`, so a link
 /// anywhere in the app can push one of these with `NavigationLink(value:)`
@@ -18,6 +18,15 @@ enum MetricRoute: Hashable {
     case steps
     /// The latest ECG recording, what it means, and the ones before it.
     case ecg
+    /// AFib History week by week, what it means, and the way to the ECG.
+    case afibBurden
+    /// Irregular rhythm, high and low heart rate notifications, by date.
+    case rhythmEvents
+    /// Walking steadiness, its notifications, falls, gait and balance work.
+    case mobility
+    /// Thirty days of brushing, the Journal's floss and gums, and the next
+    /// dental visit.
+    case oral
     /// The sound around you, day by day, against the 80 dB line.
     case environmentalSound
     /// Headphone levels and the share of a safe week they used.
@@ -44,6 +53,10 @@ enum MetricRoute: Hashable {
         switch self {
         case .steps: StepsPage()
         case .ecg: ECGPage()
+        case .afibBurden: AFibBurdenPage()
+        case .rhythmEvents: RhythmEventsPage()
+        case .mobility: MobilityPage()
+        case .oral: OralHealthPage()
         case .environmentalSound: SoundExposurePage(kind: .environment)
         case .headphoneAudio: SoundExposurePage(kind: .headphones)
         case .territory: TerritoryPage()

@@ -76,7 +76,7 @@ nonisolated enum LabHealth {
     static func age(in source: any HealthSampleSource) async -> Int? {
         guard let metric = HealthMetricCatalog.metric(for: LabMetric.dateOfBirth),
               let reading = try? await source.latest(metric) else { return nil }
-        return Int(reading.value)
+        return reading.code
     }
 
     /// Sex as Health records it, or nil when it was never entered or shared.

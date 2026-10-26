@@ -9,10 +9,14 @@ import SomaUI
 import AuthenticationServices
 #endif
 
-/// Every source Soma reads, one row each: Apple's own, the three that sign in
+/// Every source Soma reads, one row each: Apple's own, the ones that sign in
 /// directly, then the rest, each with where it stands on the trailing edge.
+///
+/// With an account, every provider Open Health Sync knows signs in there and
+/// sits under Connect, with when it last pulled.
 struct HealthAccessPage: View {
     @Environment(HealthDashboard.self) private var health
+    @State private var account = AccountSession.shared
     @Environment(\.openURL) private var openURL
     @Environment(\.somaTheme) private var theme
     @State private var connections = ProviderConnections.shared
@@ -28,7 +32,7 @@ struct HealthAccessPage: View {
 
     private var groups: [ProviderGroup] {
         let apple = [DataProvider.appleHealth, .iPhoneMotion, .appleWatch]
-        let direct = DataProvider.all.filter { $0.oauth != nil }
+        let direct = DataProvider.all.filter { $0.oauth != nil || usesOHS($0) }
         let rest = DataProvider.all.filter { provider in
             !apple.contains(provider) && !direct.contains(provider)
         }
@@ -49,10 +53,31 @@ struct HealthAccessPage: View {
                 }
             }
         }
+        .task(id: account.isSignedIn) {
+            if account.isSignedIn { await connections.refreshFromOHS() }
+        }
+    }
+
+    /// Whether this row connects through Open Health Sync: the provider is one
+    /// it knows, someone is signed in, and the instance has not said it is
+    /// missing.
+    private func usesOHS(_ provider: DataProvider) -> Bool {
+        provider.connectsThroughOHS && account.isSignedIn && connections.ohsAvailable != false && Self.canSignIn
     }
 
     @ViewBuilder
     private func row(_ provider: DataProvider) -> some View {
+        if usesOHS(provider) {
+            SettingsTileRow(provider.name, symbol: provider.symbol, opensSomething: false) {
+                connectControl(provider)
+            }
+        } else {
+            accessRow(provider)
+        }
+    }
+
+    @ViewBuilder
+    private func accessRow(_ provider: DataProvider) -> some View {
         switch provider.access {
         case .appleHealth:
             SettingsTileRow(provider.name, symbol: provider.symbol, detail: healthState, action: openHealth) {
@@ -79,13 +104,13 @@ struct HealthAccessPage: View {
         switch connections.state(provider) {
         case .connecting:
             ProgressView().controlSize(.small)
-        case .connected(let account, _):
+        case .connected(let account, let lastSync):
             Menu {
-                Button(role: .destructive) { connections.disconnect(provider) } label: {
+                Button(role: .destructive) { disconnect(provider) } label: {
                     Label("Disconnect", systemImage: "xmark.circle")
                 }
             } label: {
-                Text(account.map { String(localized: "Connected, \($0)") } ?? String(localized: "Connected"))
+                Text(Self.connectedLabel(account: account, lastSync: lastSync))
                     .somaFont(theme.typography.rowValue)
                     .foregroundStyle(theme.colors.inkSecondary.color)
                     .frame(minHeight: theme.metrics.minimumTapTarget)
@@ -94,7 +119,7 @@ struct HealthAccessPage: View {
             .menuStyle(.button)
             .buttonStyle(.plain)
         case .notConnected, .failed:
-            if provider.canConnect && Self.canSignIn {
+            if (provider.canConnect || usesOHS(provider)) && Self.canSignIn {
                 Button { connect(provider) } label: {
                     Text(connections.state(provider) == .notConnected ? "Connect" : "Retry")
                         .somaFont(theme.typography.rowValue)
@@ -115,9 +140,10 @@ struct HealthAccessPage: View {
     private var healthState: String {
         switch health.status {
         case .ready: String(localized: "Connected")
-        case .loading, .idle: String(localized: "Not connected")
+        case .idle: String(localized: "Not connected")
+        case .loading: String(localized: "Reading")
         case .unavailable: String(localized: "Not on this device")
-        case .failed: String(localized: "Error")
+        case .failed: String(localized: "Couldn't read")
         }
     }
 
@@ -145,8 +171,34 @@ struct HealthAccessPage: View {
         #endif
     }
 
+    /// A connected row's words: when it last pulled when that is known (Open
+    /// Health Sync says), else the account it signed in as.
+    static func connectedLabel(account: String?, lastSync: Date?) -> String {
+        if let lastSync { return String(localized: "Synced \(lastSync.formatted(.relative(presentation: .named)))") }
+        return account.map { String(localized: "Connected, \($0)") } ?? String(localized: "Connected")
+    }
+
+    private func disconnect(_ provider: DataProvider) {
+        if usesOHS(provider) {
+            Task { await connections.disconnectThroughOHS(provider) }
+        } else {
+            connections.disconnect(provider)
+        }
+    }
+
     private func connect(_ provider: DataProvider) {
         #if !os(visionOS)
+        if usesOHS(provider) {
+            Task {
+                await connections.connectThroughOHS(provider) { url, scheme in
+                    try await webAuthentication.authenticate(
+                        using: url, callback: .customScheme(scheme),
+                        preferredBrowserSession: .ephemeral, additionalHeaderFields: [:]
+                    )
+                }
+            }
+            return
+        }
         Task {
             await connections.connect(provider) { url, scheme in
                 try await webAuthentication.authenticate(

@@ -40,7 +40,7 @@ struct TrackWakeView: View {
                 .frame(width: metrics.moonDiameter, height: metrics.moonDiameter)
                 .animation(theme.motion.selection, value: rating)
 
-            VStack(spacing: metrics.scoreLabelSpacing * 2) {
+            VStack(spacing: metrics.spaceXS) {
                 HStack(alignment: .firstTextBaseline, spacing: metrics.readoutUnitGap) {
                     SomaReadout(rating.map { "\($0)" }, unit: "of 10")
                 }

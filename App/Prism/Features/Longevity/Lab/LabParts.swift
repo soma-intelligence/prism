@@ -32,6 +32,30 @@ struct LabBandItem: Identifiable {
     var isFlagged = false
     /// A route the line opens, when it opens one.
     var route: LabRoute?
+    /// The catalog's own name for the band the value sits in (Borderline,
+    /// Osteopenia range), said in place of the generic word when the value
+    /// is outside. Nil keeps Above normal, Below normal and Out of range.
+    var bandWord: String?
+
+    /// The word under the title and whether it reads as out of range. Nil
+    /// says nothing, for a value with neither a band nor a flag.
+    var status: LabBandStatus? {
+        guard let position, let band else {
+            guard isFlagged else { return nil }
+            return LabBandStatus(word: bandWord ?? String(localized: "Out of range"), isOut: true)
+        }
+        if isFlagged || !band.contains(position) {
+            let generic = position > band.upperBound ? String(localized: "Above normal") : String(localized: "Below normal")
+            return LabBandStatus(word: bandWord ?? generic, isOut: true)
+        }
+        return LabBandStatus(word: String(localized: "Normal range"), isOut: false)
+    }
+}
+
+/// Where a value sits against its band, in the reference design's words.
+struct LabBandStatus: Equatable {
+    let word: String
+    let isOut: Bool
 }
 
 /// A card of measures against their band: the Figma's "rows" card.
@@ -55,7 +79,7 @@ struct LabBandCard: View {
                         LabEyebrow(eyebrow)
                     }
                 }
-                .padding(.bottom, 4)
+                .padding(.bottom, theme.metrics.spaceXS)
                 ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
                     if index > 0 {
                         Rectangle()
@@ -64,6 +88,7 @@ struct LabBandCard: View {
                     }
                     if let route = item.route {
                         NavigationLink(value: route) { LabBandLine(item: item, aspect: aspect) }
+                            .zoomSource(route)
                             .buttonStyle(.plain)
                     } else {
                         LabBandLine(item: item, aspect: aspect)
@@ -84,13 +109,13 @@ struct LabBandLine: View {
         let colors = theme.colors
         let status = self.status
         HStack(alignment: .center, spacing: theme.metrics.cardSpacing) {
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: theme.metrics.spaceXS) {
                 Text(item.title)
                     .somaFont(theme.typography.body)
                     .foregroundStyle(colors.inkPrimary.color)
-                HStack(spacing: 5) {
+                HStack(spacing: theme.metrics.spaceXS) {
                     if let status {
-                        Text(status.word).foregroundStyle(status.color)
+                        Text(verbatim: status.word).foregroundStyle(status.color)
                         Text(verbatim: "·").foregroundStyle(colors.inkSecondary.color)
                     }
                     Text(item.value ?? "-")
@@ -111,24 +136,16 @@ struct LabBandLine: View {
             LabRail(band: item.band, position: item.position, aspect: aspect, isFlagged: item.isFlagged)
                 .frame(width: theme.metrics.aspectChartWidth, height: theme.metrics.chartRingDiameter + 6)
         }
-        .padding(.vertical, 10)
+        .padding(.vertical, theme.metrics.spaceM)
         .contentShape(.rect)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(item.title))
         .accessibilityValue(Text([item.value ?? "Not measured", item.detail].compactMap { $0 }.joined(separator: ", ")))
     }
 
-    /// Where the value sits against its band, as a word and a colour.
-    private var status: (word: LocalizedStringResource, color: Color)? {
-        guard let position = item.position, let band = item.band else {
-            return item.isFlagged ? ("Out of range", theme.colors.statusOut.color) : nil
-        }
-        if item.isFlagged || !band.contains(position) {
-            // The lab's own reference range, not the person's usual: said
-            // as the lab's, never as a clinical "normal".
-            return (position > band.upperBound ? "Above the lab’s range" : "Below the lab’s range", theme.colors.statusOut.color)
-        }
-        return ("Within the lab’s range", theme.colors.statusNormal.color)
+    /// Where the value sits against its band, in the reference design's words and colours.
+    private var status: (word: String, color: Color)? {
+        item.status.map { ($0.word, $0.isOut ? theme.colors.statusOut.color : theme.colors.statusNormal.color) }
     }
 }
 
@@ -191,7 +208,7 @@ extension LabBandItem {
 
 // MARK: - Headings and rows
 
-/// Small capitals over a group: "Entries", "Two inputs missing".
+/// A quiet label over a group: "Entries", "Two inputs missing".
 struct LabEyebrow: View {
     let text: String
 
@@ -202,7 +219,6 @@ struct LabEyebrow: View {
     var body: some View {
         Text(text)
             .somaFont(theme.typography.eyebrow)
-            .textCase(.uppercase)
             .foregroundStyle(theme.colors.inkSecondary.color)
             .accessibilityAddTraits(.isHeader)
     }
@@ -243,6 +259,7 @@ struct LabRowGroup: View {
                         SomaBrowseRow(title: row.title, detail: row.detail)
                             .contentShape(.rect)
                     }
+                    .zoomSource(route)
                     .buttonStyle(.plain)
                 } else {
                     SomaBrowseRow(title: row.title, detail: row.detail, opensSomething: row.action != nil, action: row.action)
@@ -265,6 +282,8 @@ struct LabFootnote: View {
             .somaFont(theme.typography.caption)
             .foregroundStyle(theme.colors.inkSecondary.color)
             .fixedSize(horizontal: false, vertical: true)
+            // It speaks for the whole page, so it runs under every column.
+            .somaColumnSpan(.full)
     }
 }
 
@@ -393,6 +412,7 @@ struct LabSheet<Content: View>: View {
                 .frame(maxWidth: theme.metrics.pageMaxWidth, alignment: .leading)
                 .frame(maxWidth: .infinity)
             }
+            .softScrollEdges()
             .background(theme.colors.canvas.color.ignoresSafeArea())
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
@@ -403,6 +423,74 @@ struct LabSheet<Content: View>: View {
     }
 }
 
+// MARK: - Form fields
+
+/// The day a sample was taken or a test was done, never in the future: one
+/// line of a lab sheet's form. The lab sheets share it so the system's date
+/// control is set in one place.
+struct LabDateRow: View {
+    let title: LocalizedStringKey
+    @Binding var date: Date
+
+    @Environment(\.somaTheme) private var theme
+
+    var body: some View {
+        DatePicker(title, selection: $date, in: ...Date(), displayedComponents: .date)
+            .somaFont(theme.typography.body)
+            .foregroundStyle(theme.colors.inkPrimary.color)
+            .padding(.horizontal, theme.metrics.browseRowPadding)
+            .frame(minHeight: theme.metrics.browseRowMinHeight)
+    }
+}
+
+/// A field to type into on a lab sheet: a value on the trailing edge set as
+/// a number, or a note set as body text. The caller sets the width and the
+/// keyboard.
+struct LabTextField: View {
+    enum Role { case value, note }
+
+    let placeholder: LocalizedStringKey
+    @Binding var text: String
+    var role: Role = .value
+
+    @Environment(\.somaTheme) private var theme
+
+    var body: some View {
+        TextField(placeholder, text: $text)
+            .somaFont(role == .value ? theme.typography.rowValue : theme.typography.body)
+            .multilineTextAlignment(role == .value ? .trailing : .leading)
+    }
+}
+
+/// The unit beside a typed value, which opens the units the marker accepts.
+struct LabUnitMenu: View {
+    let units: [String]
+    @Binding var unit: String
+
+    @Environment(\.somaTheme) private var theme
+
+    var body: some View {
+        Menu {
+            ForEach(units, id: \.self) { unit in
+                Button(unit) { self.unit = unit }
+            }
+        } label: {
+            Text(unit.isEmpty ? "unit" : unit)
+                .somaFont(theme.typography.caption)
+                .foregroundStyle(theme.colors.inkSecondary.color)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+extension View {
+    /// The navigation bar's title on a lab page, named in one place for all
+    /// of them.
+    func labPageTitle(_ title: Text) -> some View {
+        self.navigationTitle(title)
+    }
+}
+
 // MARK: - Dates
 
 extension Date {
@@ -410,4 +498,6 @@ extension Date {
     var labDay: String { formatted(.dateTime.day().month(.wide)) }
     /// "Wed 9 Sep".
     var labShortDay: String { formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated)) }
+    /// "Oct 17", for a row's one line.
+    var labCompactDay: String { formatted(.dateTime.day().month(.abbreviated)) }
 }

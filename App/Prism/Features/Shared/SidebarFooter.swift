@@ -51,6 +51,9 @@ struct SidebarFooter: View {
                 accessibilityLabel: "Account",
                 action: { onOpen(.profile) }
             ) {
+                // The Mac's sidebar is too narrow for the name and a menu
+                // that repeats the row and the gear: the name keeps the room.
+#if !os(macOS)
                 Menu {
                     Button("Profile") { onOpen(.profile) }
                     Button("Settings") { onOpen(.settings) }
@@ -61,6 +64,7 @@ struct SidebarFooter: View {
                 .menuIndicator(.hidden)
                 .fixedSize()
                 .accessibilityLabel("More")
+#endif
             }
         }
     }

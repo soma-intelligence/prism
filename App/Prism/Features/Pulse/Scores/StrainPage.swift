@@ -82,7 +82,7 @@ private struct StrainZonesCard: View {
                     Text("No zones yet")
                         .somaFont(type.caption)
                         .foregroundStyle(colors.inkSecondary.color)
-                        .padding(.top, 10)
+                        .padding(.top, theme.metrics.spaceM)
                 } else {
                     ScoreRows(zones) { zone in
                         HStack(spacing: theme.metrics.moveRowGap) {

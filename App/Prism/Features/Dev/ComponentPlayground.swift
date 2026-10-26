@@ -276,8 +276,8 @@ struct ComponentPlayground: View {
                         SomaArcGauge(scale: .daylight, value: SomaPreviewSamples.daylightMinutes, band: SomaPreviewSamples.daylightUsual) {
                             Text(verbatim: "\(Int(SomaPreviewSamples.daylightMinutes))").somaFont(theme.typography.metric)
                         }
-                        SomaSunPath(rise: SomaPreviewSamples.sunrise, set: SomaPreviewSamples.sunset, now: SomaPreviewSamples.sunNow)
-                        SomaSunPath(rise: nil, set: nil, now: .now)
+                        SomaSunCurve(rise: SomaPreviewSamples.sunrise, set: SomaPreviewSamples.sunset, now: SomaPreviewSamples.sunNow)
+                        SomaSunCurve(rise: nil, set: nil, now: .now)
                         SomaScaleBar(scale: .uvIndex, value: SomaPreviewSamples.uvIndex, ticks: [0, 3, 6, 8, 11])
                         SomaScaleBar(scale: .airQuality, value: nil, ticks: [0, 50, 100, 150, 200, 300])
                         SomaScaleBar(scale: .soundLevel, value: SomaPreviewSamples.soundAround, style: .level, limit: 70)
@@ -294,6 +294,32 @@ struct ComponentPlayground: View {
                         SomaRingScore(aspect: .mind, value: 25, trend: .down),
                         SomaRingScore(aspect: .activity, value: nil),
                     ])
+                }
+
+                // The radial proposals for Today's scores, beside the rings
+                // that ship (`-today.scores <name>` puts one on Today).
+                entry("SomaScoreBezel") {
+                    SomaScoreBezel(SomaPreviewSamples.todayScores, onSelect: { _ in })
+                }
+
+                entry("SomaScoreArch") {
+                    SomaScoreArch(SomaPreviewSamples.todayScores, onSelect: { _ in })
+                }
+
+                entry("SomaScoreHalo") {
+                    SomaScoreHalo(SomaPreviewSamples.todayScores, onSelect: { _ in })
+                }
+
+                entry("SomaScoreEcho") {
+                    SomaScoreEcho(SomaPreviewSamples.todayScores, onSelect: { _ in })
+                }
+
+                entry("SomaScoreSeven") {
+                    SomaScoreSeven(SomaPreviewSamples.todayScores, onSelect: { _ in })
+                }
+
+                entry("SomaScoreZones") {
+                    SomaScoreZones(SomaPreviewSamples.todayScores, onSelect: { _ in })
                 }
 
                 entry("SomaEnergyGauge, SomaEnergyCell, SomaEnergyTimeline") {
@@ -432,7 +458,7 @@ struct ComponentPlayground: View {
                 entry("SomaTrendTile") {
                     SomaTrendTile("Walking speed", value: "5.1", unit: "km/h", status: .trend("Increasing"),
                                   cue: "Up 0.2 km/h in 30 days", values: SomaPreviewSamples.walkingSpeedMonth,
-                                  band: 4.9...5.2, hue: .activity)
+                                  band: 4.9...5.2, aspect: .activity)
                     SomaTrendTile("Six minute walk", value: nil, unit: "m", values: [])
                 }
 

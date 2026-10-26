@@ -109,7 +109,7 @@ struct BodyBarRow: View {
         let height = metrics.bodyRowBarHeight
 
         HStack(spacing: 8) {
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
+            HStack(alignment: .firstTextBaseline, spacing: theme.metrics.spaceS) {
                 Text(title)
                     .somaFont(type.body)
                     .foregroundStyle(colors.inkPrimary.color)
@@ -248,5 +248,65 @@ struct BodyDotColumns: View {
         }
         .padding()
     }
+    .softScrollEdges()
 }
 #endif
+
+
+// MARK: - Fitness age, before the first visit
+
+/// The frame the fitness age plot draws into: its gridlines and your age as a
+/// dashed line to read the estimates against. The estimates come from pod
+/// visits, so until the first one the frame stays empty.
+struct BodyFitnessAgeFrame: View {
+    let age: Int?
+
+    @Environment(\.somaTheme) private var theme
+
+    var body: some View {
+        let metrics = theme.metrics
+        let type = theme.typography
+        let colors = theme.colors
+        let hairline = colors.inkPrimary.color.opacity(metrics.hairlineOpacity)
+
+        VStack(spacing: 8) {
+            GeometryReader { proxy in
+                let size = proxy.size
+                ZStack(alignment: .topLeading) {
+                    Path { path in
+                        for share in [0.12, 0.88] {
+                            path.move(to: CGPoint(x: 0, y: size.height * share))
+                            path.addLine(to: CGPoint(x: size.width, y: size.height * share))
+                        }
+                    }
+                    .stroke(hairline, lineWidth: 1)
+
+                    Path { path in
+                        path.move(to: CGPoint(x: 0, y: size.height * 0.4))
+                        path.addLine(to: CGPoint(x: size.width, y: size.height * 0.4))
+                    }
+                    .stroke(colors.inkSecondary.color, style: StrokeStyle(lineWidth: 1, dash: [3, 4]))
+
+                    Text(age.map { "Your age \($0)" } ?? "Your age -")
+                        .somaFont(type.caption)
+                        .foregroundStyle(colors.inkSecondary.color)
+                        .padding(.bottom, theme.metrics.spaceXS)
+                        .frame(width: size.width, alignment: .trailing)
+                        .offset(y: size.height * 0.4 - 20)
+                }
+            }
+            .frame(height: metrics.bodyPlotHeight - 24)
+
+            HStack {
+                ForEach(0..<6, id: \.self) { _ in
+                    Text(verbatim: "-")
+                        .frame(maxWidth: .infinity)
+                }
+            }
+            .somaFont(type.caption)
+            .foregroundStyle(colors.inkSecondary.color)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("Fitness age plot, empty until your first visit"))
+    }
+}

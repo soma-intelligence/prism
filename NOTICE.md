@@ -26,6 +26,10 @@ Credit line, as the app shows it in Settings, About, Open source:
 
 Share alike applies to the images: they are adaptations, so the files in that folder are shared under CC BY-SA 4.0, not under the AGPL, and anyone may reuse them on those terms. `NOTICE.txt` in the same folder repeats this. Soma's changes: the muscles chosen and lit for a front and a back view, rendered to grey shading with one mask per muscle group. The atlas also bundles an inner ear model (CC BY-NC-SA 4.0) and a kidney model (CC BY-NC 4.0); neither is used. The render script lives in the private Soma_iOS repository (`scripts/muscle-render/`) and is not part of this export.
 
+## Body silhouette (MuscleMap)
+
+The body silhouette behind the body figure is drawn from vector paths in `Packages/SomaUI/Sources/SomaUI/Components/Readings/MuscleArt/`, vendored from MuscleMap (https://github.com/melihcolpan/MuscleMap) by Melih Colpan under the MIT License. `LICENSE-MuscleMap.txt` in that folder carries the license text, and each file keeps its header. Soma's changes: the types renamed with a MuscleArt prefix and kept internal, only the male views kept.
+
 ## Unsplash photographs
 
 Eighteen photographs in `App/Prism/Assets.xcassets` come from Unsplash and are used under the Unsplash License (https://unsplash.com/license). The license asks for no credit. Prism gives one anyway: each of the twelve article covers is credited under the cover, in its article's reader, and the six landscapes in Settings, About. Soma cropped each one to its slot and gave the set one gentle grade (muted colour, soft contrast, lifted blacks, a warm balance); nothing else was changed.

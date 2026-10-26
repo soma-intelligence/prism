@@ -56,4 +56,12 @@ extension HealthDashboard {
 #endif
         return defaults.bool(forKey: emptyLaunchKey) ? EmptyHealthSource() : HealthKitSampleSource()
     }
+
+    /// The snapshot file for `source`: only the real store is cached, so a
+    /// fixture or an empty launch for screenshots and UI tests opens as it
+    /// always has. `-health.snapshot YES` caches a fixture too, to look at the
+    /// cached launch on a simulator.
+    static func launchSnapshots(for source: any HealthSampleSource, defaults: UserDefaults = .standard) -> HealthSnapshotStore? {
+        source is HealthKitSampleSource || defaults.bool(forKey: "health.snapshot") ? .shared : nil
+    }
 }

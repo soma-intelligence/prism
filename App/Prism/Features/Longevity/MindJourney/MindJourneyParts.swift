@@ -93,7 +93,7 @@ struct MindSignalRowView: View {
                 }
             }
             Spacer(minLength: 8)
-            VStack(alignment: .trailing, spacing: 6) {
+            VStack(alignment: .trailing, spacing: theme.metrics.spaceS) {
                 Text(row.value ?? "-")
                     .somaFont(type.rowValue)
                     .foregroundStyle(row.isCost ? colors.danger.color : colors.inkPrimary.color)
@@ -264,7 +264,6 @@ struct MindEyebrow: View {
     var body: some View {
         Text(text)
             .somaFont(theme.typography.eyebrow)
-            .textCase(.uppercase)
             .foregroundStyle(theme.colors.inkSecondary.color)
             .accessibilityAddTraits(.isHeader)
     }
@@ -292,6 +291,7 @@ struct MindSheetFrame<Content: View, Footer: View>: View {
                 .frame(maxWidth: theme.metrics.pageMaxWidth, alignment: .leading)
                 .frame(maxWidth: .infinity)
             }
+            .softScrollEdges()
             .safeAreaInset(edge: .bottom) {
                 footer()
                     .padding(.horizontal, theme.metrics.pagePadding)

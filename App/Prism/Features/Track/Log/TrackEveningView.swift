@@ -33,8 +33,8 @@ struct TrackEveningView: View {
         let now = Date.now
 
         TrackEntryPage(title: "This evening", closesWithDone: true) {
-            VStack(alignment: .leading, spacing: metrics.leadSpacing * 0.6) {
-                VStack(alignment: .leading, spacing: metrics.cardSpacing * 0.75) {
+            VStack(alignment: .leading, spacing: metrics.spaceM) {
+                VStack(alignment: .leading, spacing: metrics.spaceS) {
                     TrackEyebrow("\(now.formatted(.dateTime.weekday(.wide))) \u{00B7} \(TrackClock.time(now))")
                     reason
                 }
@@ -51,9 +51,9 @@ struct TrackEveningView: View {
 
                 let tonight = journal.offeredTags.filter { TrackReading.forTag($0.id) != .dayVariability }
                 if !tonight.isEmpty {
-                    VStack(alignment: .leading, spacing: metrics.cardSpacing * 0.75) {
+                    VStack(alignment: .leading, spacing: metrics.spaceS) {
                         TrackEyebrow("Tonight")
-                        TrackFlowLayout(spacing: metrics.cardSpacing * 0.5) {
+                        TrackFlowLayout(spacing: metrics.spaceS) {
                             ForEach(tonight) { tag in
                                 SomaChoiceChip(tag.title, isOn: journal.day(now).tags.contains(tag.id), style: .outline) {
                                     journal.toggle(tag.id, on: now)
@@ -116,7 +116,7 @@ struct TrackEveningView: View {
             $0.minute >= Self.eveningFrom && TrackAdherence.isDue($0.cadence, on: now, startedOn: $0.startedOn, calendar: calendar)
         }
 
-        return VStack(alignment: .leading, spacing: metrics.cardSpacing * 0.75) {
+        return VStack(alignment: .leading, spacing: metrics.spaceS) {
             HStack {
                 TrackEyebrow(due.first.map { "Before bed \u{00B7} \(TrackClock.hour(Double($0.minute) / 60))" } ?? "Before bed")
                 Spacer()

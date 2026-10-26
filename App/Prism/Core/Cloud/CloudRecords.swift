@@ -238,10 +238,13 @@ nonisolated struct ProviderConnectionRecord: SyncRecord {
     var status: String
     var accountLabel: String?
     var lastSyncAt: Date?
+    /// When the person linked the service, known for a direct sign in only.
+    var connectedAt: Date?
 
     enum CodingKeys: String, CodingKey {
         case id, provider, status
         case accountLabel = "account_label"
         case lastSyncAt = "last_sync_at"
+        case connectedAt = "connected_at"
     }
 }

@@ -41,9 +41,9 @@ public struct SomaAccountRow<Trailing: View>: View {
     }
 
     public var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: theme.metrics.spaceM) {
             Button(action: action) {
-                HStack(spacing: 10) {
+                HStack(spacing: theme.metrics.spaceM) {
                     SomaAvatarButton(
                         image: image,
                         initials: initials,
@@ -54,8 +54,11 @@ public struct SomaAccountRow<Trailing: View>: View {
                     .allowsHitTesting(false)
 
                     VStack(alignment: .leading, spacing: 1) {
+                        // A row's title, not a page's: the sidebar sets its
+                        // own width, and the title role cut a first name to
+                        // its initial there on the Mac.
                         Text(name)
-                            .somaFont(theme.typography.title)
+                            .somaFont(theme.typography.cardTitle)
                             .foregroundStyle(theme.colors.inkPrimary.color)
                             .lineLimit(1)
 

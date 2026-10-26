@@ -44,17 +44,48 @@ struct OnboardingSignInView: View {
     @Environment(\.somaTheme) private var theme
 
     var body: some View {
-        OnboardingPage(title: String(localized: "Your body, read for you."), centred: true) {
+        // What the app gives, before anything is asked of anyone: the value
+        // first, the account second, and "Not now" always there.
+        OnboardingPage(title: String(localized: "How you slept, and what today can take."), centred: true) {
+            VStack(alignment: .leading, spacing: theme.metrics.cardHeaderSpacing * 2) {
+                OnboardingValueLine(symbol: "moon", text: String(localized: "Last night against your own sleep need"))
+                OnboardingValueLine(symbol: "heart", text: String(localized: "Your heart overnight: resting rate, HRV, breathing"))
+                OnboardingValueLine(symbol: "clock", text: String(localized: "Today's plan: when to focus, last coffee, bedtime"))
+            }
+            .onboardingArrival(1)
             if let failure = model.signInFailure {
                 OnboardingNote(symbol: "info.circle", title: String(localized: "Not signed in"), detail: failure)
-                    .onboardingArrival(1)
+                    .onboardingArrival(2)
             }
         }
     }
 }
 
-/// How to sign in: Apple, or not now (and an email, when
-/// ``OnboardingSignInOptions/offersEmail`` is on).
+/// One thing Soma reads for you, said in a line with its glyph.
+private struct OnboardingValueLine: View {
+    let symbol: String
+    let text: String
+
+    @Environment(\.somaTheme) private var theme
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: theme.metrics.cardHeaderSpacing * 2) {
+            Image(systemName: symbol)
+                .somaFont(theme.typography.callout)
+                .foregroundStyle(theme.colors.inkSecondary.color)
+                .frame(width: theme.metrics.browseGlyphColumn, alignment: .center)
+                .accessibilityHidden(true)
+            Text(text)
+                .somaFont(theme.typography.callout)
+                .foregroundStyle(theme.colors.inkPrimary.color)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// How to sign in: Apple, or an email, or not now.
 ///
 /// Sign in with Apple is real (AuthenticationServices): it goes through
 /// Supabase Auth when the build has a Supabase project, and otherwise keeps
@@ -70,7 +101,7 @@ struct OnboardingSignInFooter: View {
     var body: some View {
         let metrics = theme.metrics
 
-        VStack(spacing: 10) {
+        VStack(spacing: theme.metrics.spaceM) {
             SignInWithAppleButton(.continue) { request in
                 request.requestedScopes = [.fullName, .email]
                 AccountSession.shared.prepare(request)
@@ -99,8 +130,8 @@ struct OnboardingSignInFooter: View {
                 .onboardingArrival(3)
         }
         .padding(.horizontal, metrics.pagePadding)
-        .padding(.top, 8)
-        .padding(.bottom, 12)
+        .padding(.top, theme.metrics.spaceS)
+        .padding(.bottom, theme.metrics.spaceM)
         .frame(maxWidth: metrics.pageMaxWidth)
         .frame(maxWidth: .infinity)
     }
@@ -250,8 +281,8 @@ struct OnboardingRecoveryView: View {
                 SomaIconButton(symbol: "xmark", accessibilityLabel: "Close") { dismiss() }
                 Spacer()
             }
-            .padding(.horizontal, metrics.pagePadding * 0.66)
-            .padding(.top, 8)
+            .padding(.horizontal, metrics.spaceM)
+            .padding(.top, theme.metrics.spaceS)
 
             SomaPageScroll {
                 VStack(alignment: .leading, spacing: 0) {
@@ -289,6 +320,7 @@ struct OnboardingRecoveryView: View {
                 .frame(maxWidth: metrics.pageMaxWidth, alignment: .leading)
                 .frame(maxWidth: .infinity)
             }
+            .softScrollEdges()
 
             OnboardingFooter(
                 primary: OnboardingButton(String(localized: "Send the link"), isEnabled: email.contains("@")) { tried = true }

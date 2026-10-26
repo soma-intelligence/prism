@@ -7,10 +7,12 @@ import SwiftUI
 
 /// A value set by turning a dial: minutes in a cold plunge, grams in a scoop.
 ///
-/// The ring style is a full circle cut into segments that light up in an
-/// aspect's hue from the top, for a count of something. The gauge style is
-/// three quarters of a circle with numbered ticks, filled in ink, for an
-/// amount. Drag the knob, or anywhere on the dial, round to the value.
+/// Both styles draw one thin continuous track, filled in the aspect's hue,
+/// inside a bezel of fine ticks the way a watch's is cut. The ring style is a
+/// full circle with a longer tick at each segment, for a count of something.
+/// The gauge style is three quarters of a circle with numbered ticks, for an
+/// amount. No glow and no cut segments: those read as generated (owner,
+/// 2026-10-24). Drag the knob, or anywhere on the dial, round to the value.
 public struct SomaArcDial<Center: View>: View {
     public enum Style: Sendable {
         /// A full ring in this many segments.
@@ -71,55 +73,64 @@ public struct SomaArcDial<Center: View>: View {
         GeometryReader { proxy in
             let side = min(proxy.size.width, proxy.size.height)
             let middle = CGPoint(x: proxy.size.width / 2, y: proxy.size.height / 2)
-            let radius = side / 2 - metrics.cardSpacing * 2.5
+            let radius = side / 2 - metrics.bezelGap - metrics.bezelMajorTick - metrics.spaceXL * 1.4
             let track = metrics.dialTrackWidth
 
             ZStack {
+                let bezel = radius + track / 2 + metrics.bezelGap
+                let tickInk = colors.inkPrimary.color
+
                 Circle()
-                    .fill(RadialGradient(colors: [hue.opacity(0.22), .clear], center: .center, startRadius: 0, endRadius: radius))
+                    .trim(from: 0, to: sweep / 360)
+                    .rotation(.degrees(origin - 90))
+                    .stroke(tickInk.opacity(metrics.hairlineOpacity), style: StrokeStyle(lineWidth: track, lineCap: .round))
                     .frame(width: radius * 2, height: radius * 2)
                     .position(middle)
+                if fraction > 0 {
+                    arc(middle, radius, origin, origin + sweep * fraction)
+                        .stroke(hue, style: StrokeStyle(lineWidth: track, lineCap: .round))
+                }
 
                 switch style {
                 case .ring(let segments):
                     let count = max(1, segments)
-                    let each = 360 / Double(count)
-                    let gap = metrics.dialSegmentGap
-                    ForEach(0..<count, id: \.self) { index in
-                        let from = Double(index) * each + gap / 2
-                        let to = Double(index + 1) * each - gap / 2
-                        arc(middle, radius, from, to)
-                            .stroke(colors.surface.color, style: StrokeStyle(lineWidth: track, lineCap: .round))
-                        let lit = min(max(fraction * 360, from), to)
-                        if lit > from {
-                            arc(middle, radius, from, lit)
-                                .stroke(hue.opacity(0.55 + 0.45 * Double(index + 1) / Double(count)),
-                                        style: StrokeStyle(lineWidth: track, lineCap: .round))
+                    let fine = count * max(1, 60 / count)
+                    Canvas { context, _ in
+                        for index in 0..<fine {
+                            let degrees = Double(index) * 360 / Double(fine)
+                            let isMajor = index % max(1, fine / count) == 0
+                            var path = Path()
+                            path.move(to: point(middle, bezel, degrees))
+                            path.addLine(to: point(middle, bezel + (isMajor ? metrics.bezelMajorTick : metrics.bezelTick), degrees))
+                            context.stroke(path, with: .color(tickInk.opacity(isMajor ? metrics.inputTickMedium : metrics.inputTickFaint)),
+                                           lineWidth: metrics.inputHairline)
                         }
                     }
                 case .gauge(let tick, let labelEvery):
-                    arc(middle, radius, origin, origin + sweep)
-                        .stroke(colors.surface.color, style: StrokeStyle(lineWidth: track, lineCap: .round))
-                    arc(middle, radius, origin, origin + sweep * fraction)
-                        .stroke(colors.inkPrimary.color, style: StrokeStyle(lineWidth: track, lineCap: .round))
+                    let role = Self.tickRole(theme)
                     Canvas { context, _ in
                         guard tick > 0 else { return }
+                        // A fine tick between every two numbered ones as well.
+                        let fine = tick / 2
                         var mark = range.lowerBound
-                        while mark <= range.upperBound + tick / 1000 {
+                        while mark <= range.upperBound + fine / 1000 {
                             let degrees = angle(of: mark)
-                            let isLabelled = labelEvery > 0 && abs((mark / labelEvery).rounded() * labelEvery - mark) < tick / 1000
+                            let isTick = abs((mark / tick).rounded() * tick - mark) < fine / 1000
+                            let isLabelled = isTick && labelEvery > 0 && abs((mark / labelEvery).rounded() * labelEvery - mark) < tick / 1000
+                            let length = isLabelled ? metrics.bezelMajorTick : (isTick ? metrics.bezelTick : metrics.bezelTick * 0.6)
+                            let ink = isLabelled ? metrics.inputTickStrong : (isTick ? metrics.inputTickMedium : metrics.inputTickFaint)
                             var path = Path()
-                            path.move(to: point(middle, radius + track + metrics.cardSpacing * 0.6, degrees))
-                            path.addLine(to: point(middle, radius + track + metrics.cardSpacing * (isLabelled ? 1.3 : 1), degrees))
-                            context.stroke(path, with: .color(colors.inkSecondary.color.opacity(0.6)), lineWidth: 1)
+                            path.move(to: point(middle, bezel, degrees))
+                            path.addLine(to: point(middle, bezel + length, degrees))
+                            context.stroke(path, with: .color(tickInk.opacity(ink)), lineWidth: metrics.inputHairline)
                             if isLabelled {
                                 let text = Text(Self.number(mark))
-                                    .font(Self.tickRole(theme).font)
-                                .tracking(Self.tickRole(theme).tracking)
+                                    .font(role.font)
+                                    .tracking(role.tracking)
                                     .foregroundColor(colors.inkSecondary.color)
-                                context.draw(text, at: point(middle, radius + track + metrics.cardSpacing * 2.4, degrees))
+                                context.draw(text, at: point(middle, bezel + metrics.bezelMajorTick + metrics.spaceL, degrees))
                             }
-                            mark += tick
+                            mark += fine
                         }
                     }
                 }

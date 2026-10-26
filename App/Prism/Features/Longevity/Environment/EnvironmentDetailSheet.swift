@@ -58,8 +58,8 @@ struct EnvironmentDetailBody: View {
                             Text(verbatim: status.word)
                                 .somaFont(theme.typography.caption)
                                 .foregroundStyle(status.color)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 4)
+                                .padding(.horizontal, theme.metrics.spaceM)
+                                .padding(.vertical, theme.metrics.spaceXS)
                                 .background(Capsule().fill(status.color.opacity(0.16)))
                         }
                     }
@@ -94,7 +94,7 @@ struct EnvironmentDetailBody: View {
                 SomaStat("Average", value: average.map(measure.format), unit: unit),
                 SomaStat("High", value: values.max().map(measure.format), unit: unit),
             ])
-            .padding(.vertical, 4)
+            .padding(.vertical, theme.metrics.spaceXS)
 
             if let metric = measure.metric {
                 SomaBrowseGroup([VaultLink(type: BodyDataType(metric))], hasGlyphs: false) { link in
@@ -102,6 +102,7 @@ struct EnvironmentDetailBody: View {
                         SomaBrowseRow(title: "All records", detail: nil)
                             .contentShape(.rect)
                     }
+                    .zoomSource(VaultRoute.dataType(link.type))
                     .buttonStyle(.plain)
                 }
             }

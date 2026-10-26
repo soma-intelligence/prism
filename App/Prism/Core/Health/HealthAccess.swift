@@ -18,12 +18,14 @@ import HealthExportHealthKit
 /// request. HealthKit never shows the sheet again for a type that has an
 /// answer, so the later calls those surfaces still make return at once.
 ///
-/// The sensitive metrics (cycle tracking, sexual activity and the rest) are in
-/// that one sheet too. Each still has its own switch there, off unless the
-/// person turns it on.
+/// The sensitive metrics (cycle tracking, the symptoms logged against a
+/// cycle, sexual activity and the rest) are in that one sheet too, as the
+/// owner ruled on 2026-10-03. Each still has its own switch there, off
+/// unless the person turns it on. The cycle log writes the flow and the
+/// symptoms, so their write switches are in the same sheet.
 enum HealthAccess {
-    /// Everything the app reads: the readable catalog plus the types the
-    /// catalog source does not name.
+    /// Everything the app reads: the readable catalog, sensitive types
+    /// included, plus the types the catalog source does not name.
     static func readTypes() -> Set<HKObjectType> {
         var types = Set(HealthMetricCatalog.readable.compactMap(HealthKitSampleSource.objectType))
         types.insert(HKObjectType.workoutType())
@@ -35,7 +37,7 @@ enum HealthAccess {
     }
 
     /// Everything the app writes, taken from the walk, the journal, the mood
-    /// log and the lab. Empty when this build carries no write usage string:
+    /// log, the lab and the mouth and teeth page. Empty when this build carries no write usage string:
     /// asking to write without one raises an exception the app cannot survive.
     static func shareTypes() -> Set<HKSampleType> {
         guard Bundle.main.object(forInfoDictionaryKey: "NSHealthUpdateUsageDescription") != nil else { return [] }
@@ -44,12 +46,28 @@ enum HealthAccess {
             .bloodGlucose, .bloodPressureSystolic, .bloodPressureDiastolic,
             .dietaryWater, .dietaryCaffeine, .dietaryEnergyConsumed,
             .dietaryProtein, .dietaryCarbohydrates, .dietaryFatTotal,
+            // The cardio fitness test's estimate, written only when the
+            // person taps Save to Health on its result.
+            .vo2Max,
         ]
         var types = Set<HKSampleType>(quantities.map { HKQuantityType($0) })
         types.insert(HKObjectType.workoutType())
         types.insert(HKCategoryType(.mindfulSession))
         types.insert(HKObjectType.stateOfMindType())
+        // A brushing logged by hand on the mouth and teeth page.
+        types.insert(HKCategoryType(.toothbrushingEvent))
+        // The cycle log: the flow and the symptoms, switches off until the
+        // person turns them on.
+        types.formUnion(cycleShareTypes())
         return types
+    }
+
+    /// The flow and the symptoms of the cycle log.
+    private static func cycleShareTypes() -> Set<HKSampleType> {
+        let written = [HomeMetric.menstrualFlow] + CycleSymptom.allCases.map(\.identifier)
+        return Set(written.compactMap { id -> HKSampleType? in
+            HKObjectType.categoryType(forIdentifier: HKCategoryTypeIdentifier(rawValue: id))
+        })
     }
 
     /// Shows the one sheet. Returns once the person has answered it.
@@ -67,5 +85,16 @@ enum HealthAccess {
             try await store.requestAuthorization(toShare: shareTypes(), read: readTypes())
         }
         await motion?.requestAccess()
+    }
+
+    /// The Medications list, the one Health type that is not in the sheet
+    /// above: HealthKit authorises medications one by one, in a sheet of its
+    /// own where the person picks which of them Soma may read (per object,
+    /// like vision prescriptions), so it cannot ride the launch sheet. Asked from
+    /// the dose page when the person taps to show their medications, never
+    /// at launch. Read only: Soma writes nothing to the list.
+    static func requestMedications(store: HKHealthStore = HKHealthStore()) async throws {
+        guard HKHealthStore.isHealthDataAvailable() else { return }
+        try await store.requestPerObjectReadAuthorization(for: .userAnnotatedMedicationType(), predicate: nil)
     }
 }

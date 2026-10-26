@@ -54,10 +54,10 @@ public enum SomaMoodScale {
 
 /// The mood sheet's orb: the feeling itself.
 ///
-/// It wears the palette of the stop chosen and grows as the feeling turns
-/// pleasant, settling smaller and cooler below neutral. A change of palette
-/// travels the way the hero orb's does; with Reduce Motion on, the size and
-/// the palette change at once.
+/// A matte sphere in the colour of the stop chosen, lit softly from above
+/// with no gloss, no rim light and no halo. It grows as the feeling turns
+/// pleasant and settles smaller below neutral; the colour and the size travel
+/// together on the selection spring, and change at once under Reduce Motion.
 public struct SomaMoodOrb: View {
     private let value: Int?
     private let stops: Int
@@ -77,14 +77,32 @@ public struct SomaMoodOrb: View {
         let stage = metrics.moodOrbDiameter
         let fill = value.map { metrics.moodOrbSmallest + (1 - metrics.moodOrbSmallest) * SomaMoodScale.share($0, stops: stops) }
             ?? metrics.moodOrbUnset
-        // The hero orb draws at its own diameter; this sets it to the stage.
-        let scale = stage * fill / metrics.orbDiameter
+        let palette = theme.aspects[SomaMoodScale.aspect(for: value, stops: stops)].orb.stops
+        let base = palette[1].color
+        let light = palette[3].color
+        let deep = palette[2].color
 
-        SomaOrb(aspect: SomaMoodScale.aspect(for: value, stops: stops), scale: .hero)
-            .scaleEffect(scale)
+        // The colour laid over a stone ground at less than full strength:
+        // the feeling reads, but as a natural pigment, never a neon.
+        Circle()
+            .fill(theme.colors.surfaceRecessed.color)
+            .overlay { Circle().fill(base.opacity(metrics.moodOrbStrength)) }
+            .overlay {
+                // Form, not gloss: a broad light from above, a little depth
+                // towards the foot.
+                Circle().fill(RadialGradient(
+                    colors: [light.opacity(0.35), light.opacity(0)],
+                    center: UnitPoint(x: 0.42, y: 0.3), startRadius: 0, endRadius: stage * fill * 0.62
+                ))
+            }
+            .overlay {
+                Circle().fill(LinearGradient(
+                    colors: [deep.opacity(0), deep.opacity(0.18)],
+                    startPoint: UnitPoint(x: 0.5, y: 0.45), endPoint: .bottom
+                ))
+            }
+            .frame(width: stage * fill, height: stage * fill)
             .frame(width: stage, height: stage)
-            // Room for the halo and the shadow, so nothing above or below
-            // the orb is ever drawn over it.
             .padding(.vertical, stage * theme.aspects.shading.haloReach * 0.5)
             .animation(reduceMotion ? nil : theme.motion.selection, value: value)
             .accessibilityHidden(true)

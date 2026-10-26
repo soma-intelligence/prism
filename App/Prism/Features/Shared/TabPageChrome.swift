@@ -53,6 +53,8 @@ private struct TabPageChrome<Switcher: View>: ViewModifier {
     @Environment(\.somaTheme) private var theme
     @State private var isShowingSettings = false
     @State private var isShowingNotifications = false
+    /// Whether the page's parts fit in the bar, read off the page's width.
+    @State private var partsFitBar = true
 
 #if os(macOS)
     private var hasSidebar: Bool { true }
@@ -67,7 +69,24 @@ private struct TabPageChrome<Switcher: View>: ViewModifier {
     }
 
     func body(content: Content) -> some View {
+        let threshold = theme.metrics.partsInBarMinWidth
+        let hasParts = Switcher.self != EmptyView.self
+
         content
+            .onGeometryChange(for: Bool.self) { proxy in
+                proxy.size.width >= threshold
+            } action: { fits in
+                partsFitBar = fits
+            }
+            // Too narrow for the parts between the account and the bell (a
+            // Split View third, a slim window): they sit just under the bar
+            // instead, whole, rather than with every label cut short.
+            .safeAreaInset(edge: .top, spacing: 0) {
+                if hasParts && !partsFitBar {
+                    switcher
+                        .padding(.bottom, theme.metrics.cardSpacing)
+                }
+            }
             // Still set where the control takes the middle: it names the window
             // on a Mac and the page to VoiceOver.
             .navigationTitle(Text(title))
@@ -96,7 +115,7 @@ private struct TabPageChrome<Switcher: View>: ViewModifier {
                     }
                 }
 
-                if Switcher.self != EmptyView.self {
+                if hasParts && partsFitBar {
                     ToolbarItem(placement: .principal) { switcher }
 #if !os(visionOS)
                         // Liquid Glass only: visionOS has no shared background to hide.

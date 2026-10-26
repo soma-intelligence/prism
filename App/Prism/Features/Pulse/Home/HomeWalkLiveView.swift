@@ -48,7 +48,7 @@ struct HomeWalkLiveView: View {
                 SomaChartCard(eyebrow: "Heart rate, this walk", value: nil, note: bandNote) {
                     if session.heartSeries.count > 1 {
                         HomeTrendChart(values: session.heartSeries.map { Optional($0) }, band: band, aspect: .heart, axis: ["Start", "Now"])
-                            .padding(.top, 8)
+                            .padding(.top, theme.metrics.spaceS)
                     }
                 }
 

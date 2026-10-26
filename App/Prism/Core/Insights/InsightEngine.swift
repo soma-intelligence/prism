@@ -28,7 +28,7 @@ struct Insight: Equatable, Sendable, Codable {
         case backInRange
         /// "Rising over 30 days".
         case trend
-        /// "Building your usual".
+        /// "Usual range after 12 days".
         case learning
     }
 
@@ -83,6 +83,10 @@ enum InsightEngine {
     static let usualDays = 60
     /// Readings the usual needs before it means anything.
     static let usualMinimum = 5
+
+    /// What a reading says while its usual is still being learned: the days
+    /// it takes, the last week plus the readings the usual is drawn from.
+    static var learningCue: String { "Usual range after \(recentDays + usualMinimum) days" }
     /// The window the direction is read over.
     static let trendDays = 30
     /// Spread from the median absolute deviation as a standard deviation.
@@ -100,7 +104,10 @@ enum InsightEngine {
     ///   percent; false where a percent of the value means nothing (a
     ///   temperature).
     static func interpret(_ days: [Double?], policy: InsightPolicy, percentCue: Bool = true) -> Insight {
-        let series = policy.partialToday ? Array(days.dropLast()) : days
+        // A NaN or an infinity is a missing day: one would poison the median
+        // and the band built on it.
+        let finite = days.map { $0.flatMap { $0.isFinite ? $0 : nil } }
+        let series = policy.partialToday ? Array(finite.dropLast()) : finite
         let count = series.count
         var insight = Insight.empty(policy.preference)
         guard count > 0 else { return insight }
@@ -213,7 +220,7 @@ enum InsightEngine {
             switch insight.direction {
             case .rising: return ("Rising over 30 days", .trend)
             case .falling: return ("Falling over 30 days", .trend)
-            default: return insight.current == nil ? nil : ("Building your usual", .learning)
+            default: return insight.current == nil ? nil : (learningCue, .learning)
             }
         }
 

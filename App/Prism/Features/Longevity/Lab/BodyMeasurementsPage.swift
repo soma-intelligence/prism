@@ -48,10 +48,10 @@ struct BodyMeasurementsPage: View {
                 actionTitle: "Start",
                 action: { isMeasuring = true }
             ) {
-                SomaOrb(aspect: .body, scale: .mini)
+                SomaObjectIcon(aspect: .body, size: .row)
             }
         }
-        .navigationTitle("Body Measurements")
+        .labPageTitle(Text("Body Measurements"))
         #if os(iOS)
         .fullScreenCover(isPresented: $isMeasuring) { MeasurementCaptureFlow() }
         #else
@@ -236,7 +236,7 @@ struct MeasurementCaptureFlow: View {
                     .foregroundStyle(theme.colors.inkSecondary.color)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                HStack(alignment: .firstTextBaseline, spacing: theme.metrics.spaceS) {
                     Text(LabMath.format(current, decimals: 1) ?? "-")
                         .somaFont(theme.typography.metric)
                         .foregroundStyle(theme.colors.inkPrimary.color)
@@ -253,7 +253,7 @@ struct MeasurementCaptureFlow: View {
             }
             .padding(theme.metrics.pagePadding)
             .background(theme.colors.canvas.color.ignoresSafeArea())
-            .navigationTitle("Measure")
+            .labPageTitle(Text("Measure"))
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
             #endif
@@ -317,11 +317,7 @@ struct MeasurementReviewView: View {
                                       detail: entry.values[kind].flatMap { LabMath.format($0, decimals: 1) }.map { "\($0) cm" } ?? "-",
                                       opensSomething: false)
                     }
-                    DatePicker("Date", selection: $entry.date, in: ...Date(), displayedComponents: .date)
-                        .somaFont(theme.typography.body)
-                        .foregroundStyle(theme.colors.inkPrimary.color)
-                        .padding(.horizontal, theme.metrics.browseRowPadding)
-                        .frame(minHeight: theme.metrics.browseRowMinHeight)
+                    LabDateRow(title: "Date", date: $entry.date)
                         .background(RoundedRectangle(cornerRadius: theme.metrics.browseGroupCornerRadius, style: .continuous)
                             .fill(theme.colors.surface.color))
                     LabFootnote(status ?? "Waist also saved to Health.")
@@ -339,8 +335,9 @@ struct MeasurementReviewView: View {
             .padding(.horizontal, theme.metrics.pagePadding)
             .padding(.bottom, theme.metrics.pagePadding)
         }
+        .softScrollEdges()
         .background(theme.colors.canvas.color.ignoresSafeArea())
-        .navigationTitle("Review")
+        .labPageTitle(Text("Review"))
     }
 
     private func save() async {

@@ -7,7 +7,10 @@ import Foundation
 import SomaUI
 
 /// Every question Soma asks, each phrased as a question and short enough to
-/// read in one glance, in the order it is worth asking.
+/// read in one glance, in the order it is worth asking. Every one is a yes
+/// or no, as Whoop's journal asks (owner, 2026-10-24): the questions that
+/// were scales are phrased so a yes is the scale's high end, which is where
+/// ``CheckInAnswer/step`` puts it.
 ///
 /// The question is the whole card: no title sits over a row ("Alcohol") and
 /// leaves the person to guess what is being asked.
@@ -16,12 +19,12 @@ nonisolated enum CheckInCatalog {
 
     static let morning: [CheckInQuestion] = [
         CheckInQuestion(
-            id: "wake", text: "How did you wake up?", windows: [.morning],
-            kind: .scale(low: "Groggy", high: "Refreshed", tone: .rising), destination: .wakeRating, aspect: .sleep
+            id: "wake", text: "Woke up refreshed?", windows: [.morning],
+            kind: .yesNo, destination: .wakeRating, aspect: .sleep
         ),
         CheckInQuestion(
-            id: "rested", text: "How rested do you feel?", windows: [.morning],
-            kind: .scale(low: "Exhausted", high: "Fully rested", tone: .rising), destination: .mindEnergy, aspect: .sleep
+            id: "rested", text: "Feeling rested?", windows: [.morning],
+            kind: .yesNo, destination: .mindEnergy, aspect: .sleep
         ),
         CheckInQuestion(
             id: "alcohol", text: "Did you drink alcohol yesterday?", windows: [.morning],
@@ -39,16 +42,32 @@ nonisolated enum CheckInCatalog {
 
     static let evening: [CheckInQuestion] = [
         CheckInQuestion(
-            id: "day", text: "How was your day?", windows: [.evening],
-            kind: .scale(low: "Rough", high: "Great", tone: .rising), destination: .journalFeeling, aspect: .mind
+            id: "day", text: "Good day overall?", windows: [.evening],
+            kind: .yesNo, destination: .journalFeeling, aspect: .mind
+        ),
+        // Bleeding gums when brushing are the first sign of gingivitis (ADA).
+        // Once a week is enough to see it last, and second in the evening so
+        // the session limit never pushes it out on the day it is due.
+        CheckInQuestion(
+            id: "gums", text: "Gums bleed when brushing?", windows: [.evening],
+            kind: .yesNo, destination: .journalTag(OralTag.gumsBleed, day: .today), aspect: .body,
+            everyDays: 7
         ),
         CheckInQuestion(
-            id: "energy", text: "How much energy is left?", windows: [.evening],
-            kind: .scale(low: "Drained", high: "Plenty", tone: .rising), destination: .homeEnergy, aspect: .activity
+            id: "energy", text: "Energy left tonight?", windows: [.evening],
+            kind: .yesNo, destination: .homeEnergy, aspect: .activity
         ),
         CheckInQuestion(
-            id: "stress", text: "How stressed was today?", windows: [.evening],
-            kind: .scale(low: "Calm", high: "Very", tone: .falling), destination: .homeStress, aspect: .mind
+            id: "stress", text: "Stressful day?", windows: [.evening],
+            kind: .yesNo, destination: .homeStress, aspect: .mind
+        ),
+        // Strong social ties go with a longer life (Holt-Lunstad, Smith and
+        // Layton, PLoS Med 2010). Asked every evening, right after stress,
+        // so the session limit keeps it in the run; a yes writes the Journal
+        // tag Mind's connection page counts.
+        CheckInQuestion(
+            id: "people", text: "Time with people you care about today?", windows: [.evening],
+            kind: .yesNo, destination: .journalTag(SocialTag.timeWithPeople, day: .today), aspect: .mind
         ),
         CheckInQuestion(
             id: "coffee-late", text: "Coffee after 14:00?", windows: [.evening],
@@ -71,8 +90,8 @@ nonisolated enum CheckInCatalog {
             kind: .yesNo, destination: .journalTag("sauna", day: .today), aspect: .heart
         ),
         CheckInQuestion(
-            id: "focus", text: "How focused were you today?", windows: [.evening],
-            kind: .scale(low: "Foggy", high: "Sharp", tone: .rising), destination: .mindFocus, aspect: .mind
+            id: "focus", text: "Focused today?", windows: [.evening],
+            kind: .yesNo, destination: .mindFocus, aspect: .mind
         ),
     ]
 
@@ -112,7 +131,7 @@ nonisolated enum CheckInCatalog {
             if rise >= restingRiseBeats {
                 asked.append((rise / restingRiseBeats, CheckInQuestion(
                     id: "data.resting-up",
-                    text: "Resting HR up \(Int(rise)) bpm. Coming down with something?",
+                    text: "Resting heart rate is \(Int(rise)) bpm above your usual. How do you feel?",
                     windows: [.morning, .evening], kind: .yesNo, destination: .bodyQuestion, aspect: .heart, isDataDriven: true
                 )))
             }

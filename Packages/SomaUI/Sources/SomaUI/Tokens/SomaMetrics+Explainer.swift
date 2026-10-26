@@ -19,7 +19,7 @@ public extension SomaMetrics {
     /// Room above the hero, under the close button.
     var explainerHeroTopPadding: CGFloat { 28 }
     /// Gap between the title block and each section under it.
-    var explainerSectionSpacing: CGFloat { 22 }
+    var explainerSectionSpacing: CGFloat { spaceXL }
     /// Gap between the title and the line under it.
     var explainerTitleSpacing: CGFloat { 8 }
     /// The tinted disc that holds a row's glyph, and the glyph in it.
@@ -28,9 +28,9 @@ public extension SomaMetrics {
     /// Opacity of that disc's tint.
     var explainerGlyphTint: Double { 0.16 }
     /// Gap between the glyph and the words of a row.
-    var explainerRowGap: CGFloat { 14 }
+    var explainerRowGap: CGFloat { spaceM }
     /// Inset of a row inside its section.
-    var explainerRowPadding: CGFloat { 14 }
+    var explainerRowPadding: CGFloat { cardPadding }
     /// Gap between a row's term and its line.
     var explainerLineSpacing: CGFloat { 2 }
     /// The band over a section that names it.

@@ -23,13 +23,13 @@ public extension SomaMetrics {
     /// The cover across the top of the reader page.
     var articleReaderCoverHeight: CGFloat { 300 }
     /// The featured card and the reader cover share this radius.
-    var articleCoverCornerRadius: CGFloat { 22 }
+    var articleCoverCornerRadius: CGFloat { cardCornerRadius }
     /// A tile's cover: smaller picture, tighter corner.
     var articleTileCornerRadius: CGFloat { 16 }
     /// A row's square cover.
     var articleRowCornerRadius: CGFloat { 14 }
     /// Between tiles, across and down.
-    var articleGridSpacing: CGFloat { 14 }
+    var articleGridSpacing: CGFloat { cardSpacing }
     /// Between the lines of text under a cover.
     var articleTextSpacing: CGFloat { 4 }
     /// The coloured dot that leads a topic chip and a reason.
@@ -62,4 +62,15 @@ public extension SomaMetrics {
     var articleCoverRingWidth: CGFloat { 1 }
     /// A filled disc (a sun on the horizon, a body in orbit).
     var articleCoverDiscOpacity: Double { 0.22 }
+}
+
+/// Sizes other components still read, kept from the parallel design lines.
+public extension SomaMetrics {
+    /// A card in the sideways rail of news.
+    var articleRailCardWidth: CGFloat { 236 }
+    /// The topic glyph drawn on a generated cover.
+    var articleFeatureGlyphSize: CGFloat { 64 }
+    var articleTileGlyphSize: CGFloat { 34 }
+    /// The glyph's strength on a generated cover, and the rings' behind it.
+    var articleCoverGlyphOpacity: Double { 0.92 }
 }

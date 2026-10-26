@@ -160,7 +160,7 @@ enum BodyMath {
             let start = calendar.date(byAdding: .day, value: -7 * back, to: thisWeek.start) ?? thisWeek.start
             let end = calendar.date(byAdding: .day, value: 7, to: start) ?? start
             return workouts.filter {
-                types.contains(Int($0.value)) && $0.start >= start && $0.start < end
+                types.contains($0.code) && $0.start >= start && $0.start < end
             }.count
         }
     }

@@ -60,8 +60,8 @@ struct SomaPaletteTests {
         }
     }
 
-    @Test("The grounds and inks are the Soma tokens")
-    func groundsAreSomaTokens() {
+    @Test("The grounds and inks are Soma tokens")
+    func groundsAreNeutral() {
         #expect(colors.canvas == SomaColorValue(light: 0xF4F4F6, dark: 0x1F2023))
         #expect(colors.surface == SomaColorValue(light: 0xFFFFFF, dark: 0x2E3037))
         #expect(colors.inkPrimary == SomaColorValue(light: 0x1C1C1E, dark: 0xFFFFFF))

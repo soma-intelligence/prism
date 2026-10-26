@@ -16,7 +16,7 @@ public struct SomaCardHeader: View {
 
     /// - Parameters:
     ///   - title: what the card is about: Tonight, Today.
-    ///   - caption: set in small capitals under it.
+    ///   - caption: set small under it.
     ///   - isSigned: whether the caption is Soma speaking, which sets the mark
     ///     before it.
     public init(_ title: LocalizedStringResource, caption: LocalizedStringResource? = nil, isSigned: Bool = false) {
@@ -43,7 +43,6 @@ public struct SomaCardHeader: View {
                     }
                     Text(caption)
                         .somaFont(type.eyebrow)
-                        .textCase(.uppercase)
                         .foregroundStyle(colors.inkSecondary.color)
                 }
                 .accessibilityElement(children: .combine)
@@ -53,7 +52,7 @@ public struct SomaCardHeader: View {
     }
 }
 
-/// One next move: the aspect's glyph in its colour, the
+/// One next move: the object of the aspect it serves, the
 /// move itself as the hero (a time set large under the few words that lead
 /// to it: "In bed by" over "11:00 PM"), and a slim check that fills with the
 /// aspect's colour once it is done.
@@ -89,8 +88,7 @@ public struct SomaMoveRow: View {
         let colors = theme.colors
 
         HStack(alignment: .center, spacing: metrics.moveRowGap) {
-            SomaAspectGlyph(aspect)
-                .frame(width: metrics.checkDiameter)
+            SomaObjectIcon(aspect, size: .row)
 
             VStack(alignment: .leading, spacing: 0) {
                 if let lead {
@@ -111,7 +109,7 @@ public struct SomaMoveRow: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .opacity(isDone ? theme.motion.pressOpacity : 1)
+            .opacity(isDone ? theme.motion.dimOpacity : 1)
 
             Button(action: toggle) {
                 SomaCheck(isDone: isDone, aspect: aspect)
@@ -156,7 +154,7 @@ public struct SomaCheck: View {
                 .opacity(isDone ? 1 : 0)
         }
         .frame(width: side, height: side)
-        .animation(reduceMotion ? nil : .easeOut(duration: theme.motion.pressDuration * 2), value: isDone)
+        .animation(reduceMotion ? nil : theme.motion.quick, value: isDone)
         .accessibilityHidden(true)
     }
 }
@@ -177,7 +175,7 @@ struct SomaCheckGlyph: Shape {
     ZStack {
         SomaPreviewBackdrop()
         SomaCard {
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: SomaMetrics.standard.spaceM) {
                 Text("Tonight")
                 ForEach(0..<2) { index in
                     SomaMoveRow(

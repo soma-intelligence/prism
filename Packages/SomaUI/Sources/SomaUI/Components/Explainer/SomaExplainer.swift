@@ -28,7 +28,7 @@ public struct SomaExplainer<Hero: View, Content: View>: View {
     @Environment(\.somaTheme) private var theme
 
     /// - Parameters:
-    ///   - eyebrow: small capitals over the title, or nil.
+    ///   - eyebrow: a few words over the title, or nil.
     ///   - title: two or three words.
     ///   - summary: one line under the title, or nil.
     ///   - aspect: the aspect whose colour washes the top of the sheet.
@@ -60,7 +60,6 @@ public struct SomaExplainer<Hero: View, Content: View>: View {
                     if let eyebrow {
                         Text(eyebrow)
                             .somaFont(type.eyebrow)
-                            .textCase(.uppercase)
                             .foregroundStyle(colors.inkSecondary.color)
                     }
                     Text(title)

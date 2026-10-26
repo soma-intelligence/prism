@@ -38,7 +38,7 @@ struct ProgramsPage: View {
                     SomaBrowseGroup(others) { program in
                         Button { opened = program } label: {
                             HStack(spacing: theme.metrics.browseRowSpacing) {
-                                SomaOrb(aspect: program.aspect, scale: .mini)
+                                SomaObjectIcon(aspect: program.aspect, size: .row)
                                     .scaleEffect(0.7)
                                     .frame(width: theme.metrics.browseGlyphColumn, height: theme.metrics.miniOrbDiameter * 0.7)
                                     .accessibilityHidden(true)
@@ -110,7 +110,7 @@ private struct ProgramProgressCard: View {
         SomaCard {
             VStack(alignment: .leading, spacing: metrics.cardSpacing) {
                 HStack(spacing: metrics.cardSpacing) {
-                    SomaOrb(aspect: program.aspect, scale: .mini)
+                    SomaObjectIcon(aspect: program.aspect, size: .row)
                         .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: metrics.scoreLabelSpacing) {
                         Text(program.title)

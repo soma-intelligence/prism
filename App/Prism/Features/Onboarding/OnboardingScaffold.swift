@@ -63,8 +63,8 @@ struct OnboardingFooter: View {
             }
         }
         .padding(.horizontal, metrics.pagePadding)
-        .padding(.top, 8)
-        .padding(.bottom, 12)
+        .padding(.top, theme.metrics.spaceS)
+        .padding(.bottom, theme.metrics.spaceM)
         .frame(maxWidth: metrics.pageMaxWidth)
         .frame(maxWidth: .infinity)
     }
@@ -150,10 +150,10 @@ struct OnboardingRow<Lead: View, Trailing: View>: View {
         let colors = theme.colors
         let type = theme.typography
 
-        HStack(alignment: .center, spacing: theme.metrics.cardPadding * 0.75) {
+        HStack(alignment: .center, spacing: theme.metrics.spaceM) {
             lead()
                 .frame(width: theme.metrics.miniOrbDiameter)
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: theme.metrics.spaceXS) {
                 Text(title)
                     .somaFont(type.callout)
                     .foregroundStyle(colors.inkPrimary.color)
@@ -190,7 +190,7 @@ struct OnboardingRowsCard<Item: Identifiable, Row: View>: View {
                         Rectangle()
                             .fill(theme.colors.inkPrimary.color.opacity(theme.metrics.browseSeparatorOpacity))
                             .frame(height: 0.5)
-                            .padding(.vertical, 12)
+                            .padding(.vertical, theme.metrics.spaceM)
                     }
                     row(item)
                 }
@@ -300,7 +300,7 @@ struct OnboardingChip: View {
                 .foregroundStyle(isOn ? colors.accent.color : colors.inkPrimary.color)
                 .lineLimit(1)
                 .fixedSize()
-                .padding(.horizontal, metrics.cardPadding * 0.75)
+                .padding(.horizontal, metrics.spaceM)
                 .frame(maxWidth: fills ? .infinity : nil, minHeight: metrics.minimumTapTarget * 0.9)
                 .background(Capsule().fill(isOn ? colors.surface.color : Color.clear))
                 .overlay(

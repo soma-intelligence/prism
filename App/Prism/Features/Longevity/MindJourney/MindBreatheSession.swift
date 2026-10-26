@@ -104,7 +104,7 @@ struct MindBreatheSession: View {
                 .aspectRatio(1, contentMode: .fit)
                 .accessibilityHidden(true)
 
-                VStack(spacing: 6) {
+                VStack(spacing: theme.metrics.spaceS) {
                     Text(isPaused ? "Paused" : (breath.isInhaling ? "Breathe in" : "Breathe out"))
                         .somaFont(type.headline)
                         .foregroundStyle(colors.inkPrimary.color)
@@ -289,7 +289,7 @@ struct MindBeforeAfterRow: View {
                 .somaFont(type.body)
                 .foregroundStyle(colors.inkPrimary.color)
             Spacer(minLength: 8)
-            VStack(alignment: .trailing, spacing: 6) {
+            VStack(alignment: .trailing, spacing: theme.metrics.spaceS) {
                 Text(text)
                     .somaFont(type.rowValue)
                     .foregroundStyle(colors.inkPrimary.color)

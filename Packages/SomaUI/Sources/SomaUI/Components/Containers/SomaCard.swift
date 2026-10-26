@@ -5,11 +5,12 @@
 
 import SwiftUI
 
-/// The standard content container: a surface one tonal step above the canvas,
-/// a single hairline, and a low diffuse shadow.
+/// The standard content container: a surface one tonal step above the canvas
+/// and a single hairline.
 ///
-/// Depth comes from the tonal step first: the shadow only settles the card onto
-/// the ground, it never announces it.
+/// Depth comes from the tonal step and a light from above
+/// (``SomaLitSurface``). A shadow under every card read as generated, the
+/// way Apple Health and the reference design never do: the card sits flat.
 public struct SomaCard<Content: View>: View {
     private let content: Content
 
@@ -23,17 +24,6 @@ public struct SomaCard<Content: View>: View {
         content
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(theme.metrics.cardPadding)
-            .background(
-                RoundedRectangle(cornerRadius: theme.metrics.cardCornerRadius, style: .continuous)
-                    .fill(theme.colors.surface.color)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: theme.metrics.cardCornerRadius, style: .continuous)
-                    .strokeBorder(
-                        theme.colors.inkPrimary.color.opacity(theme.metrics.hairlineOpacity),
-                        lineWidth: 0.5
-                    )
-            )
-            .shadow(color: .black.opacity(0.04), radius: 2, y: 2)
+            .somaLitSurface()
     }
 }

@@ -24,3 +24,13 @@ public extension SomaTypography {
         return spec
     }
 }
+
+/// Sizes other components still read, kept from the parallel design lines.
+public extension SomaTypography {
+    /// The percent sign beside that level.
+    var bankFigureUnit: SomaFontSpec {
+        var spec = metricCompact
+        spec.size = metricCompact.size * 0.75
+        return spec
+    }
+}

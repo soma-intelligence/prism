@@ -51,15 +51,7 @@ struct MindSignals: Equatable, Sendable {
         let restingNow = restingByDay[today] ?? restingByDay[yesterday]
 
         // Breathing overnight: the respiratory rate recorded asleep.
-        let nightly = MindUsual.daily(respiratory.filter {
-            let hour = calendar.component(.hour, from: $0.start)
-            return hour < 8 || hour >= 22
-        }.map { reading in
-            // A reading before 08:00 belongs to the night that began the day before.
-            let hour = calendar.component(.hour, from: reading.start)
-            let shift: TimeInterval = hour < 8 ? 0 : 24 * 60 * 60
-            return HealthReading(metric: reading.metric, value: reading.value, unit: reading.unit, start: reading.start.addingTimeInterval(shift), end: reading.end.addingTimeInterval(shift))
-        }, calendar: calendar, reduce: MindUsual.mean)
+        let nightly = nightlyBreathing(respiratory, calendar: calendar)
         let breathingUsual = MindUsual.range(nightly.filter { $0.key < today }.map(\.value))
         let breathingNow = nightly[today]
 
@@ -120,11 +112,32 @@ struct MindSignals: Equatable, Sendable {
         )
     }
 
+    /// The breathing rate of each night, keyed by the morning it ended on:
+    /// readings from 22:00 to 08:00, one taken before midnight counted with
+    /// the next morning. The Breathing row and the check-in's streak both
+    /// read nights this one way.
+    static func nightlyBreathing(_ respiratory: [HealthReading], calendar: Calendar) -> [Date: Double] {
+        var byMorning: [Date: [Double]] = [:]
+        for reading in respiratory {
+            let hour = calendar.component(.hour, from: reading.start)
+            let day = calendar.startOfDay(for: reading.start)
+            let morning: Date? = if hour < 8 {
+                day
+            } else if hour >= 22 {
+                calendar.date(byAdding: .day, value: 1, to: day)
+            } else {
+                nil
+            }
+            if let morning { byMorning[morning, default: []].append(reading.value) }
+        }
+        return byMorning.compactMapValues(MindUsual.mean)
+    }
+
     /// Breathing ran over its usual range this many nights in a row, ending
     /// last night: the check-in asks about it from three.
     static func fastBreathingNights(_ respiratory: [HealthReading], now: Date, calendar: Calendar) -> Int {
         let today = calendar.startOfDay(for: now)
-        let night = MindUsual.daily(respiratory.filter { calendar.component(.hour, from: $0.start) < 8 }, calendar: calendar, reduce: MindUsual.mean)
+        let night = nightlyBreathing(respiratory, calendar: calendar)
         guard let usual = MindUsual.range(night.filter { $0.key < calendar.date(byAdding: .day, value: -3, to: today) ?? today }.map(\.value)) else { return 0 }
         var count = 0
         var day = today
@@ -149,11 +162,11 @@ enum MindScoreWords {
     }
 
     static func headline(_ score: Int?) -> String {
-        guard let score else { return "Mind reads your nervous system." }
+        guard let score else { return "Mind reads your HRV and your pulse at rest." }
         switch score {
-        case 70...: return "Your nervous system is at ease."
-        case 50..<70: return "Your nervous system is working hard."
-        default: return "Your nervous system is under strain."
+        case 70...: return "HRV high and pulse low for you: a calm reading."
+        case 50..<70: return "HRV and pulse close to your usual."
+        default: return "HRV low or pulse high for you: a strained reading."
         }
     }
 

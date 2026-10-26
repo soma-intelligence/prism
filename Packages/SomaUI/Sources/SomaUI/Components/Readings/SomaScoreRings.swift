@@ -16,24 +16,39 @@ public struct SomaRingScore: Identifiable, Sendable {
     public var trend: SomaTrend?
     /// "Lowest in 30 days": the accessibility value, never printed.
     public var cue: LocalizedStringResource?
+    /// Where the value should sit, on the same 0 to 100 scale: the person's
+    /// usual, or a target for the day. Nil when there is none yet.
+    public var range: ClosedRange<Double>?
+    /// The person's usual for this score, 0 to 100, or nil while it is
+    /// still being learned. The rings leave it out; the other styles mark it.
+    public var usual: Int?
+    /// The last seven days, oldest first, ending today, nil on a day with
+    /// no score. Empty when the caller has no history to give.
+    public var week: [Int?]
 
-    public init(aspect: SomaAspect, value: Int?, trend: SomaTrend? = nil, cue: LocalizedStringResource? = nil) {
+    public init(
+        aspect: SomaAspect,
+        value: Int?,
+        trend: SomaTrend? = nil,
+        cue: LocalizedStringResource? = nil,
+        range: ClosedRange<Double>? = nil,
+        usual: Int? = nil,
+        week: [Int?] = []
+    ) {
         self.aspect = aspect
         self.value = value
         self.trend = trend
         self.cue = cue
+        self.range = range
+        self.usual = usual
+        self.week = week
     }
 }
 
 /// Three scores as compact rings, as the head of a home page: each
 /// drawn to its value in the aspect's colour over a faint track of the same
 /// colour, the number in the middle with a small mark when it moved, the
-/// name under it.
-///
-/// Given a namespace, each ring marks itself as the source of a zoom, by its
-/// aspect or by the id `zoomID` gives it (the route the ring opens, say), so
-/// the page it opens grows out of it (iOS only; elsewhere the push is the
-/// ordinary one).
+/// aspect's object and name under it.
 public struct SomaScoreRings: View {
     private let scores: [SomaRingScore]
     private let zoom: Namespace.ID?
@@ -73,7 +88,8 @@ public struct SomaScoreRings: View {
     }
 }
 
-private extension View {
+extension View {
+    /// Marks a score as the source of the zoom into its page (iOS only).
     @ViewBuilder
     func zoomSource(_ id: AnyHashable, in namespace: Namespace.ID?) -> some View {
 #if os(iOS)
@@ -127,20 +143,25 @@ private struct SomaScoreRing: View {
             }
             .frame(width: diameter, height: diameter)
 
-            Text(score.aspect.title)
-                .somaFont(theme.typography.caption)
-                .foregroundStyle(colors.inkSecondary.color)
-                .lineLimit(1)
+            HStack(spacing: metrics.identityDotSpacing) {
+                SomaObjectIcon(score.aspect)
+                Text(score.aspect.title)
+                    .somaFont(theme.typography.caption)
+                    .foregroundStyle(colors.inkSecondary.color)
+                    .lineLimit(1)
+            }
         }
         .onAppear {
             guard !hasAppeared else { return }
             if reduceMotion {
                 hasAppeared = true
             } else {
-                withAnimation(.easeOut(duration: theme.motion.pressDuration * 6)) { hasAppeared = true }
+                withAnimation(theme.motion.reveal) { hasAppeared = true }
             }
         }
-        .animation(reduceMotion ? nil : .easeOut(duration: theme.motion.pressDuration * 4), value: fraction)
+        // A spring, not an ease: a score that updates while the arc is still
+        // drawing carries on from where it is rather than restarting.
+        .animation(reduceMotion ? nil : theme.motion.standard, value: fraction)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(score.aspect.title))
         .accessibilityValue(accessibilityValue)

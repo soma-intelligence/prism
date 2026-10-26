@@ -70,7 +70,7 @@ struct LogShortcutGlyph: View {
         let side = theme.metrics.miniOrbDiameter * 0.7
         Group {
             if let aspect = shortcut.aspect {
-                SomaOrb(aspect: aspect, scale: .mini)
+                SomaObjectIcon(aspect: aspect, size: .row)
                     .scaleEffect(0.7)
             } else {
                 Image(systemName: "doc.text")

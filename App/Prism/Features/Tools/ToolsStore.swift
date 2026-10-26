@@ -98,6 +98,30 @@ final class ToolsStore {
     }
 }
 
+extension ToolsStore.Record {
+    /// Each field is read on its own. A file written before a field existed,
+    /// or by a build that stored one differently, keeps everything else the
+    /// person entered: one new setting never wipes their screenings,
+    /// supplements, sets or trip.
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let empty = Self()
+        off = container.value(.off, or: empty.off)
+        since = container.value(.since, or: empty.since)
+        notes = container.value(.notes, or: empty.notes)
+        skinType = try? container.decodeIfPresent(Int.self, forKey: .skinType)
+        alarm = container.value(.alarm, or: empty.alarm)
+        evening = container.value(.evening, or: empty.evening)
+        shift = container.value(.shift, or: empty.shift)
+        trip = try? container.decodeIfPresent(TripPrefs.self, forKey: .trip)
+        supplements = container.value(.supplements, or: empty.supplements)
+        taken = container.value(.taken, or: empty.taken)
+        screening = container.value(.screening, or: empty.screening)
+        lifts = container.value(.lifts, or: empty.lifts)
+        forecasts = container.value(.forecasts, or: empty.forecasts)
+    }
+}
+
 // MARK: - What each tool stores
 
 /// The Smart Alarm's settings, as the settings sheet draws them.
@@ -166,11 +190,16 @@ struct SupplementItem: Codable, Equatable, Identifiable, Sendable {
 }
 
 /// The Screening Ledger's record: what was done when, the family history
-/// answers that change a cadence, and the sex the catalog filters on.
+/// answers that change a cadence, and the age and sex the catalog filters on
+/// when the profile does not hold them.
 struct ScreeningRecord: Codable, Equatable, Sendable {
     var ledger = SomaTools.ScreeningLedger()
-    /// "female", "male", or nil when not said.
+    /// "female", "male", "other", or nil when not said. The profile's answer
+    /// wins over this one.
     var sex: String?
+    /// The date of birth the ledger asked for, when neither the profile nor
+    /// Apple Health holds one. Optional, so a file written before it decodes.
+    var birthday: Date?
 }
 
 /// One set logged on the Strength Load page.

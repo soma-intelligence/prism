@@ -27,9 +27,9 @@ struct SomaSwitchTests {
         #expect(colors.accent.dark != colors.onAccent.dark)
     }
 
-    @Test("The toggle style is reachable as .soma")
+    @Test("The cross and check toggle style is reachable as .somaCrossCheck")
     func style() {
-        let style: SomaSwitchToggleStyle = .soma
+        let style: SomaSwitchToggleStyle = .somaCrossCheck
         _ = style
     }
 }

@@ -5,8 +5,15 @@
 
 import SwiftUI
 
-/// A figure standing against a ruler. Drag up or down and the figure grows or
-/// shrinks to the height under the knob.
+/// A tape measure set on end, read against one fixed line.
+///
+/// The tape carries a fine tick every centimetre (every inch on an imperial
+/// tape), a longer one halfway, and a numbered one at each `tickEvery`. Drag
+/// it up or down and it follows the finger; let go mid flick and it keeps
+/// turning, slowing to rest on a step, with a selection tick under the thumb
+/// at every unit it passes. No figure stands beside it: the tape and the
+/// number above it say everything. With Reduce Motion on, a flick lands at
+/// once.
 public struct SomaHeightRuler: View {
     @Binding private var value: Double
     private let range: ClosedRange<Double>
@@ -17,14 +24,18 @@ public struct SomaHeightRuler: View {
     private let format: @Sendable (Double) -> String
 
     @Environment(\.somaTheme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var dragStart: Double?
+    @State private var glide: Task<Void, Never>?
 
     /// - Parameters:
     ///   - value: centimetres.
-    ///   - range: the ruler's span, foot to top.
-    ///   - step: one detent of the drag.
-    ///   - tickEvery: the distance between two ticks.
-    ///   - labels: where the ruler is numbered.
+    ///   - range: the tape's span, foot to top.
+    ///   - step: where the tape comes to rest.
+    ///   - tickEvery: the distance between two numbered ticks: ten
+    ///     centimetres, or half a foot.
+    ///   - labels: ticks numbered on top of those, the whole feet of an
+    ///     imperial tape.
     ///   - label: what VoiceOver calls it.
     ///   - format: how a numbered tick reads, and the value to VoiceOver.
     public init(
@@ -45,82 +56,68 @@ public struct SomaHeightRuler: View {
         self.format = format
     }
 
+    /// Whether the tape counts in tens, so every numbered tick reads.
+    private var isMetric: Bool {
+        let tens = tickEvery / 10
+        return tickEvery > 0 && abs(tens - tens.rounded()) < 0.001
+    }
+
+    /// One fine tick: a centimetre in tens, an inch in half feet.
+    private var minor: Double { tickEvery / (isMetric ? 10 : 6) }
+
     public var body: some View {
         let metrics = theme.metrics
         let colors = theme.colors
-        let hue = theme.aspects[.body].identity.color
 
         GeometryReader { proxy in
             let size = proxy.size
-            let foot = size.height - metrics.cardSpacing
-            let span = foot - metrics.cardSpacing * 2
-            let rulerX = size.width * 0.78
-            let y = { (v: Double) -> CGFloat in foot - CGFloat((v - range.lowerBound) / (range.upperBound - range.lowerBound)) * span }
-            let height = foot - y(value)
-            let figureX = size.width * 0.34
+            // The tape sits a little left of centre, so the ticks and their
+            // numbers together balance on the page.
+            let tapeX = (size.width - metrics.rulerWidth) / 2 + metrics.spaceL
+            let mid = size.height / 2
+            let indicator = metrics.rulerMajorTick + metrics.spaceL * 2
 
             ZStack(alignment: .topLeading) {
-                // The ground.
-                Path { path in
-                    path.move(to: CGPoint(x: 0, y: foot))
-                    path.addLine(to: CGPoint(x: size.width, y: foot))
-                }
-                .stroke(colors.inkPrimary.color.opacity(metrics.browseSeparatorOpacity), lineWidth: 1)
-
-                // The ruler.
-                Canvas { context, _ in
-                    var tick = range.lowerBound
-                    while tick <= range.upperBound + 0.001 {
-                        let isLabelled = labels.contains { abs($0 - tick) < 0.001 }
-                        let length = isLabelled ? metrics.rulerMajorTick : metrics.rulerTick
-                        var path = Path()
-                        path.move(to: CGPoint(x: rulerX - length / 2, y: y(tick)))
-                        path.addLine(to: CGPoint(x: rulerX + length / 2, y: y(tick)))
-                        context.stroke(path, with: .color(colors.inkSecondary.color.opacity(isLabelled ? 0.9 : 0.5)), lineWidth: 1)
-                        tick += tickEvery
+                tape(height: size.height)
+                    .frame(width: metrics.rulerWidth, height: size.height)
+                    .mask {
+                        LinearGradient(
+                            stops: [
+                                .init(color: .clear, location: 0),
+                                .init(color: colors.inkPrimary.color, location: 0.22),
+                                .init(color: colors.inkPrimary.color, location: 0.78),
+                                .init(color: .clear, location: 1),
+                            ],
+                            startPoint: .top, endPoint: .bottom
+                        )
                     }
-                    var spine = Path()
-                    spine.move(to: CGPoint(x: rulerX, y: y(range.upperBound)))
-                    spine.addLine(to: CGPoint(x: rulerX, y: foot))
-                    context.stroke(spine, with: .color(colors.inkSecondary.color.opacity(0.5)), lineWidth: 1)
-                    for mark in labels {
-                        let text = Text(format(mark))
-                            .font(Self.tickRole(theme).font)
-                                .tracking(Self.tickRole(theme).tracking)
-                            .foregroundColor(colors.inkSecondary.color)
-                        context.draw(text, at: CGPoint(x: rulerX + metrics.rulerMajorTick + metrics.cardSpacing, y: y(mark)), anchor: .leading)
-                    }
-                }
+                    .offset(x: tapeX)
 
-                SomaFigure()
-                    .fill(hue.opacity(0.5))
-                    .frame(width: max(1, height * 0.42), height: max(1, height))
-                    .position(x: figureX, y: foot - height / 2)
-
-                Path { path in
-                    path.move(to: CGPoint(x: figureX, y: y(value)))
-                    path.addLine(to: CGPoint(x: rulerX, y: y(value)))
-                }
-                .stroke(colors.inkSecondary.color, style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
-
-                SomaKnob()
-                    .position(x: rulerX, y: y(value))
+                // The line the tape is read against.
+                Capsule()
+                    .fill(colors.accent.color)
+                    .frame(width: indicator, height: metrics.inputIndicatorWidth)
+                    .position(x: tapeX - metrics.spaceL + indicator / 2, y: mid)
             }
             .contentShape(.rect)
             .somaClaimsSwipe()
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { drag in
+                        glide?.cancel()
                         let start = dragStart ?? value
                         if dragStart == nil { dragStart = value }
-                        let perPoint = (range.upperBound - range.lowerBound) / Double(max(span, 1))
-                        value = snapped(start - Double(drag.translation.height) * perPoint)
+                        value = snapped(start + Double(drag.translation.height / metrics.rulerPointsPerUnit))
                     }
-                    .onEnded { _ in dragStart = nil }
+                    .onEnded { drag in
+                        dragStart = nil
+                        let speed = Double(drag.velocity.height / metrics.rulerPointsPerUnit)
+                        glide = SomaGlide.start(from: value, speed: speed, reduceMotion: reduceMotion, metrics: metrics) { value = snapped($0) }
+                    }
             )
         }
         .frame(height: metrics.rulerHeight)
-        .sensoryFeedback(.selection, trigger: (value / max(step, 0.001)).rounded())
+        .sensoryFeedback(.selection, trigger: (value / max(minor, 0.001)).rounded())
         .accessibilityElement()
         .accessibilityLabel(Text(label))
         .accessibilityValue(Text(format(value)))
@@ -133,17 +130,65 @@ public struct SomaHeightRuler: View {
         }
     }
 
+    /// The tape: ticks running off its left edge, numbers beside the long
+    /// ones, all in one hairline.
+    private func tape(height: CGFloat) -> some View {
+        let metrics = theme.metrics
+        let colors = theme.colors
+        let role = Self.tickRole(theme)
+        let current = value
+
+        return Canvas { context, size in
+            let mid = size.height / 2
+            let reach = Double(mid / metrics.rulerPointsPerUnit) + minor
+            let first = Int(((max(range.lowerBound, current - reach)) / minor).rounded(.down))
+            let last = Int(((min(range.upperBound, current + reach)) / minor).rounded(.up))
+            guard first <= last else { return }
+            for index in first...last {
+                let mark = Double(index) * minor
+                guard mark >= range.lowerBound - minor / 2, mark <= range.upperBound + minor / 2 else { continue }
+                let y = mid - CGFloat(mark - current) * metrics.rulerPointsPerUnit
+                let isMajor = Self.lands(mark, every: tickEvery)
+                let isFoot = labels.contains { abs($0 - mark) < minor / 2 }
+                let isNumbered = isMetric ? isMajor : isFoot
+                let isMid = !isNumbered && (isMetric ? Self.lands(mark, every: tickEvery / 2) : isMajor)
+                let length = isNumbered ? metrics.rulerMajorTick : (isMid ? metrics.rulerMidTick : metrics.rulerTick)
+                let ink = isNumbered ? metrics.inputTickStrong : (isMid ? metrics.inputTickMedium : metrics.inputTickFaint)
+                var tick = Path()
+                tick.move(to: CGPoint(x: 0, y: y))
+                tick.addLine(to: CGPoint(x: length, y: y))
+                context.stroke(tick, with: .color(colors.inkPrimary.color.opacity(ink)), lineWidth: metrics.inputHairline)
+                if isNumbered {
+                    let text = Text(format(mark))
+                        .font(role.font)
+                        .tracking(role.tracking)
+                        .foregroundColor(colors.inkSecondary.color)
+                    context.draw(text, at: CGPoint(x: metrics.rulerMajorTick + metrics.spaceM, y: y), anchor: .leading)
+                }
+            }
+        }
+    }
+
+    /// Whether a mark falls on a multiple of a length.
+    static func lands(_ mark: Double, every length: Double) -> Bool {
+        guard length > 0 else { return false }
+        let share = mark / length
+        return abs(share - share.rounded()) < 0.001
+    }
+
     /// The role a label drawn into the canvas is set in: a Canvas takes a
     /// Text, so the role is applied by hand, font and tracking together.
-    static func tickRole(_ theme: SomaTheme) -> SomaFontSpec { theme.typography.captionValue }
+    static func tickRole(_ theme: SomaTheme) -> SomaFontSpec { theme.typography.rowValue }
 
     private func snapped(_ raw: Double) -> Double {
         let clamped = min(max(raw, range.lowerBound), range.upperBound)
+        guard step > 0 else { return clamped }
         return (clamped / step).rounded() * step
     }
 }
 
-/// A person standing, drawn in rounded blocks: head, body, arms and legs.
+/// A standing figure in rounded blocks. No longer drawn by the height ruler;
+/// kept public for callers that still draw it.
 public struct SomaFigure: Shape {
     public init() {}
 
@@ -152,19 +197,15 @@ public struct SomaFigure: Shape {
         let h = rect.height
         let unit = h / 7.4
         var path = Path()
-        // Head.
         path.addEllipse(in: CGRect(x: rect.midX - unit * 0.62, y: rect.minY, width: unit * 1.24, height: unit * 1.24))
-        // Body.
         let torsoTop = rect.minY + unit * 1.4
         path.addRoundedRect(in: CGRect(x: rect.midX - w * 0.3, y: torsoTop, width: w * 0.6, height: unit * 2.6),
                             cornerSize: CGSize(width: unit * 0.4, height: unit * 0.4))
-        // Arms.
         let armWidth = w * 0.1
         for x in [rect.minX, rect.maxX - armWidth] {
             path.addRoundedRect(in: CGRect(x: x, y: torsoTop + unit * 0.1, width: armWidth, height: unit * 2.9),
                                 cornerSize: CGSize(width: armWidth / 2, height: armWidth / 2))
         }
-        // Legs.
         let legTop = torsoTop + unit * 2.72
         let legWidth = w * 0.27
         for x in [rect.midX - w * 0.015 - legWidth, rect.midX + w * 0.015] {
@@ -181,7 +222,7 @@ public struct SomaFigure: Shape {
         SomaPreviewBackdrop()
         VStack {
             SomaReadout(String(format: "%.1f", centimetres), unit: "cm")
-            SomaHeightRuler(value: $centimetres, label: "Height")
+            SomaHeightRuler(value: $centimetres, range: 0...220, label: "Height")
         }
         .padding()
     }

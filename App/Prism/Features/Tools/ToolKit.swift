@@ -37,6 +37,7 @@ struct ToolPage<Content: View>: View {
             .frame(maxWidth: metrics.pageMaxWidth, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
+        .softScrollEdges()
         .background(theme.colors.canvas.color.ignoresSafeArea())
         .navigationTitle(title)
         #if os(iOS)
@@ -45,7 +46,7 @@ struct ToolPage<Content: View>: View {
     }
 }
 
-/// Small capitals over a section, the way every group on a tool page opens.
+/// A quiet label over a section, the way every group on a tool page opens.
 struct ToolEyebrow: View {
     let text: String
 
@@ -56,7 +57,6 @@ struct ToolEyebrow: View {
     var body: some View {
         Text(text)
             .somaFont(theme.typography.eyebrow)
-            .textCase(.uppercase)
             .foregroundStyle(theme.colors.inkSecondary.color)
             .accessibilityAddTraits(.isHeader)
             .padding(.top, theme.metrics.cardSpacing)
@@ -104,7 +104,6 @@ struct ToolHero: View {
             if let eyebrow {
                 Text(eyebrow)
                     .somaFont(theme.typography.eyebrow)
-                    .textCase(.uppercase)
                     .foregroundStyle(theme.colors.inkSecondary.color)
             }
             Text(headline)
@@ -252,7 +251,6 @@ struct ToolRowsCard: View {
                 if let eyebrow {
                     Text(eyebrow)
                         .somaFont(theme.typography.eyebrow)
-                        .textCase(.uppercase)
                         .foregroundStyle(theme.colors.inkSecondary.color)
                 }
                 ForEach(Array(rows.enumerated()), id: \.offset) { index, row in
@@ -289,7 +287,7 @@ struct ToolRowView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            VStack(alignment: .trailing, spacing: 6) {
+            VStack(alignment: .trailing, spacing: theme.metrics.spaceS) {
                 Text(row.value ?? "-")
                     .somaFont(type.rowValue)
                     .foregroundStyle(tint(row.tone, fallback: colors.inkPrimary.color))
@@ -299,7 +297,7 @@ struct ToolRowView: View {
                 }
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, theme.metrics.spaceXS)
         .accessibilityElement(children: .combine)
     }
 
@@ -360,6 +358,7 @@ struct ToolLinkRow<Value: Hashable>: View {
         NavigationLink(value: value) {
             ToolLinkLabel(title: title, detail: detail)
         }
+        .zoomSource(value)
         .buttonStyle(TilePressStyle())
     }
 }

@@ -34,7 +34,7 @@ struct BodyBiomarker: Identifiable, Equatable, Sendable, Codable {
     /// The latest value, formatted, or nil when Health holds none.
     let value: String?
     /// One value per day, oldest first, nil on a day with no reading.
-    let days: [Double?]
+    var days: [Double?]
     let status: Status
     /// What the days mean: the usual band, the cue, how much it moved.
     var insight: Insight = .empty(.steady)
@@ -236,6 +236,33 @@ enum BodyBiomarkers {
             for await (spec, readings) in group { result[spec] = readings }
             return result
         }
+    }
+
+    /// How far back a sparse reading looks for something to draw: a weight
+    /// or a blood pressure logged once a month still gets a line.
+    static let sparseLookback = 365
+
+    /// The markers whose month holds fewer than two readings, given a year
+    /// of their days instead, so their row draws a line rather than nothing.
+    static func filledSparse(
+        _ markers: [BodyBiomarkerSpec: BodyBiomarker], from source: any HealthSampleSource, now: Date, calendar: Calendar
+    ) async -> [BodyBiomarkerSpec: BodyBiomarker] {
+        var result = markers
+        let sparse = markers.filter { $0.value.days.compactMap { $0 }.count < 2 && $0.value.value != nil }.map(\.key)
+        guard !sparse.isEmpty else { return result }
+        let start = calendar.date(byAdding: .day, value: -sparseLookback, to: calendar.startOfDay(for: now)) ?? now
+        await withTaskGroup(of: (BodyBiomarkerSpec, [Double?]).self) { group in
+            for spec in sparse {
+                group.addTask {
+                    let readings = await read(spec, from: source, start: start, now: now, calendar: calendar)
+                    return (spec, daily(spec, readings: readings, days: sparseLookback, now: now, calendar: calendar))
+                }
+            }
+            for await (spec, days) in group where days.compactMap({ $0 }).count > (result[spec]?.days.compactMap { $0 }.count ?? 0) {
+                result[spec]?.days = days
+            }
+        }
+        return result
     }
 
     /// Reads ninety days of one reading.

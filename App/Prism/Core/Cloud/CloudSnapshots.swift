@@ -258,7 +258,10 @@ enum CloudSnapshots {
 
     // MARK: Providers
 
-    static func providers(_ states: [String: ProviderConnectionState], userID: String) -> [ProviderConnectionRecord] {
+    /// - Parameter connectedAt: when each provider was linked, by its id; a
+    ///   connection made through Open Health Sync has no date on the phone.
+    static func providers(_ states: [String: ProviderConnectionState], connectedAt: [String: Date] = [:],
+                          userID: String) -> [ProviderConnectionRecord] {
         states.compactMap { provider, state in
             let record: (String, String?, Date?)
             switch state {
@@ -269,7 +272,8 @@ enum CloudSnapshots {
             }
             return ProviderConnectionRecord(
                 id: CloudRecords.id(CloudRecords.providerConnections, userID: userID, key: provider),
-                provider: provider, status: record.0, accountLabel: record.1, lastSyncAt: record.2
+                provider: provider, status: record.0, accountLabel: record.1, lastSyncAt: record.2,
+                connectedAt: connectedAt[provider].map(ms)
             )
         }
     }

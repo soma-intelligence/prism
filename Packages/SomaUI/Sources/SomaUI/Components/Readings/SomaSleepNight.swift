@@ -131,8 +131,10 @@ public struct SomaSleepPeriodRow: View {
 
 // MARK: - Totals
 
-/// Time in bed and time asleep, side by side in large digits, a hairline
-/// between them.
+/// Time in bed and time asleep, side by side, set the way Apple Health sets
+/// them: a quiet label over large digits with their units small ("7 hr 13
+/// min"), both left aligned. The owner asked for Apple's sleep page
+/// (2026-10-25).
 public struct SomaSleepTotals: View {
     private let inBed: TimeInterval?
     private let asleep: TimeInterval?
@@ -145,29 +147,40 @@ public struct SomaSleepTotals: View {
     }
 
     public var body: some View {
-        HStack(spacing: 0) {
+        HStack(alignment: .top, spacing: theme.metrics.cardSpacing) {
             total("Time in bed", inBed)
-            Rectangle()
-                .fill(theme.colors.inkPrimary.color.opacity(theme.metrics.hairlineOpacity))
-                .frame(width: 0.5)
-                .padding(.vertical, theme.metrics.chartLabelGap)
             total("Time asleep", asleep)
         }
-        .fixedSize(horizontal: false, vertical: true)
     }
 
     private func total(_ title: LocalizedStringResource, _ seconds: TimeInterval?) -> some View {
-        VStack(spacing: theme.metrics.chartLabelGap / 2) {
+        let type = theme.typography
+        let colors = theme.colors
+
+        return VStack(alignment: .leading, spacing: theme.metrics.chartLabelGap / 2) {
             Text(title)
-                .somaFont(theme.typography.caption)
-                .foregroundStyle(theme.colors.inkSecondary.color)
-            Text(verbatim: seconds.map(SomaSleepClock.short) ?? "-")
-                .somaFont(theme.typography.metricCompact)
-                .foregroundStyle(theme.colors.inkPrimary.color)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
+                .somaFont(type.caption)
+                .foregroundStyle(colors.inkSecondary.color)
+            Group {
+                if let seconds {
+                    let minutes = Int((max(0, seconds) / 60).rounded())
+                    HStack(alignment: .firstTextBaseline, spacing: theme.metrics.trendMarkSpacing) {
+                        if minutes >= 60 {
+                            Text(verbatim: "\(minutes / 60)").somaFont(type.metric)
+                            Text("hr").somaFont(type.caption).foregroundStyle(colors.inkSecondary.color)
+                        }
+                        Text(verbatim: "\(minutes % 60)").somaFont(type.metric)
+                        Text("min").somaFont(type.caption).foregroundStyle(colors.inkSecondary.color)
+                    }
+                } else {
+                    Text(verbatim: "-").somaFont(type.metric)
+                }
+            }
+            .foregroundStyle(colors.inkPrimary.color)
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
         }
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
     }
 }
@@ -352,7 +365,7 @@ public struct SomaStageTile: View {
     ZStack {
         SomaPreviewBackdrop()
         SomaCard {
-            VStack(spacing: 14) {
+            VStack(spacing: SomaMetrics.standard.spaceM) {
                 SomaSleepPeriodRow(bed: "23:34", wake: "06:39")
                 SomaSleepTotals(inBed: 25_522, asleep: 24_619)
                 SomaSleepTotals(inBed: nil, asleep: nil)

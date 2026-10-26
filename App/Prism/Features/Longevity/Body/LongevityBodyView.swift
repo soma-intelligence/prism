@@ -7,16 +7,15 @@ import SwiftUI
 import SomaUI
 import HealthExportCore
 
-/// The Longevity tab's Body lens: the three numbers that sum the body up,
-/// then every reading the wearables give as a tile or a row with its last
-/// thirty days: heart and fitness, movement, walking, muscle freshness, the
-/// biomarkers, and the pages further in.
+/// The Longevity tab's Body lens, laid out like the reference design's Biology tab: the three
+/// numbers that sum the body up, the fitness readings as tiles, every
+/// biomarker as a row with its last thirty days, then the pod's body map, the
+/// next visit and the pages further in.
 ///
 /// Few words on purpose (owner, 2026-10-03): each reading says its value,
 /// where it sits, a cue of a few words on what that means, and the line
 /// beside it drawn over the usual band. Tiles and rows are ordered by how
-/// much each moved (``InsightEngine``), so what moved comes first. Prism reads
-/// wearables (owner, 2026-10-19): nothing here waits on a visit.
+/// much each moved (``InsightEngine``), so what moved comes first.
 ///
 /// It draws no stack and no top bar: the Longevity page hosts both, and maps
 /// the ``LongevityRoute`` values the rows push.
@@ -24,118 +23,150 @@ struct LongevityBodyView: View {
     @Environment(HealthDashboard.self) private var health
     @Environment(\.somaTheme) private var theme
 
-    /// What the lens drew the last time, kept on the device, so it opens on
-    /// its numbers rather than on dashes (``LongevitySnapshotStore``).
-    @State private var kept = LongevitySnapshotStore.shared.body
-    /// This opening's read, once it lands. The numbers roll to it.
-    @State private var fresh: BodyLensSnapshot?
+    /// Heart rhythm and mobility, read apart from the cached lens: their two
+    /// tiles stay hidden until the read finds something from the last year.
+    @State private var rhythmMobility = RhythmMobilityReadings()
+    /// A continuous glucose monitor's fortnight, read apart like the two
+    /// above: nil, and no tile, without a monitor's trace in Health.
+    @State private var glucose: GlucoseTile?
 
-    private var shown: LongevityShown<BodyLensSnapshot> { LongevityShown(kept: kept, fresh: fresh) }
-    private var lens: BodyLensSnapshot { shown.value ?? .empty() }
-    private var page: BodyOverview { lens.page }
-    private var sex: BodyFitnessAge.Sex { lens.sex }
-    private var markers: [BodyBiomarkerSpec: BodyBiomarker] { lens.markers }
+    /// The last read, this launch's or the last one's: the lens draws it at
+    /// once and the next read replaces every tile in one go.
+    private var cache: LongevityCache { .shared }
 
     var body: some View {
         let metrics = theme.metrics
-        let updated = shown.updated(now: .now)
+        let state = cache.body ?? LongevityBodyState.empty(now: .now, calendar: .current)
+        let page = state.overview
 
+        ScrollViewReader { scroller in
         SomaPageScroll {
             VStack(alignment: .leading, spacing: metrics.leadSpacing) {
                 // Three numbers, no line under them (owner, 2026-10-03), each a
-                // door to its page, under the quiet "Updated" line while they
-                // are kept ones.
-                SomaUpdatedHeader(updated) {
-                    SomaStatRow([
-                        SomaStat(
-                            "Fitness age",
-                            value: page.fitnessAge.value,
-                            cue: page.fitnessAge.cue.map { LocalizedStringResource(stringLiteral: $0) },
-                            cueTone: page.fitnessAge.isGood ? .good : .neutral
-                        ),
-                        SomaStat("Lean mass", value: page.leanMass, unit: "kg", trend: page.leanTrend),
-                        SomaStat("VO2 max", value: page.vo2Max, trend: page.vo2Trend),
-                    ]) { stat in
-                        openStat(stat)
+                // door to its page.
+                SomaStatRow([
+                    SomaStat("Fitness age", value: page.fitnessAge.value),
+                    SomaStat("Lean mass", value: page.leanMass, unit: "kg", trend: page.leanTrend),
+                    SomaStat("VO2 max", value: page.vo2Max, trend: page.vo2Trend),
+                ]) { stat in
+                    openStat(stat)
                 }
                 .padding(.top, metrics.heroTopPadding)
-                }
 
-                BodySection("Heart and fitness") {
-                    BodyTileGrid {
-                        NavigationLink(value: LabRoute.biologicalAge) {
-                            BodyFitnessAgeTile(stat: page.fitnessAge, days: fitnessAgeDays)
-                                .contentShape(.rect)
+                // The sections in one column on a phone and two where the
+                // width holds them: the tiles beside the muscle map, the
+                // biomarkers beside the pod.
+                SomaCardColumns(gap: .sections) {
+                    BodySection("Fitness") {
+                        LazyVGrid(
+                            columns: [GridItem(.flexible(), spacing: metrics.cardSpacing), GridItem(.flexible(), spacing: metrics.cardSpacing)],
+                            spacing: metrics.cardSpacing
+                        ) {
+                            ForEach(ranked(BodyBiomarkerSpec.tiles, in: state), id: \.self) { spec in
+                                let marker = marker(spec, in: state)
+                                BodyMarkerLink(spec: spec) {
+                                    SomaTrendTile(
+                                        LocalizedStringResource(stringLiteral: marker.title),
+                                        value: marker.value,
+                                        unit: marker.unit.isEmpty ? nil : marker.unit,
+                                        status: marker.status.reading,
+                                        cue: marker.cue.map { LocalizedStringResource(stringLiteral: $0) },
+                                        values: marker.days,
+                                        band: marker.band,
+                                        aspect: .body,
+                                        chart: spec.sumsPerDay ? .bars : .line
+                                    )
+                                }
+                            }
                         }
-                        .buttonStyle(.somaGlassPress)
-                        tiles(ranked(BodyBiomarkerSpec.tiles))
                     }
-                }
 
-                BodySection("Movement") {
-                    BodyTileGrid { tiles(ranked(BodyBiomarkerSpec.movement)) }
-                }
+                    BodyMapCard(states: state.muscles)
 
-                // Shown once the read has landed, with only the readings
-                // Health holds: deciding before would draw every tile and
-                // then take most of them away.
-                let walking = ranked(BodyBiomarkerSpec.walking).filter(hasReadings)
-                if !walking.isEmpty {
-                    BodySection("Walking") {
-                        BodyTileGrid { tiles(walking) }
+                    BodySection("Biomarkers") {
+                        VStack(spacing: metrics.cardSpacing) {
+                            ForEach(ranked(BodyBiomarkerSpec.rows, in: state), id: \.self) { spec in
+                                let marker = marker(spec, in: state)
+                                BodyMarkerLink(spec: spec) {
+                                    SomaTrendRow(
+                                        LocalizedStringResource(stringLiteral: marker.title),
+                                        value: marker.value.map { marker.unit.isEmpty ? $0 : "\($0) \(marker.unit)" },
+                                        status: marker.status.reading,
+                                        cue: marker.cue.map { LocalizedStringResource(stringLiteral: $0) },
+                                        values: marker.days,
+                                        band: marker.band,
+                                        hue: spec.hue,
+                                        chart: spec.sumsPerDay ? .bars : .line
+                                    )
+                                }
+                            }
+                        }
                     }
-                    .transition(.opacity)
+
+                    let rhythmTiles = RhythmMobilityTile.shown(rhythmMobility)
+                    if !rhythmTiles.isEmpty || glucose != nil {
+                        BodySection("Rhythm and balance") {
+                            VStack(spacing: metrics.cardSpacing) {
+                                if !rhythmTiles.isEmpty {
+                                    BodyRhythmMobilityTiles(tiles: rhythmTiles, readings: rhythmMobility)
+                                }
+                                if let glucose {
+                                    BodyGlucoseTile(tile: glucose)
+                                }
+                            }
+                        }
+                        .id("rhythm")
+                    }
+
+                    BodySection("Lab") {
+                        BodyLabTiles()
+                    }
+                    .id("lab")
+
+                    BodySection("Fitness age") {
+                        BodyFitnessAgeCard(age: page.age)
+                    }
+
+                    BodyMoreRows(vo2Max: page.vo2Max)
                 }
-
-                SomaMuscleFreshness(lens.muscles)
-
-                BodyBiomarkersSection(specs: ranked(BodyBiomarkerSpec.rows), marker: marker)
-
-                BodyMoreRows(vo2Max: page.vo2Max)
             }
             .padding(.horizontal, metrics.pagePadding)
             .padding(.bottom, metrics.pagePadding)
             .frame(maxWidth: metrics.pageMaxWidth, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
-        .aspectWash(.body)
-        .task { await load(force: false) }
-        .refreshable { await load(force: true) }
-    }
-
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    @Environment(AppRouter.self) private var router
-
-    /// One tile per reading, each a door to its page in the Vault.
-    @ViewBuilder
-    private func tiles(_ specs: [BodyBiomarkerSpec]) -> some View {
-        ForEach(specs, id: \.self) { spec in
-            let marker = marker(spec)
-            BodyMarkerLink(spec: spec) {
-                SomaTrendTile(
-                    LocalizedStringResource(stringLiteral: marker.title),
-                    value: marker.value,
-                    unit: marker.unit.isEmpty ? nil : marker.unit,
-                    status: marker.status.reading,
-                    cue: marker.cue.map { LocalizedStringResource(stringLiteral: $0) },
-                    values: marker.days,
-                    band: marker.band,
-                    hue: spec.hue
-                )
+        .softScrollEdges()
+#if DEBUG
+        .task {
+            // `-longevity.metric mobility` (or afib, rhythm, oral) pushes that page.
+            let metrics: [String: MetricRoute] = ["mobility": .mobility, "afib": .afibBurden, "rhythm": .rhythmEvents, "oral": .oral]
+            if let name = UserDefaults.standard.string(forKey: "longevity.metric"), let route = metrics[name], router.longevityPath.isEmpty {
+                router.longevityPath.append(route)
             }
+            // `-longevity.metric cycle` pushes the cycle page.
+            if UserDefaults.standard.string(forKey: "longevity.metric") == "cycle", router.longevityPath.isEmpty {
+                router.longevityPath.append(HomeRoute.cycle)
+            }
+            // `-longevity.scroll lab` (or rhythm) brings that section into view, for screenshots.
+            if let section = UserDefaults.standard.string(forKey: "longevity.scroll"), ["lab", "rhythm"].contains(section) {
+                try? await Task.sleep(for: .milliseconds(1200))
+                scroller.scrollTo(section, anchor: .top)
+            }
+        }
+#endif
+        }
+        .aspectWash(.body)
+        .task { await cache.loadBody(health) }
+        .task { rhythmMobility = await health.rhythmMobility() }
+        .task { glucose = GlucoseTile.make(samples: await health.glucoseFortnight()) }
+        .somaRefreshable {
+            await cache.loadBody(health, force: true)
+            rhythmMobility = await health.rhythmMobility()
+            glucose = GlucoseTile.make(samples: await health.glucoseFortnight())
         }
     }
 
-    /// Fitness age day by day, read off each day's VO2 max: the same curve
-    /// the stat reads, so the tile's line and the number agree.
-    private var fitnessAgeDays: [Double?] {
-        marker(.vo2Max).days.map { day in day.map { Double(BodyFitnessAge.estimate(vo2Max: $0, sex: sex)) } }
-    }
-
-    private func hasReadings(_ spec: BodyBiomarkerSpec) -> Bool {
-        markers[spec].map { $0.value != nil || $0.days.contains { $0 != nil } } ?? false
-    }
+    @Environment(AppRouter.self) private var router
 
     /// Fitness age opens the biological age page; the two Health readings open
     /// their page in the Vault.
@@ -157,180 +188,14 @@ struct LongevityBodyView: View {
         router.longevityPath.append(VaultRoute.dataType(BodyDataType(metric)))
     }
 
-    private func marker(_ spec: BodyBiomarkerSpec) -> BodyBiomarker {
-        markers[spec] ?? BodyBiomarkers.make(spec, readings: [], now: .now, calendar: .current)
+    private func marker(_ spec: BodyBiomarkerSpec, in state: LongevityBodyState) -> BodyBiomarker {
+        state.markers[spec] ?? BodyBiomarkers.make(spec, readings: [], now: .now, calendar: .current)
     }
 
     /// What moved first: the full list, ordered by how far each reading moved
     /// from its usual, Soma's order kept among equals.
-    private func ranked(_ specs: [BodyBiomarkerSpec]) -> [BodyBiomarkerSpec] {
-        InsightEngine.sortedBySeverity(specs) { markers[$0]?.insight.severity ?? 0 }
-    }
-
-    /// Reads Health, or takes the read kept from the last minute, with the
-    /// last month of workouts for muscle freshness; then rolls the numbers
-    /// on screen to it and keeps it for the next opening. Nothing changes
-    /// when Health could not be read: the kept numbers stay.
-    private func load(force: Bool) async {
-        async let read = BodyLensCache.shared.read(health: health, force: force)
-        let muscles = await muscleReadings()
-        guard let read = await read else { return }
-        let snapshot = BodyLensSnapshot(
-            page: BodyOverview.make(from: read.inputs),
-            sex: read.inputs.sex,
-            markers: read.markers,
-            muscles: muscles ?? lens.muscles
-        )
-        withAnimation(reduceMotion ? nil : theme.motion.numberRoll) { fresh = snapshot }
-        LongevitySnapshotStore.shared.save(body: snapshot)
-    }
-
-    /// Muscle freshness from the last month of workouts. Nil when Health
-    /// could not be read.
-    private func muscleReadings() async -> [SomaMuscleReading]? {
-#if DEBUG
-        if EnvironmentReport.usesPreview { return MuscleFreshness.preview }
-#endif
-        guard let history = await health.fitnessHistory(days: Int(MuscleFreshness.days)) else { return nil }
-        return MuscleFreshness.readings(history.workouts, now: .now)
-    }
-}
-
-/// The reading cards, one to a row on a phone (each sets its value beside
-/// its line, which needs the width), two or more side by side where the
-/// page is wide enough.
-private struct BodyTileGrid<Content: View>: View {
-    @ViewBuilder let content: Content
-
-    @Environment(\.somaTheme) private var theme
-
-    var body: some View {
-        let spacing = theme.metrics.cardSpacing
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: theme.metrics.bodyReadingCardMinWidth), spacing: spacing)], spacing: spacing) {
-            content
-        }
-    }
-}
-
-/// The biomarkers as quiet rows on one card, each the same height (its
-/// name, where it sits, its month as a small line, the value), and one way
-/// to add to them: a blood test read on the phone, or a reading written to
-/// Health where Health lets an app write it.
-private struct BodyBiomarkersSection: View {
-    let specs: [BodyBiomarkerSpec]
-    let marker: (BodyBiomarkerSpec) -> BodyBiomarker
-
-    @Environment(\.somaTheme) private var theme
-    @State private var adding: BodyAddition?
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: theme.metrics.cardSpacing) {
-            HStack(alignment: .center) {
-                Text("Biomarkers")
-                    .somaFont(theme.typography.headline)
-                    .foregroundStyle(theme.colors.inkPrimary.color)
-                    .accessibilityAddTraits(.isHeader)
-                Spacer(minLength: theme.metrics.cardSpacing)
-                Menu {
-                    ForEach(BodyAddition.offered) { addition in
-                        Button(addition.title, systemImage: addition.symbol) { adding = addition }
-                    }
-                } label: {
-                    SomaQuietPill("Add", systemImage: "plus")
-                }
-                .menuStyle(.button)
-                .buttonStyle(.plain)
-                .accessibilityLabel("Add to biomarkers")
-            }
-
-            SomaBrowseGroup(specs, hasGlyphs: false) { spec in
-                let marker = marker(spec)
-                BodyMarkerLink(spec: spec) {
-                    SomaReadingRow(
-                        title: marker.title,
-                        caption: marker.cue,
-                        value: marker.value,
-                        unit: marker.unit.isEmpty ? nil : marker.unit,
-                        week: marker.days,
-                        aspect: .body,
-                        status: marker.status.reading
-                    )
-                }
-            }
-        }
-        .sheet(item: $adding) { addition in
-            switch addition {
-            case .bloodTest: AddBloodTestSheet()
-            case .log(let kind): LabLogSheet(kind: kind)
-            }
-        }
-    }
-}
-
-extension BodyBiomarkerSpec: Identifiable {
-    var id: String { rawValue }
-}
-
-/// What the Biomarkers section offers to add.
-enum BodyAddition: Identifiable, Hashable {
-    /// A lab's blood panel: photographed, imported or typed, read on the phone.
-    case bloodTest
-    /// One reading written to Apple Health.
-    case log(LabLogSheet.Kind)
-
-    var id: String {
-        switch self {
-        case .bloodTest: "blood"
-        case .log(let kind): "log.\(kind)"
-        }
-    }
-
-    var title: LocalizedStringResource {
-        switch self {
-        case .bloodTest: "Blood test"
-        case .log(.weight): "Weight"
-        case .log(.pressure): "Blood pressure"
-        case .log(.leanMass): "Lean mass"
-        case .log(.glucose): "Blood glucose"
-        }
-    }
-
-    var symbol: String {
-        switch self {
-        case .bloodTest: "drop"
-        case .log(.weight): "scalemass"
-        case .log(.pressure): "heart.text.square"
-        case .log(.leanMass): "figure.strengthtraining.traditional"
-        case .log(.glucose): "chart.line.uptrend.xyaxis"
-        }
-    }
-
-    /// A blood test always; a reading only where this build writes to
-    /// Health, since a reading kept nowhere else would be lost.
-    static func offered(canWrite: Bool) -> [BodyAddition] {
-        [.bloodTest] + (canWrite ? [.log(.weight), .log(.pressure), .log(.leanMass), .log(.glucose)] : [])
-    }
-
-    @MainActor
-    static var offered: [BodyAddition] { offered(canWrite: LabHealthWriter.canWrite) }
-}
-
-/// Fitness age as a tile: the age, how it sits against yours, and the age
-/// day by day as the watch's VO2 max moved.
-private struct BodyFitnessAgeTile: View {
-    let stat: BodyFitnessAge.Stat
-    let days: [Double?]
-
-    var body: some View {
-        SomaTrendTile(
-            "Fitness age",
-            value: stat.value,
-            unit: stat.value == nil ? nil : "years",
-            status: .none,
-            cue: stat.cue.map { LocalizedStringResource(stringLiteral: $0) },
-            values: days,
-            hue: .activity
-        )
+    private func ranked(_ specs: [BodyBiomarkerSpec], in state: LongevityBodyState) -> [BodyBiomarkerSpec] {
+        InsightEngine.sortedBySeverity(specs) { state.markers[$0]?.insight.severity ?? 0 }
     }
 }
 
@@ -345,6 +210,7 @@ private struct BodyMarkerLink<Label: View>: View {
             NavigationLink(value: VaultRoute.dataType(BodyDataType(metric))) {
                 label.contentShape(.rect)
             }
+            .zoomSource(VaultRoute.dataType(BodyDataType(metric)))
             .buttonStyle(.somaGlassPress)
         } else {
             label
@@ -352,7 +218,163 @@ private struct BodyMarkerLink<Label: View>: View {
     }
 }
 
-/// A titled group on the Body lens, such as "Other Biomarkers".
+/// The Rhythm and balance section: AFib History and the heart notifications
+/// as one tile, walking steadiness and falls as the other. Each opens its
+/// page, and each is left out when its readings are empty.
+private struct BodyRhythmMobilityTiles: View {
+    let tiles: [RhythmMobilityTile]
+    let readings: RhythmMobilityReadings
+
+    @Environment(\.somaTheme) private var theme
+
+    var body: some View {
+        let rhythm = readings.rhythm()
+        let mobility = readings.mobility()
+
+        VStack(spacing: theme.metrics.cardSpacing) {
+            ForEach(tiles, id: \.self) { tile in
+                switch tile {
+                case .heartRhythm:
+                    let latestWeek = rhythm.weeks.last
+                    link(latestWeek == nil ? .rhythmEvents : .afibBurden) {
+                        SomaTrendRow(
+                            "Heart rhythm",
+                            value: latestWeek.map { "\(HeartRhythmSummary.burdenText($0.burden)) in AFib" }
+                                ?? "\(rhythm.events.count) \(rhythm.events.count == 1 ? "notification" : "notifications")",
+                            cue: LocalizedStringResource(stringLiteral: latestWeek == nil ? "This year" : "AFib History, latest week"),
+                            values: rhythm.weeks.suffix(30).map { Optional($0.burden * 100) },
+                            hue: .heart,
+                            chart: .bars
+                        )
+                    }
+                case .mobility:
+                    link(.mobility) {
+                        SomaTrendRow(
+                            "Mobility",
+                            value: mobility.steadiness.map { "\(Int(($0 * 100).rounded()))% steady" }
+                                ?? "\(mobility.fallsLast12Months) \(mobility.fallsLast12Months == 1 ? "fall" : "falls")",
+                            status: mobility.steadiness == nil ? .none
+                                : mobility.level == .ok ? .normal : .below,
+                            cue: mobility.fallsLast12Months > 0
+                                ? LocalizedStringResource(stringLiteral: "\(mobility.fallsLast12Months) \(mobility.fallsLast12Months == 1 ? "fall" : "falls") this year")
+                                : nil,
+                            values: mobility.history.suffix(30).map { Optional($0.value * 100) },
+                            hue: .mobility
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private func link<Label: View>(_ route: MetricRoute, @ViewBuilder label: () -> Label) -> some View {
+        NavigationLink(value: route) {
+            label().contentShape(.rect)
+        }
+        .zoomSource(route)
+        .buttonStyle(.somaGlassPress)
+    }
+
+}
+
+/// The Glucose tile under the rhythm tiles: a monitor's time in range over
+/// the fortnight, a bar for each of the last seven days, opening the
+/// monitor's page (`LabRoute.cgm`). Only drawn when Health holds a
+/// continuous trace (``GlucoseTile``).
+private struct BodyGlucoseTile: View {
+    let tile: GlucoseTile
+
+    var body: some View {
+        NavigationLink(value: LabRoute.cgm) {
+            SomaTrendRow(
+                "Glucose",
+                value: tile.timeInRange.map { "\(Int(($0 * 100).rounded()))% in range" },
+                cue: "Time in range, 14 days",
+                values: tile.days,
+                hue: .nutrition,
+                chart: .bars
+            )
+            .contentShape(.rect)
+        }
+        .zoomSource(LabRoute.cgm)
+        .buttonStyle(.somaGlassPress)
+    }
+}
+
+/// The Lab section: blood, urine, gut, genome and imaging and functional tests,
+/// each a card with its latest date and a headline (markers to watch,
+/// variants read, tests on file) that opens its page. Owner's call,
+/// 2026-10-24: a tile per kind of test here, and each one can also be added
+/// from Track's add grid.
+private struct BodyLabTiles: View {
+    @Environment(\.somaTheme) private var theme
+
+    private var blood: BloodPanelStore { .shared }
+    private var urine: UrinePanelStore { .shared }
+    private var genome: GenomeStore { .shared }
+    private var functional: FunctionalResultStore { .shared }
+    private var stool: StoolPanelStore { .shared }
+
+    var body: some View {
+        VStack(spacing: theme.metrics.cardSpacing) {
+            tile(.bloodPanel, symbol: "drop.fill", title: "Blood", hue: .vitals,
+                 date: blood.latest?.date.labCompactDay, caption: blood.latest.map { "\($0.markers.count) markers" },
+                 value: blood.latest.map { panel in "\(panel.markers.filter { LabMath.reading($0).isOutside }.count)" },
+                 unit: "to watch",
+                 bars: blood.panels.prefix(7).reversed().map { panel in Double(panel.markers.filter { LabMath.reading($0).isOutside }.count) })
+            tile(.urine, symbol: "flask.fill", title: "Urine", hue: .nutrition,
+                 date: urine.latest?.date.labCompactDay,
+                 caption: urine.latest.map { $0.kind == .dipstick ? "Strip, approximate" : "\($0.values.count) markers" },
+                 value: urine.latest.map { "\($0.flagged.count)" },
+                 unit: "to watch",
+                 bars: urine.panels.prefix(7).reversed().map { Double($0.flagged.count) })
+            // Green like the Gut aspect: nutrition is the health hue nearest it.
+            tile(.stool, symbol: "leaf.fill", title: "Gut", hue: .nutrition,
+                 date: stool.latest?.date.labCompactDay,
+                 caption: stool.latest.map { $0.kind == .microbiomeKit ? "Microbiome kit" : "\($0.values.count) markers" },
+                 value: stool.latest.map { "\($0.flagged.count)" },
+                 unit: "to watch",
+                 bars: stool.panels.prefix(7).reversed().map { Double($0.flagged.count) })
+            tile(.genome, symbol: "point.3.filled.connected.trianglepath.dotted", title: "Genome", hue: .symptoms,
+                 date: genome.result?.importedAt.labCompactDay,
+                 caption: genome.result.map { "\($0.provider.title), \($0.snpsRead.formatted(.number.notation(.compactName))) read" },
+                 value: genome.result.map { "\($0.found.count)" },
+                 unit: "variants",
+                 bars: [])
+            // One card for the six imaging and functional tests: each is
+            // rare and one off, so six cards would bury blood and urine.
+            tile(.functional, symbol: "figure.strengthtraining.functional", title: "Tests", hue: .activity,
+                 date: functional.latest?.date.labCompactDay,
+                 caption: functional.latest.map { $0.kind.title },
+                 value: functional.latest.map { _ in "\(functional.kinds.count)" },
+                 unit: functional.kinds.count == 1 ? "test" : "tests",
+                 bars: [])
+        }
+    }
+
+    private func tile(_ route: LabRoute, symbol: String, title: LocalizedStringResource, hue: SomaHealthHue,
+                      date: String?, caption: String?, value: String?, unit: String, bars: [Double?]) -> some View {
+        NavigationLink(value: route) {
+            // The same row as the biomarkers above it (owner, 2026-10-25):
+            // the title, what the latest test holds, when it was, and the
+            // tests over time on the trailing edge.
+            SomaTrendRow(
+                title,
+                value: value.map { "\($0) \(unit)" },
+                cue: LocalizedStringResource(stringLiteral: caption.map { text in date.map { "\(text) \u{00B7} \($0)" } ?? text } ?? "Nothing added yet"),
+                // A shape needs a few tests: one or two draw as a block.
+                values: bars.count >= 3 ? bars : [],
+                hue: hue,
+                chart: .bars
+            )
+            .contentShape(.rect)
+        }
+        .zoomSource(route)
+        .buttonStyle(.somaGlassPress)
+    }
+}
+
+/// A titled group on the Body lens, the way the reference design heads "Other Biomarkers".
 private struct BodySection<Content: View>: View {
     let title: LocalizedStringResource
     let content: Content
@@ -375,8 +397,100 @@ private struct BodySection<Content: View>: View {
     }
 }
 
-/// The rows under the cards: Cardio and Strength, the blood panel and the lab
-/// pages.
+/// Fitness age over visits. Built from the pod, so it is empty until the
+/// first visit, with your age already drawn as the line to read it against.
+private struct BodyFitnessAgeCard: View {
+    let age: Int?
+
+    var body: some View {
+        TileLink(value: PulseRoute.category("Body Measurements")) {
+            SomaChartCard(
+                eyebrow: "Fitness age",
+                value: nil,
+                unit: "give or take",
+                note: "Your first visit to the pod draws this."
+            ) {
+                BodyFitnessAgeFrame(age: age)
+            }
+        }
+    }
+}
+
+/// Every muscle front and back, filled by how rested it is, as the reference design's Muscle
+/// Groups page draws it, with the three states as a legend under the figure.
+/// Read from the last month of workouts (``MuscleFreshness``) with the rest
+/// of the lens, so it fills in the same moment as the tiles.
+private struct BodyMapCard: View {
+    let states: [SomaMuscle: SomaMuscleState]
+
+    @Environment(\.somaTheme) private var theme
+
+    var body: some View {
+        let metrics = theme.metrics
+
+        VStack(alignment: .leading, spacing: metrics.cardSpacing) {
+            Text("Muscle freshness")
+                .somaFont(theme.typography.cardTitle)
+                .fontWeight(.semibold)
+                .foregroundStyle(theme.colors.inkPrimary.color)
+            SomaMuscleMap(states)
+                .frame(maxWidth: .infinity)
+            // Roomy, or packed tight when the card shares a row: a column
+            // of the unfolded screen of a foldable broke "Recovered" in two.
+            ViewThatFits(in: .horizontal) {
+                legend(isTight: false)
+                legend(isTight: true)
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .padding(metrics.cardPadding)
+        .background(theme.colors.surface.color, in: .rect(cornerRadius: metrics.cardCornerRadius, style: .continuous))
+    }
+
+    private func legend(isTight: Bool) -> some View {
+        HStack(spacing: isTight ? theme.metrics.spaceXS : theme.metrics.cardSpacing) {
+            ForEach([SomaMuscleState.recovered, .fatigued, .depleted], id: \.self) { state in
+                BodyLegendChip(state: state, isTight: isTight)
+            }
+        }
+    }
+}
+
+/// A dot and a word, as the reference design's filter chips under the figure.
+private struct BodyLegendChip: View {
+    let state: SomaMuscleState
+    var isTight = false
+
+    @Environment(\.somaTheme) private var theme
+
+    var body: some View {
+        HStack(spacing: theme.metrics.spaceS) {
+            Circle()
+                .fill(color)
+                .frame(width: 7, height: 7)
+            Text(state.title)
+                .somaFont(theme.typography.caption)
+                .foregroundStyle(theme.colors.inkPrimary.color)
+                .lineLimit(1)
+                .fixedSize()
+        }
+        .padding(.horizontal, isTight ? theme.metrics.spaceS : theme.metrics.spaceM)
+        .padding(.vertical, theme.metrics.spaceS)
+        .background(theme.colors.surfaceRecessed.color, in: .capsule)
+    }
+
+    private var color: Color {
+        switch state {
+        case .recovered: theme.colors.statusNormal.color
+        case .fatigued: theme.colors.statusOut.color
+        case .depleted: theme.colors.statusAlert.color
+        case .none: theme.colors.inkSecondary.color
+        }
+    }
+}
+
+/// The rows under the cards: Cardio and Strength, the blood panel, the lab
+/// pages, and mouth and teeth.
 private struct BodyMoreRows: View {
     let vo2Max: String?
 
@@ -390,12 +504,16 @@ private struct BodyMoreRows: View {
         let route: LongevityRoute?
         /// A Body lab page (lane 4), pushed through `journeyDestinations()`.
         var lab: LabRoute? = nil
+        /// A metric page, pushed the same way.
+        var metric: MetricRoute? = nil
+        /// A page Today also opens (the cycle), pushed the same way.
+        var home: HomeRoute? = nil
     }
 
     private var rows: [Row] {
         [
             Row(id: "cardio", title: "Cardio", detail: "VO2 max \(vo2Max ?? "-")", route: .cardio),
-            Row(id: "strength", title: "Strength", detail: nil, route: .strength),
+            Row(id: "strength", title: "Strength", detail: "Grip -", route: .strength),
             Row(id: "bioage", title: "Biological age", detail: nil, route: nil, lab: .biologicalAge),
             Row(id: "blood", title: "Blood panel", detail: BloodPanelStore.shared.latest?.date.labDay ?? "-", route: nil, lab: .bloodPanel),
             Row(id: "risk", title: "Cardiometabolic risk", detail: nil, route: nil, lab: .risk),
@@ -405,8 +523,14 @@ private struct BodyMoreRows: View {
             Row(id: "lean", title: "Lean body mass", detail: nil, route: nil, lab: .leanMass),
             Row(id: "pressure", title: "Blood pressure", detail: nil, route: nil, lab: .bloodPressure),
             Row(id: "glucose", title: "Blood glucose", detail: nil, route: nil, lab: .glucose),
+            Row(id: "oral", title: "Mouth and teeth", detail: nil, route: nil, metric: .oral),
             Row(id: "skin", title: "Skin report", detail: nil, route: nil, lab: .skin),
-        ]
+        ] + cycleRow
+    }
+
+    /// The cycle, only for a person who tracks one (`CycleVisibility`).
+    private var cycleRow: [Row] {
+        CycleVisibility.tracksCycle ? [Row(id: "cycle", title: "Cycle", detail: nil, route: nil, home: .cycle)] : []
     }
 
     var body: some View {
@@ -429,6 +553,20 @@ private struct BodyMoreRows: View {
                         SomaBrowseRow(title: row.title, detail: row.detail)
                             .contentShape(.rect)
                             .zoomSource(lab)
+                    }
+                    .buttonStyle(.plain)
+                } else if let metric = row.metric {
+                    NavigationLink(value: metric) {
+                        SomaBrowseRow(title: row.title, detail: row.detail)
+                            .contentShape(.rect)
+                            .zoomSource(metric)
+                    }
+                    .buttonStyle(.plain)
+                } else if let home = row.home {
+                    NavigationLink(value: home) {
+                        SomaBrowseRow(title: row.title, detail: row.detail)
+                            .contentShape(.rect)
+                            .zoomSource(home)
                     }
                     .buttonStyle(.plain)
                 } else {

@@ -174,7 +174,7 @@ private struct WaterFigure: View {
     var body: some View {
         let parts = LogText.waterParts(ml: model.tally.waterMl)
         VStack(alignment: .leading, spacing: 0) {
-            ValueLabel(LogText.waterLabel)
+            ValueLabel(LogText.waterLabel, aspect: .mind)
             NumberWithUnit(text: parts.number, unit: parts.unit, number: theme.typography.widgetHero, freshness: freshness)
         }
     }
@@ -241,7 +241,7 @@ public struct LogSmall: View {
                 VStack(alignment: .leading, spacing: metrics.widgetLabelSpacing) {
                     WaterFigure(model: model, freshness: freshness)
                         .modifier(LogReading(model: model))
-                    ThinBar(fraction: model.waterFraction, dimmed: freshness != .fresh)
+                    ThinBar(fraction: model.waterFraction, dimmed: freshness != .fresh, aspect: .mind)
                         .frame(height: metrics.widgetBarHeight)
                     Spacer(minLength: 0)
                     HStack(alignment: .bottom) {
@@ -360,7 +360,7 @@ public struct LogLarge: View {
                     VStack(alignment: .leading, spacing: metrics.widgetBlockSpacing) {
                         VStack(alignment: .leading, spacing: metrics.widgetLabelSpacing) {
                             WaterFigure(model: model, freshness: freshness)
-                            ThinBar(fraction: model.waterFraction, dimmed: freshness != .fresh)
+                            ThinBar(fraction: model.waterFraction, dimmed: freshness != .fresh, aspect: .mind)
                                 .frame(height: metrics.widgetBarHeight)
                         }
                         HStack(alignment: .top, spacing: metrics.widgetColumnSpacing) {

@@ -27,6 +27,10 @@ struct PulseInsightItem: Equatable, Identifiable, Sendable {
     var metric: InsightMetric
     /// The latest value with its unit, or nil for a dash.
     var value: String?
+    /// The latest value alone, as ``value`` prints it, and its unit apart,
+    /// for a surface that sets the two in different sizes.
+    var number: String?
+    var unit: String = ""
     /// The last thirty days, oldest first.
     var days: [Double?]
     var insight: Insight
@@ -73,6 +77,8 @@ struct PulseInsights: Equatable, Sendable {
                 return PulseInsightItem(
                     metric: metric,
                     value: marker.value.map { marker.unit.isEmpty ? $0 : "\($0) \(marker.unit)" },
+                    number: marker.value,
+                    unit: marker.unit,
                     days: marker.days,
                     insight: marker.insight,
                     cue: marker.cue,
@@ -89,6 +95,7 @@ struct PulseInsights: Equatable, Sendable {
             return PulseInsightItem(
                 metric: metric,
                 value: last.map { PulseWording(calendar: calendar, locale: .current).clock($0 * 3600) },
+                number: last.map { PulseWording(calendar: calendar, locale: .current).clock($0 * 3600) },
                 days: Array(nights.suffix(BodyBiomarkers.days)),
                 insight: insight,
                 cue: last == nil ? nil : insight.cue,
@@ -162,12 +169,14 @@ private struct PulseMovedRow: View {
             cue: nil,
             values: item.days,
             band: item.band,
-            hue: item.metric.hue
+            hue: item.metric.hue,
+            chart: MetricProfile.of(item.metric).chart == .bars ? .bars : .line
         )
         if let metric = HealthMetricCatalog.metric(for: item.metric.identifier) {
             NavigationLink(value: VaultRoute.dataType(BodyDataType(metric))) {
                 row.contentShape(.rect)
             }
+            .zoomSource(VaultRoute.dataType(BodyDataType(metric)))
             .buttonStyle(.somaGlassPress)
         } else {
             row

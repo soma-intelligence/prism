@@ -45,9 +45,8 @@ struct PhaseAlignmentPage: View {
                     VStack(alignment: .leading, spacing: theme.metrics.cardHeaderSpacing) {
                         Text("Next window")
                             .somaFont(theme.typography.eyebrow)
-                            .textCase(.uppercase)
                             .foregroundStyle(theme.colors.inkSecondary.color)
-                        HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        HStack(alignment: .firstTextBaseline, spacing: theme.metrics.spaceS) {
                             Text(ToolFormat.clock(hour: next.startHour))
                                 .somaFont(theme.typography.metric)
                                 .foregroundStyle(theme.colors.inkPrimary.color)

@@ -27,12 +27,6 @@ struct PulseTodayLayoutTests {
         #expect(stored.hidden.contains(.sleep))
     }
 
-    @Test("Without a night the sleep card has no line and no stages, so it says what it waits for")
-    func sleepCardWithoutANight() {
-        #expect(PulseSleepCard.night(nil) == nil)
-        #expect(PulseSleepCard.line(nil) == nil)
-    }
-
     @Test("The foot's grid holds the six aspects once each, and each opens its own page")
     func footOpensEveryAspect() {
         #expect(Set(HomeTodayFoot.order) == Set(SomaAspect.allCases))

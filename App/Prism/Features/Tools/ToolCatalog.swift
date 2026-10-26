@@ -137,7 +137,7 @@ enum ToolKind: String, CaseIterable, Identifiable, Hashable, Codable {
         case .sleepForecast, .napArchitect, .smartAlarm:
             ("It needs seven recorded nights to know your usual.", "Switch it off here. Nothing is deleted from Health.")
         case .sunBudget, .skinForecast:
-            ("It needs the weather where you are.", "Until Soma has a weather source, the numbers wait as dashes.")
+            ("It needs the weather where you are.", "It reads it for the place the Environment lens knows; until there is one, the numbers wait as dashes.")
         default:
             ("It starts from what you give it.", "Switch it off here; what you entered stays on this phone.")
         }

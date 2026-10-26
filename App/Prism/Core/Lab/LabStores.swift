@@ -17,10 +17,15 @@ import Observation
 /// Where the lab files live. Nil in previews and tests, which keep memory only.
 nonisolated enum LabFiles {
     static func url(_ name: String) -> URL? {
+        folder?.appending(path: name)
+    }
+
+    /// Application Support/lab, made on first use.
+    static var folder: URL? {
         guard let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { return nil }
         let folder = base.appending(path: "lab", directoryHint: .isDirectory)
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        return folder.appending(path: name)
+        return folder
     }
 
     static func load<T: Decodable>(_ type: T.Type, from url: URL?) -> T? {
@@ -59,7 +64,16 @@ extension JSONDecoder {
 @MainActor
 @Observable
 final class BloodPanelStore {
-    static let shared = BloodPanelStore(url: LabFiles.url("blood-panels.json"))
+    static let shared: BloodPanelStore = {
+        #if DEBUG
+        if LabFixtures.isOn {
+            let store = BloodPanelStore(url: nil)
+            LabFixtures.bloodPanels.forEach(store.save)
+            return store
+        }
+        #endif
+        return BloodPanelStore(url: LabFiles.url("blood-panels.json"))
+    }()
 
     /// Newest first, by the day the blood was drawn.
     private(set) var panels: [BloodPanel]
@@ -82,6 +96,12 @@ final class BloodPanelStore {
     func delete(_ panel: BloodPanel) {
         panels.removeAll { $0.id == panel.id }
         LabFiles.save(panels, to: url)
+    }
+
+    /// Every blood panel gone, the file with them.
+    func eraseAll() {
+        panels = []
+        if let url { try? FileManager.default.removeItem(at: url) }
     }
 
     /// Every reading of one marker, oldest first.

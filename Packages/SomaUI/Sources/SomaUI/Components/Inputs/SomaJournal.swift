@@ -12,13 +12,16 @@ import SwiftUI
 
 // MARK: - Quick add tile
 
-/// One thing to add: its line glyph on a softly tinted square, the name under
-/// it, on a plain card. Four sit in a row; the colour stays in the badge, so a
-/// grid of them reads calm.
+/// One thing to add: its glyph in its hue on a plain tile, the name under
+/// it. Four sit in a row, the way the + menu of a journal
+/// lays its actions out.
 public struct SomaGlyphTile: View {
     private let title: String
     private let glyph: SomaTrackGlyph.Kind
     private let tone: SomaTrackTone?
+    /// An SF Symbol drawn instead of the line glyph, for the entries the
+    /// glyph set does not draw (a cycle day, an appointment).
+    private let symbol: String?
     private let action: () -> Void
 
     @Environment(\.somaTheme) private var theme
@@ -29,15 +32,65 @@ public struct SomaGlyphTile: View {
         self.title = title
         self.glyph = glyph
         self.tone = tone
+        self.symbol = nil
+        self.action = action
+    }
+
+    /// A tile led by an SF Symbol in ink. The hue names the entry it adds;
+    /// the tile itself stays uncoloured.
+    public init(_ title: String, symbol: String, hue: SomaHealthHue, action: @escaping () -> Void) {
+        self.title = title
+        self.glyph = .tag
+        self.tone = nil
+        self.symbol = symbol
         self.action = action
     }
 
     public var body: some View {
+        if let symbol {
+            symbolTile(symbol)
+        } else {
+            glyphTile
+        }
+    }
+
+    private func symbolTile(_ symbol: String) -> some View {
+        let metrics = theme.metrics
+        let shape = RoundedRectangle(cornerRadius: metrics.journalTileCornerRadius, style: .continuous)
+
+        return Button(action: action) {
+            VStack(alignment: .leading, spacing: 0) {
+                Image(systemName: symbol)
+                    .font(.system(size: metrics.journalTileGlyph * 0.85, weight: .light))
+                    .foregroundStyle(theme.colors.inkPrimary.color)
+                    .frame(height: metrics.journalTileGlyph * 1.2, alignment: .leading)
+                Spacer(minLength: metrics.spaceS)
+                Text(title)
+                    .somaFont(theme.typography.caption)
+                    .foregroundStyle(theme.colors.inkPrimary.color)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+            }
+            .padding(metrics.spaceM - 2)
+            .frame(maxWidth: .infinity, minHeight: metrics.journalTileHeight, alignment: .leading)
+            .background(shape.fill(theme.colors.surface.color))
+            .overlay(shape.strokeBorder(theme.colors.inkPrimary.color.opacity(metrics.hairlineOpacity), lineWidth: 0.5))
+            .contentShape(shape)
+        }
+        .buttonStyle(.somaGlassPress)
+        .accessibilityLabel(Text(title))
+    }
+
+    private var glyphTile: some View {
         let metrics = theme.metrics
         let colors = theme.colors
         let shape = RoundedRectangle(cornerRadius: metrics.journalTileCornerRadius, style: .continuous)
 
-        Button(action: action) {
+        // The glyph in ink at a light weight, top leading, and the name under
+        // it on the same edge, the way a widget sets a small tile. No colour
+        // at all: a grid of coloured glyphs, then of coloured dots, read as a
+        // template (owner, 2026-10-24). The hue is kept for the entry itself.
+        return Button(action: action) {
             VStack(spacing: metrics.journalTileLabelSpacing) {
                 SomaTrackGlyph(glyph, tone: tone, style: .badge)
                 Text(title)
@@ -47,9 +100,11 @@ public struct SomaGlyphTile: View {
                     .minimumScaleFactor(0.75)
             }
             .padding(.horizontal, metrics.scoreLabelSpacing)
-            .frame(maxWidth: .infinity, minHeight: metrics.journalTileHeight + 10)
-            .background(shape.fill(colors.surface.color))
-            .overlay(shape.strokeBorder(colors.inkPrimary.color.opacity(metrics.hairlineOpacity), lineWidth: 0.5))
+            .frame(maxWidth: .infinity, minHeight: metrics.journalTileHeight)
+            // One plain surface for every tile, the way Apple Health sets its
+            // categories: the hue rides the glyph alone. A wash of each hue
+            // behind each tile turned the grid into a rainbow.
+            .background(shape.fill(theme.colors.surface.color))
             .contentShape(shape)
         }
         .buttonStyle(.somaGlassPress)
@@ -131,6 +186,143 @@ public struct SomaHabitMark: View {
             }
     }
 }
+
+// MARK: - Answer (three glyphs)
+
+/// A yes or no answer on the trailing edge of a habit card, the way the reference design
+/// and the earlier app draw it: three glyphs in one graphite capsule, a cross, a dash
+/// and a check. The chosen one sits in a raised pill a step lighter than the
+/// track, and the pill slides between them.
+///
+/// The dash is the resting place: an unanswered day sits on it, and choosing
+/// it clears the answer. A check takes the row's hue, because a yes is what
+/// the row is about; a cross takes the alert colour held low, a real answer
+/// that does not shout. Every change lands with a selection haptic.
+public struct SomaTriStateControl: View {
+    @Binding private var value: Bool?
+    private let hue: SomaHealthHue
+
+    @Namespace private var pill
+    @Environment(\.somaTheme) private var theme
+    @Environment(\.colorScheme) private var scheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    public init(value: Binding<Bool?>, hue: SomaHealthHue) {
+        self._value = value
+        self.hue = hue
+    }
+
+    /// The three answers in the order they are drawn: no, none, yes.
+    public static let order: [Bool?] = [false, nil, true]
+
+    /// What VoiceOver says the answer is.
+    public static func spokenValue(_ value: Bool?) -> String {
+        switch value {
+        case true?: "Yes"
+        case false?: "No"
+        case nil: "Not answered"
+        }
+    }
+
+    /// The answer one step along the control, `steps` to the right when
+    /// positive: what a swipe up or down does under VoiceOver. Held at the
+    /// ends rather than wrapping, the way an adjustable control behaves.
+    public static func step(_ value: Bool?, by steps: Int) -> Bool? {
+        let index = order.firstIndex(of: value) ?? 1
+        return order[min(max(index + steps, 0), order.count - 1)]
+    }
+
+    public var body: some View {
+        let metrics = theme.metrics
+
+        HStack(spacing: 0) {
+            ForEach(Self.order.indices, id: \.self) { index in
+                segment(Self.order[index])
+            }
+        }
+        .padding(metrics.journalChoiceInset)
+        .background(Capsule().fill(theme.colors.surfaceRecessed.color))
+        .sensoryFeedback(.selection, trigger: value)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("Answer"))
+        .accessibilityValue(Text(Self.spokenValue(value)))
+        .accessibilityAdjustableAction { direction in
+            switch direction {
+            case .increment: choose(Self.step(value, by: 1))
+            case .decrement: choose(Self.step(value, by: -1))
+            @unknown default: break
+            }
+        }
+    }
+
+    private func choose(_ answer: Bool?) {
+        guard answer != value else { return }
+        if reduceMotion { value = answer } else { withAnimation(theme.motion.selection) { value = answer } }
+    }
+
+    private func segment(_ answer: Bool?) -> some View {
+        let metrics = theme.metrics
+        let isChosen = value == answer
+
+        return Button {
+            choose(answer)
+        } label: {
+            Image(systemName: Self.symbol(answer))
+                .font(.system(size: metrics.journalChoiceGlyph, weight: .semibold))
+                .foregroundStyle(glyphColor(answer, isChosen: isChosen))
+                .frame(width: metrics.journalChoiceWidth, height: metrics.journalChoiceHeight)
+                .background {
+                    if isChosen {
+                        raisedPill.matchedGeometryEffect(id: "pill", in: pill)
+                    }
+                }
+                // Taller to a thumb than to the eye: the reach is added for
+                // the hit test and taken back for the layout.
+                .padding(.vertical, metrics.journalChoiceReach)
+                .contentShape(.rect)
+                .padding(.vertical, -metrics.journalChoiceReach)
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// The chosen segment's pill: a wash of ink over the track on the dark
+    /// ground, the card's own surface with a soft shadow on the light one.
+    @ViewBuilder
+    private var raisedPill: some View {
+        let metrics = theme.metrics
+        let colors = theme.colors
+        if scheme == .dark {
+            Capsule()
+                .fill(colors.inkPrimary.color.opacity(metrics.journalChoiceLiftOpacity))
+                .overlay(Capsule().strokeBorder(colors.inkPrimary.color.opacity(metrics.hairlineOpacity), lineWidth: 0.5))
+        } else {
+            Capsule()
+                .fill(colors.surface.color)
+                .shadow(color: colors.inkPrimary.color.opacity(metrics.journalChoiceShadowOpacity),
+                        radius: metrics.journalChoiceShadowRadius, y: 0.5)
+        }
+    }
+
+    private static func symbol(_ answer: Bool?) -> String {
+        switch answer {
+        case true?: "checkmark"
+        case false?: "xmark"
+        case nil: "minus"
+        }
+    }
+
+    private func glyphColor(_ answer: Bool?, isChosen: Bool) -> Color {
+        let metrics = theme.metrics
+        let colors = theme.colors
+        guard isChosen else { return colors.inkSecondary.color.opacity(metrics.journalChoiceIdleOpacity) }
+        switch answer {
+        case true?: return hue.color
+        case false?: return colors.statusAlert.color.opacity(metrics.journalChoiceNoOpacity)
+        case nil: return colors.inkPrimary.color
+        }
+    }
+}
+
 
 // MARK: - Answer switch
 
@@ -657,7 +849,8 @@ public struct SomaFeelingScale: View {
 
     /// - Parameters:
     ///   - value: 0...6, or nil until chosen.
-    ///   - names: what each stop is called, for VoiceOver.
+    ///   - names: what each stop is called; the first and last also label
+    ///     the ends.
     public init(value: Binding<Int?>, names: [String]) {
         self._value = value
         self.names = names
@@ -670,6 +863,7 @@ public struct SomaFeelingScale: View {
 
     public var body: some View {
         let metrics = theme.metrics
+        let colors = theme.colors
 
         HStack(spacing: metrics.journalFeelStopSpacing) {
             SomaTrackGlyph(.cloud, tone: nil, style: .caption)
@@ -681,33 +875,29 @@ public struct SomaFeelingScale: View {
                 } label: {
                     stopView(stop)
                 }
-                .buttonStyle(.somaGlassPressDim)
-                .accessibilityLabel(Text(stop < names.count ? names[stop] : "\(stop + 1)"))
-                .accessibilityAddTraits(value == stop ? .isSelected : [])
             }
             SomaTrackGlyph(.daylight, tone: nil, style: .caption)
                 .opacity(0.6)
         }
-        .frame(minHeight: metrics.minimumTapTarget)
+        .sensoryFeedback(.selection, trigger: value)
     }
 
     private func stopView(_ stop: Int) -> some View {
         let metrics = theme.metrics
-        let hue = Self.color(stop, theme: theme)
+        let colors = theme.colors
         let isChosen = value == stop
-        let idle = value == nil ? metrics.journalFeelRestOpacity : metrics.journalFeelIdleOpacity
+        let rest = metrics.aspectDotSize * 1.6
+        let chosen = metrics.journalFeelStopHeight * 0.8
 
-        return RoundedRectangle(cornerRadius: metrics.journalFeelStopHeight / 3.5, style: .continuous)
-            .fill(hue.opacity(isChosen ? 1 : idle))
-            .overlay {
-                if isChosen {
-                    Circle()
-                        .fill(theme.colors.surface.color)
-                        .frame(width: metrics.aspectDotSize * 1.4, height: metrics.aspectDotSize * 1.4)
-                }
-            }
-            .frame(height: isChosen ? metrics.journalFeelStopHeight : metrics.journalFeelStopHeight * 0.72)
-            .frame(maxWidth: .infinity, minHeight: metrics.minimumTapTarget)
-            .contentShape(.rect)
+        return ZStack {
+            Circle()
+                .fill(colors.surface.color)
+                .frame(width: (isChosen ? chosen : rest) + 6, height: (isChosen ? chosen : rest) + 6)
+            Circle()
+                .fill(isChosen ? Self.color(stop, theme: theme) : colors.inkPrimary.color.opacity(0.22))
+                .frame(width: isChosen ? chosen : rest, height: isChosen ? chosen : rest)
+        }
+        .frame(maxWidth: .infinity, minHeight: metrics.minimumTapTarget)
+        .contentShape(.rect)
     }
 }

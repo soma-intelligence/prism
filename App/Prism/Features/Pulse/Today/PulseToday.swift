@@ -16,43 +16,21 @@ import SomaUI
 /// from.
 struct PulseToday: Equatable {
     /// One value in the row under the orb.
-    struct Reading: Equatable {
+    struct Reading: Equatable, Codable {
         var value: String?
         var trend: SomaTrend?
     }
 
     /// One thing to do next, and the numbers that ask for it.
-    struct Move: Equatable, Identifiable {
+    struct Move: Equatable, Identifiable, Codable {
         var id: SomaAspect { aspect }
         var aspect: SomaAspect
         var title: String
         var reason: String
-        /// The engine's id for the move, which the history keys on.
-        var moveID: String = ""
-        /// The two words the orb wears.
-        var orb: String = ""
-        /// One line from the evidence: what asked for the move.
-        var why: String = ""
-
-        init(aspect: SomaAspect, title: String, reason: String, moveID: String = "", orb: String = "", why: String = "") {
-            self.aspect = aspect
-            self.title = title
-            self.reason = reason
-            self.moveID = moveID
-            self.orb = orb
-            self.why = why
-        }
-
-        init(_ candidate: NextMoveCandidate) {
-            self.init(
-                aspect: candidate.aspect, title: candidate.title, reason: candidate.message,
-                moveID: candidate.id, orb: candidate.orbWord, why: candidate.why
-            )
-        }
     }
 
     /// The words of one aspect card.
-    struct Card: Equatable {
+    struct Card: Equatable, Codable {
         var value: String?
         var summary: String
     }
@@ -65,12 +43,6 @@ struct PulseToday: Equatable {
 
     var movesTitle: String
     var moves: [Move]
-    /// What the orb says now: the engine's winner, or the calm default. Nil
-    /// when nothing was read, so the orb claims nothing.
-    var cue: Move?
-    /// The calm default for this part of the day, for when every move has
-    /// been ticked off.
-    var steady: Move?
 
     var sleep: Reading
     var mind: Reading
@@ -93,29 +65,41 @@ struct PulseToday: Equatable {
     var bodyCard: Card
     var age: Int?
 
+    /// Steps counted today so far, by the watch or the phone.
+    var stepsToday: Double?
+
     /// Whether the store held anything at all for today.
     var hasData: Bool
+
+    /// Last night as the night pass draws it: nil until a night ended this
+    /// morning.
+    var night: Night?
+
+    /// Last night in words: bed and waking as clock times, time asleep, how
+    /// that sits against the usual, and where the night, a usual one and
+    /// midnight sit on a fixed stretch of clock, 0 to 1 of it.
+    struct Night: Equatable, Codable {
+        var bed: String
+        var woke: String
+        var asleep: String
+        var usual: String?
+        var span: ClosedRange<Double>
+        var usualSpan: ClosedRange<Double>?
+        var midnight: Double
+    }
 }
 
 extension PulseToday {
     /// The page for `inputs`.
-    ///
-    /// The moves and the orb's cue come from the Next move engine. `context`
-    /// carries what the person logged when the caller read it; without it the
-    /// engine reads Health alone.
     static func make(
         from inputs: PulseInputs,
         scores: SomaScores? = nil,
-        context: NextMoveContext? = nil,
-        history: NextMoveHistory = .empty,
         calendar: Calendar = .current,
         locale: Locale = .current
     ) -> PulseToday {
         PulseTodayBuilder(
             inputs: inputs,
             scores: scores,
-            context: context ?? NextMoveContext.make(inputs: inputs, scores: scores, calendar: calendar),
-            history: history,
             calendar: calendar,
             words: PulseWording(calendar: calendar, locale: locale)
         ).build()
@@ -126,8 +110,6 @@ extension PulseToday {
 private struct PulseTodayBuilder {
     let inputs: PulseInputs
     let scores: SomaScores?
-    let context: NextMoveContext
-    let history: NextMoveHistory
     let calendar: Calendar
     let words: PulseWording
 
@@ -141,7 +123,27 @@ private struct PulseTodayBuilder {
     func build() -> PulseToday {
         let nights = PulseNights.nights(from: inputs.sleep, calendar: calendar)
         let lastNight = nights.last { $0.day == today && $0.woke <= now }
+        let before = nights.filter { $0.day < today && $0.day >= day(-30) }
+        let usualSleep = before.count >= 3 ? PulseSignals.median(before.suffix(14).map(\.asleep)) : nil
+        let shortBy: TimeInterval? = {
+            guard let lastNight, let usualSleep, usualSleep - lastNight.asleep >= 45 * 60 else { return nil }
+            return usualSleep - lastNight.asleep
+        }()
+
+        // The scores' own HRV and baseline when recovery has them, so the
+        // sentence under the orb and the Recovery page quote the same two
+        // numbers: two HRVs for one morning is a reason to trust neither.
+        let ownVariability = heartRateVariability(since: lastNight?.fellAsleep ?? today)
+        // Both numbers come from one source or the other, never one of each:
+        // the two measure HRV over different windows.
+        let hrvTerm = scores?.recoveryTerms.first { $0.kind == .hrv }
+        let variability = if let value = hrvTerm?.value, let baseline = hrvTerm?.baseline {
+            Variability(today: value, usual: baseline)
+        } else {
+            ownVariability
+        }
         let resting = restingHeart()
+        let usualExercise = inputs.exerciseByNowBefore.count >= 5 ? PulseSignals.median(inputs.exerciseByNowBefore) : nil
 
         let workouts = PulseSignals.workouts(
             inputs.workouts.filter { $0.start >= today },
@@ -158,18 +160,14 @@ private struct PulseTodayBuilder {
             workouts: workouts
         )
 
-        // The engine ranks the moves for this part of the person's day. The
-        // card lists what was ticked off too; the orb moves past it.
-        let arbiter = NextMoveArbiter()
-        let ranked = arbiter.rank(context, history: history.listing)
-        var seen: Set<SomaAspect> = []
-        let moves = ranked.filter { seen.insert($0.aspect).inserted }.prefix(3).map { PulseToday.Move($0) }
-        let hasData = !inputs.isEmpty
-        let cue = hasData ? PulseToday.Move(arbiter.cue(context, history: history)) : nil
-        let (headline, reason) = hasData
-            ? (cue?.title ?? "", cue?.reason ?? "")
-            : ("Nothing to read yet.",
-               "Apple Health holds no sleep, heart or activity for today. The page fills in as your watch and phone record them.")
+        let moves = self.moves(
+            lastNight: lastNight, shortBy: shortBy, month: before + [lastNight].compactMap { $0 },
+            variability: variability, resting: resting, peaks: peaks, usualExercise: usualExercise
+        )
+        let (headline, reason) = self.headline(
+            top: moves.first, lastNight: lastNight, shortBy: shortBy,
+            variability: variability, resting: resting, peaks: peaks, usualExercise: usualExercise
+        )
 
         let week = (-6...0).map { offset in nights.first { $0.day == day(offset) } }
         let lowest = lowestOvernight(lastNight)
@@ -178,10 +176,8 @@ private struct PulseTodayBuilder {
             carrying: moves.first?.aspect,
             headline: headline,
             reason: reason,
-            movesTitle: words.movesTitle(context.part),
-            moves: Array(moves),
-            cue: cue,
-            steady: hasData ? PulseToday.Move(NextMoveSteady.cue(context)) : nil,
+            movesTitle: words.movesTitle(at: now),
+            moves: moves,
             // The three scores. Mind is recovery, or 100 minus stress on a day
             // without recovery: see `SomaScores.mind`.
             sleep: PulseToday.Reading(value: scores?.sleep.map(words.score), trend: scores?.sleepTrend),
@@ -202,16 +198,40 @@ private struct PulseTodayBuilder {
             ),
             restingDays: (-13...0).map { resting.daily[day($0)] },
             restingBand: resting.band,
-            bodyCard: {
-                let fitness = BodyFitnessAge.stat(vo2Max: inputs.vo2Max, age: inputs.age, sex: inputs.sex)
-                return PulseToday.Card(value: fitness.value, summary: words.bodySummary(fitness))
-            }(),
+            bodyCard: PulseToday.Card(value: nil, summary: words.bodySummary(age: inputs.age)),
             age: inputs.age,
-            hasData: hasData
+            stepsToday: inputs.stepsToday,
+            hasData: !inputs.isEmpty,
+            night: lastNight.map { night(for: $0, usual: usualSleep) }
         )
     }
 
     // MARK: - Signals
+
+    struct Variability {
+        var today: Double?
+        var usual: Double?
+    }
+
+    /// Today's heart rate variability, from the readings since falling asleep,
+    /// against the median of the daily means over the month before.
+    func heartRateVariability(since start: Date) -> Variability {
+        let recent = inputs.heartRateVariability.filter { $0.start >= start && $0.start <= now }.map(\.value)
+        // A night with no reading falls back on the latest one, if it is
+        // recent enough to still describe today.
+        let current = recent.isEmpty
+            ? inputs.heartRateVariability
+                .filter { $0.start <= now && now.timeIntervalSince($0.end) < 36 * 60 * 60 }
+                .max { $0.end < $1.end }?
+                .value
+            : recent.reduce(0, +) / Double(recent.count)
+        let earlier = inputs.heartRateVariability.filter { $0.start < start && $0.start >= day(-30) }
+        let daily = PulseSignals.daily(earlier, calendar: calendar) { values in
+            values.isEmpty ? nil : values.reduce(0, +) / Double(values.count)
+        }
+        let usual = daily.count >= 5 ? PulseSignals.median(Array(daily.values)) : nil
+        return Variability(today: current, usual: usual)
+    }
 
     struct Resting {
         var latest: Double?
@@ -255,7 +275,185 @@ private struct PulseTodayBuilder {
             .map { ($0.value, $0.start) }
     }
 
+    // MARK: - Moves
+
+    /// Up to three moves, the most pressing first. Each one is asked for by a
+    /// number: nothing here fires on a hunch.
+    func moves(
+        lastNight: PulseNight?,
+        shortBy: TimeInterval?,
+        month: [PulseNight],
+        variability: Variability,
+        resting: Resting,
+        peaks: [PulsePeak],
+        usualExercise: Double?
+    ) -> [PulseToday.Move] {
+        var found: [(priority: Int, move: PulseToday.Move)] = []
+
+        let variabilityLow = variability.today.flatMap { today in
+            variability.usual.map { today <= $0 * 0.9 }
+        } ?? false
+        if !peaks.isEmpty || variabilityLow {
+            let reason = variability.usual.map {
+                "Slow breathing can bring your HRV back toward your usual \(words.whole($0)) ms."
+            } ?? "Slow breathing helps a raised heart settle."
+            found.append((peaks.count >= 2 ? 100 : (peaks.isEmpty ? 60 : 80),
+                          PulseToday.Move(aspect: .mind, title: "Breathe for 10 minutes", reason: reason)))
+        }
+
+        if let bedtime = bedtime(month) {
+            var reason = "Your longest nights this month started before \(words.time(bedtime.before))."
+            if let shortBy, let lastNight {
+                reason = "You slept \(words.clock(lastNight.asleep)), \(words.span(shortBy)) under your usual."
+            }
+            found.append((shortBy == nil ? 30 : 90,
+                          PulseToday.Move(aspect: .sleep, title: "In bed by \(words.time(bedtime.target))", reason: reason)))
+        }
+
+        // Compared as the card prints them, in whole beats, so a card that
+        // reads "5 above your usual" and the move it asks for agree.
+        if let latest = resting.latest, let usual = resting.usual, (latest - usual).rounded() >= 5 {
+            found.append((70, PulseToday.Move(
+                aspect: .heart,
+                title: "Keep tonight easy",
+                reason: "Resting heart rate is \(words.whole(latest)), \(words.whole(latest - usual)) above your usual."
+            )))
+        }
+
+        let hour = calendar.component(.hour, from: now)
+        if let exercise = inputs.exerciseToday, let usual = usualExercise, (10..<20).contains(hour),
+           exercise < usual - max(10, usual * 0.3) {
+            found.append((50, PulseToday.Move(
+                aspect: .activity,
+                title: "Walk for 15 minutes",
+                reason: "\(words.whole(exercise)) min of exercise so far. By now you usually have \(words.whole(usual))."
+            )))
+        }
+
+        return Array(found.sorted { $0.priority > $1.priority }.prefix(3).map(\.move))
+    }
+
+    /// When to be in bed tonight: the middle of the bedtimes of the month's
+    /// longest nights, rounded down to the quarter hour, and the latest of
+    /// them, rounded up, to say why.
+    func bedtime(_ month: [PulseNight]) -> (target: Date, before: Date)? {
+        guard month.count >= 7 else { return nil }
+        let longest = month.sorted { $0.asleep > $1.asleep }.prefix(max(3, month.count / 3))
+        // Minutes since six in the evening, so a bedtime after midnight sorts
+        // after one before it.
+        let clocks = longest.map { night -> Double in
+            let parts = calendar.dateComponents([.hour, .minute], from: night.bedtime)
+            let minutes = Double((parts.hour ?? 0) * 60 + (parts.minute ?? 0))
+            return (minutes - 18 * 60 + 24 * 60).truncatingRemainder(dividingBy: 24 * 60)
+        }
+        guard let middle = PulseSignals.median(clocks), let latest = clocks.max() else { return nil }
+        let evening = calendar.date(bySettingHour: 18, minute: 0, second: 0, of: today) ?? today
+        let target = evening.addingTimeInterval((middle / 15).rounded(.down) * 15 * 60)
+        let before = evening.addingTimeInterval((latest / 15).rounded(.up) * 15 * 60)
+        return (target, max(before, target))
+    }
+
+    // MARK: - The headline
+
+    func headline(
+        top: PulseToday.Move?,
+        lastNight: PulseNight?,
+        shortBy: TimeInterval?,
+        variability: Variability,
+        resting: Resting,
+        peaks: [PulsePeak],
+        usualExercise: Double?
+    ) -> (String, String) {
+        guard !inputs.isEmpty else {
+            return ("Nothing to read yet.",
+                    "Apple Health holds no sleep, heart or activity for today. The page fills in as your watch and phone record them.")
+        }
+        let partName: String = switch words.part(of: now) {
+        case .morning: "morning"
+        case .afternoon: "afternoon"
+        case .evening: "evening"
+        }
+
+        switch top?.aspect {
+        case .mind where !peaks.isEmpty:
+            let when = peaks.map { words.time($0.start) }
+            let above = peaks.map(\.above).max() ?? 0
+            let count = words.count(peaks.count, "stress peak", "stress peaks").capitalizedFirst
+            return ("Slow the \(partName) down.",
+                    "\(count) today, at \(words.list(when)), your heart up to \(words.whole(above)) above resting while you were still. Ten minutes of slow breathing and an early night help it settle.")
+        case .mind:
+            guard let current = variability.today, let usual = variability.usual else { break }
+            return ("Go gently today.",
+                    "Your HRV is \(words.whole(current)) ms, under your usual \(words.whole(usual)). Slow breathing and an early night help it recover.")
+        case .sleep:
+            guard let lastNight, let shortBy else { break }
+            return (words.part(of: now) == .evening ? "Tonight decides tomorrow." : "A short night to make up.",
+                    "You slept \(words.clock(lastNight.asleep)), \(words.span(shortBy)) under your usual. An earlier night gives most of it back.")
+        case .heart:
+            guard let latest = resting.latest, let usual = resting.usual else { break }
+            return ("Keep today light.",
+                    "Your resting heart rate is \(words.whole(latest)), \(words.whole(latest - usual)) above your usual. An easy day and a full night usually bring it down.")
+        case .activity:
+            guard let exercise = inputs.exerciseToday, let usualExercise else { break }
+            return ("A walk would help.",
+                    "\(words.whole(exercise)) min of exercise so far. By this time you usually have \(words.whole(usualExercise)).")
+        default:
+            break
+        }
+        return steadyDay()
+    }
+
+    /// The day with nothing to act on. It still names a score that sits off
+    /// its usual, in the words of the row under it, without repeating the
+    /// cue that row already prints, and ends on what would help, as every
+    /// other sentence does: a sentence that calls every part usual over a
+    /// row with one marked off says two things at once.
+    func steadyDay() -> (String, String) {
+        let parts: [(name: String, insight: Insight, help: String)] = [
+            ("Sleep", PulseScoreInsights.sleep(scores), "An earlier night gives most of it back."),
+            ("Mind", PulseScoreInsights.mind(scores), "Slow breathing and an early night help it recover."),
+            ("Activity", PulseScoreInsights.activity(scores),
+             // In the evening the orb says wind down: the walk is a short one.
+             words.part(of: now) == .evening ? "A short walk this evening would close most of it." : "A walk would close most of it."),
+        ]
+        let off = parts.filter { $0.insight.tone == .watch && $0.insight.position != nil && $0.insight.position != .within }
+        guard let first = off.first else {
+            return ("A steady day.", "Sleep, mind and activity sit close to your usual.")
+        }
+        let gaps = off.map { "\($0.name.lowercased()) sits \($0.insight.position == .below ? "under" : "over") your usual" }
+        let rest = parts.filter { part in !off.contains { $0.name == part.name } }.map { $0.name.lowercased() }
+        let tail = rest.isEmpty ? "" : ", \(words.list(rest)) where \(rest.count == 1 ? "it" : "they") should be"
+        return (off.count == 1 ? "One gap today." : "\(words.count(off.count, "gap", "gaps").capitalizedFirst) today.",
+                "\(words.list(gaps).capitalizedFirst)\(tail). \(first.help)")
+    }
+
     // MARK: - The timeline
+
+    /// The night pass's words for `night`.
+    ///
+    /// The track is the same stretch of clock every night, 8 PM to 10 AM,
+    /// widened only when the night ran past either end, so a short night
+    /// draws short. The usual night starts where this one fell asleep.
+    func night(for night: PulseNight, usual: TimeInterval?) -> PulseToday.Night {
+        let morning = calendar.startOfDay(for: night.day)
+        let evening = calendar.date(byAdding: .hour, value: -4, to: morning) ?? morning
+        let late = calendar.date(byAdding: .hour, value: 10, to: morning) ?? morning
+        let start = min(evening, night.bedtime)
+        let end = max(late, night.woke)
+        let length = max(1, end.timeIntervalSince(start))
+        func at(_ date: Date) -> Double { date.timeIntervalSince(start) / length }
+
+        let asleepFrom = at(night.fellAsleep)
+        return PulseToday.Night(
+            bed: words.time(night.bedtime),
+            woke: words.time(night.woke),
+            asleep: words.clock(night.asleep),
+            usual: usual.map { "Usual \(words.clock($0))" },
+            span: asleepFrom...max(asleepFrom, at(night.woke)),
+            usualSpan: usual.map { asleepFrom...(asleepFrom + $0 / length) },
+            midnight: at(morning)
+        )
+    }
 
     /// The day as events, each with its numbers as glyph and value stats
     /// (the card draws those rather than the sentence, which stays as the
@@ -317,5 +515,72 @@ private struct PulseTodayBuilder {
             stats: nowStats, start: self.now
         )
         return dated.sorted { $0.0 < $1.0 }.map(\.1) + [now]
+    }
+}
+
+private extension String {
+    /// The string with its first letter capitalised: "two" reads "Two".
+    var capitalizedFirst: String {
+        guard let first else { return self }
+        return first.uppercased() + dropFirst()
+    }
+}
+
+// Written to disk by HealthSnapshotStore so the page draws at launch. The
+// day's events are left out: each carries a navigation destination, which
+// is not data, and the timeline fills in on the first read a moment later.
+extension PulseToday: Codable {
+    private enum CodingKeys: String, CodingKey {
+        case carrying, headline, reason, movesTitle, moves, sleep, mind, activity, energyLevel, energyNote
+        case sleepCard, nights, heartCard, restingDays, restingBand, bodyCard, age, stepsToday, hasData, night
+    }
+
+    init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        carrying = try c.decodeIfPresent(SomaAspect.self, forKey: .carrying)
+        headline = try c.decode(String.self, forKey: .headline)
+        reason = try c.decode(String.self, forKey: .reason)
+        movesTitle = try c.decode(String.self, forKey: .movesTitle)
+        moves = try c.decode([Move].self, forKey: .moves)
+        sleep = try c.decode(Reading.self, forKey: .sleep)
+        mind = try c.decode(Reading.self, forKey: .mind)
+        activity = try c.decode(Reading.self, forKey: .activity)
+        energyLevel = try c.decodeIfPresent(Double.self, forKey: .energyLevel)
+        energyNote = try c.decode(String.self, forKey: .energyNote)
+        events = []
+        sleepCard = try c.decode(Card.self, forKey: .sleepCard)
+        nights = try c.decode([Double?].self, forKey: .nights)
+        heartCard = try c.decode(Card.self, forKey: .heartCard)
+        restingDays = try c.decode([Double?].self, forKey: .restingDays)
+        restingBand = try c.decodeIfPresent(ClosedRange<Double>.self, forKey: .restingBand)
+        bodyCard = try c.decode(Card.self, forKey: .bodyCard)
+        age = try c.decodeIfPresent(Int.self, forKey: .age)
+        stepsToday = try c.decodeIfPresent(Double.self, forKey: .stepsToday)
+        hasData = try c.decode(Bool.self, forKey: .hasData)
+        night = try c.decodeIfPresent(Night.self, forKey: .night)
+    }
+
+    func encode(to encoder: any Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encodeIfPresent(carrying, forKey: .carrying)
+        try c.encode(headline, forKey: .headline)
+        try c.encode(reason, forKey: .reason)
+        try c.encode(movesTitle, forKey: .movesTitle)
+        try c.encode(moves, forKey: .moves)
+        try c.encode(sleep, forKey: .sleep)
+        try c.encode(mind, forKey: .mind)
+        try c.encode(activity, forKey: .activity)
+        try c.encodeIfPresent(energyLevel, forKey: .energyLevel)
+        try c.encode(energyNote, forKey: .energyNote)
+        try c.encode(sleepCard, forKey: .sleepCard)
+        try c.encode(nights, forKey: .nights)
+        try c.encode(heartCard, forKey: .heartCard)
+        try c.encode(restingDays, forKey: .restingDays)
+        try c.encodeIfPresent(restingBand, forKey: .restingBand)
+        try c.encode(bodyCard, forKey: .bodyCard)
+        try c.encodeIfPresent(age, forKey: .age)
+        try c.encodeIfPresent(stepsToday, forKey: .stepsToday)
+        try c.encode(hasData, forKey: .hasData)
+        try c.encodeIfPresent(night, forKey: .night)
     }
 }

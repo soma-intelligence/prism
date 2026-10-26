@@ -53,6 +53,7 @@ struct DeveloperToolsPage: View {
                 }
             }
 
+
 #if DEBUG && targetEnvironment(simulator)
 #if canImport(HealthKit)
             VStack(alignment: .leading, spacing: theme.metrics.browseHeadingSpacing) {
@@ -80,7 +81,7 @@ struct DeveloperToolsPage: View {
                                 .somaFont(theme.typography.title)
                                 .foregroundStyle(theme.colors.danger.color)
                                 .frame(maxWidth: .infinity)
-                                .padding(.vertical, 12)
+                                .padding(.vertical, theme.metrics.spaceM)
                                 .contentShape(.rect)
                         }
                         .buttonStyle(.somaGlassPress)

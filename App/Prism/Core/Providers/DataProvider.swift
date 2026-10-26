@@ -65,6 +65,11 @@ nonisolated struct DataProvider: Identifiable, Sendable, Equatable {
     var name: String
     var symbol: String
     var access: Access
+    /// The provider's slug on Open Health Sync, when the instance can sign in
+    /// to it for Soma. With an account, the provider connects there instead of
+    /// through ``access``: no client secret in Soma, and the instance pulls the
+    /// data on its own schedule.
+    var ohsSlug: String? = nil
 
     var oauth: OAuthConfig? {
         if case .direct(let config) = access { return config }
@@ -75,6 +80,9 @@ nonisolated struct DataProvider: Identifiable, Sendable, Equatable {
 
     /// Whether the Connect button can do anything in this build.
     var canConnect: Bool { oauth != nil && clientID != nil }
+
+    /// Whether Open Health Sync can connect it.
+    var connectsThroughOHS: Bool { ohsSlug != nil }
 }
 
 extension DataProvider {
@@ -91,7 +99,8 @@ extension DataProvider {
             tokenURL: url("https://wbsapi.withings.net/v2/oauth2"),
             scopes: ["user.info", "user.metrics", "user.activity"],
             scopeSeparator: ",", usesPKCE: false, tokenStyle: .withings
-        ))
+        )),
+        ohsSlug: "withings"
     )
     static let oura = DataProvider(
         id: "oura", name: "Oura", symbol: "circle.circle",
@@ -99,7 +108,8 @@ extension DataProvider {
             authorizeURL: url("https://cloud.ouraring.com/oauth/authorize"),
             tokenURL: url("https://api.ouraring.com/oauth/token"),
             scopes: ["personal", "daily", "heartrate", "workout", "session", "spo2"]
-        ))
+        )),
+        ohsSlug: "oura"
     )
     static let whoop = DataProvider(
         id: "whoop", name: "Whoop", symbol: "bolt.heart",
@@ -108,7 +118,8 @@ extension DataProvider {
             tokenURL: url("https://api.prod.whoop.com/oauth/oauth2/token"),
             scopes: ["offline", "read:recovery", "read:cycles", "read:sleep", "read:workout", "read:profile", "read:body_measurement"],
             usesPKCE: false, stateLength: 8
-        ))
+        )),
+        ohsSlug: "whoop"
     )
 
     /// Every provider the Health access page lists, in its order: Apple's
@@ -116,14 +127,14 @@ extension DataProvider {
     static let all: [DataProvider] = [
         appleHealth, iPhoneMotion, appleWatch,
         withings, oura, whoop,
-        DataProvider(id: "ultrahuman", name: "Ultrahuman", symbol: "circle.dashed", access: .throughHealth),
-        DataProvider(id: "garmin", name: "Garmin", symbol: "location.north.circle", access: .throughHealth),
-        DataProvider(id: "polar", name: "Polar", symbol: "heart.circle", access: .throughHealth),
-        DataProvider(id: "fitbit", name: "Fitbit", symbol: "square.grid.3x3", access: .soon),
-        DataProvider(id: "eight-sleep", name: "Eight Sleep", symbol: "bed.double", access: .throughHealth),
-        DataProvider(id: "dexcom", name: "Dexcom", symbol: "drop", access: .throughHealth),
+        DataProvider(id: "ultrahuman", name: "Ultrahuman", symbol: "circle.dashed", access: .throughHealth, ohsSlug: "ultrahuman"),
+        DataProvider(id: "garmin", name: "Garmin", symbol: "location.north.circle", access: .throughHealth, ohsSlug: "garmin"),
+        DataProvider(id: "polar", name: "Polar", symbol: "heart.circle", access: .throughHealth, ohsSlug: "polar"),
+        DataProvider(id: "fitbit", name: "Fitbit", symbol: "square.grid.3x3", access: .soon, ohsSlug: "fitbit"),
+        DataProvider(id: "eight-sleep", name: "Eight Sleep", symbol: "bed.double", access: .throughHealth, ohsSlug: "eight_sleep"),
+        DataProvider(id: "dexcom", name: "Dexcom", symbol: "drop", access: .throughHealth, ohsSlug: "dexcom"),
         DataProvider(id: "levels", name: "Levels", symbol: "chart.line.uptrend.xyaxis", access: .soon),
-        DataProvider(id: "strava", name: "Strava", symbol: "figure.run", access: .throughHealth),
+        DataProvider(id: "strava", name: "Strava", symbol: "figure.run", access: .throughHealth, ohsSlug: "strava"),
         DataProvider(id: "myfitnesspal", name: "MyFitnessPal", symbol: "fork.knife", access: .throughHealth),
     ]
 }
