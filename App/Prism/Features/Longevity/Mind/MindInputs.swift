@@ -147,15 +147,17 @@ extension MindInputs {
 /// inputs come back empty, and every value they feed renders as a dash.
 @MainActor
 enum MindLoad {
-    static func inputs(_ health: HealthDashboard) async -> MindInputs {
-        guard let source = await health.prepare(MindInputs.Metric.all) else { return MindInputs(now: Date()) }
-        return await MindInputs.read(from: source, now: Date(), calendar: .current)
+    /// `now` and `calendar` default to the clock and the user's calendar; the
+    /// Longevity preload passes its own so every lens is read at one instant.
+    static func inputs(_ health: HealthDashboard, now: Date = Date(), calendar: Calendar = .current) async -> MindInputs {
+        guard let source = await health.prepare(MindInputs.Metric.all) else { return MindInputs(now: now) }
+        return await MindInputs.read(from: source, now: now, calendar: calendar)
     }
 
-    static func stress(_ health: HealthDashboard, inputs: MindInputs) async -> [MindStressDay] {
+    static func stress(_ health: HealthDashboard, inputs: MindInputs, calendar: Calendar = .current) async -> [MindStressDay] {
         guard let source = await health.prepare(MindInputs.Metric.all) else { return [] }
         return await MindInputs.readStress(
-            from: source, now: inputs.now, calendar: .current,
+            from: source, now: inputs.now, calendar: calendar,
             resting: inputs.restingHeartRate, workouts: inputs.workouts
         )
     }

@@ -125,6 +125,11 @@ public struct SomaTypography: Sendable, Equatable {
     /// A number read at caption size: a time in a timeline, a label on a
     /// chart. Always tabular, so a column of times holds its edge.
     public var captionValue: SomaFontSpec
+    /// The face and weight of an SF Symbol glyph. Its size is not here: a
+    /// glyph is sized by the metric of the control it sits in, and set with
+    /// `somaGlyph(_:size:)`, so a change of family or weight reaches every
+    /// icon that goes through it.
+    public var glyph: SomaFontSpec
 
     public init(
         display: SomaFontSpec,
@@ -143,7 +148,8 @@ public struct SomaTypography: Sendable, Equatable {
         callout: SomaFontSpec,
         cardTitle: SomaFontSpec,
         metricCompact: SomaFontSpec,
-        captionValue: SomaFontSpec
+        captionValue: SomaFontSpec,
+        glyph: SomaFontSpec = SomaFontSpec(size: 17, weight: .medium)
     ) {
         self.display = display
         self.title = title
@@ -162,12 +168,13 @@ public struct SomaTypography: Sendable, Equatable {
         self.cardTitle = cardTitle
         self.metricCompact = metricCompact
         self.captionValue = captionValue
+        self.glyph = glyph
     }
 
     /// Every role in this scale, for anything that has to walk them.
     public var allRoles: [SomaFontSpec] {
         [display, title, body, metric, caption, rowValue, field, tabLabel, eyebrow, segment, headerTitle,
-         orbLabel, headline, callout, cardTitle, metricCompact, captionValue]
+         orbLabel, headline, callout, cardTitle, metricCompact, captionValue, glyph]
     }
 
     /// Read at arm's length on a handheld screen.
@@ -188,7 +195,8 @@ public struct SomaTypography: Sendable, Equatable {
         callout: SomaFontSpec(size: 16),
         cardTitle: SomaFontSpec(size: 17, weight: .semibold),
         metricCompact: SomaFontSpec(size: 28, tracking: -0.4, digits: .tabular),
-        captionValue: SomaFontSpec(size: 13, digits: .tabular)
+        captionValue: SomaFontSpec(size: 13, digits: .tabular),
+        glyph: SomaFontSpec(size: 17, weight: .medium)
     )
 
     /// Read at desk distance. The desktop's body text is 13pt, and a scale built
@@ -210,7 +218,8 @@ public struct SomaTypography: Sendable, Equatable {
         callout: SomaFontSpec(size: 12),
         cardTitle: SomaFontSpec(size: 13, weight: .semibold),
         metricCompact: SomaFontSpec(size: 22, tracking: -0.3, digits: .tabular),
-        captionValue: SomaFontSpec(size: 11, digits: .tabular)
+        captionValue: SomaFontSpec(size: 11, digits: .tabular),
+        glyph: SomaFontSpec(size: 13, weight: .medium)
     )
 
 #if os(macOS)

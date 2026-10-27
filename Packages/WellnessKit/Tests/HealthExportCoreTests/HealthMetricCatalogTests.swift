@@ -139,6 +139,18 @@ struct HealthMetricCatalogTests {
         #expect(!ids.contains("HKQuantityTypeIdentifierUvExposure"))
     }
 
+    @Test("Environmental audio exposure events keep the identifier HealthKit stored before the rename")
+    func renamedIdentifiersAreExact() {
+        // `HKCategoryTypeIdentifier.environmentalAudioExposureEvent` has the raw
+        // value `HKCategoryTypeIdentifierAudioExposureEvent`. Built from the
+        // Swift member name, the identifier resolves to nil and the events are
+        // never asked for or read.
+        let ids = Set(HealthMetricCatalog.all.map(\.identifier))
+        #expect(ids.contains("HKCategoryTypeIdentifierAudioExposureEvent"))
+        #expect(!ids.contains("HKCategoryTypeIdentifierEnvironmentalAudioExposureEvent"))
+        #expect(ids.contains("HKCategoryTypeIdentifierHeadphoneAudioExposureEvent"))
+    }
+
     @Test("Activity and heart rate are read before nutrition")
     func tiersAreOrdered() {
         #expect(HealthMetricCatalog.metric(for: "HKQuantityTypeIdentifierStepCount")?.tier == .priority)

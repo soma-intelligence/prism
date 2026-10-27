@@ -296,30 +296,14 @@ struct ComponentPlayground: View {
                     ])
                 }
 
-                // The radial proposals for Today's scores, beside the rings
-                // that ship (`-today.scores <name>` puts one on Today).
-                entry("SomaScoreBezel") {
-                    SomaScoreBezel(SomaPreviewSamples.todayScores, onSelect: { _ in })
-                }
-
-                entry("SomaScoreArch") {
-                    SomaScoreArch(SomaPreviewSamples.todayScores, onSelect: { _ in })
-                }
-
-                entry("SomaScoreHalo") {
-                    SomaScoreHalo(SomaPreviewSamples.todayScores, onSelect: { _ in })
-                }
-
-                entry("SomaScoreEcho") {
-                    SomaScoreEcho(SomaPreviewSamples.todayScores, onSelect: { _ in })
-                }
-
-                entry("SomaScoreSeven") {
-                    SomaScoreSeven(SomaPreviewSamples.todayScores, onSelect: { _ in })
-                }
-
+                // The dials that ship on Today, under the orb: each with
+                // its range, then with only the usual, as a caller without
+                // a range draws them.
                 entry("SomaScoreZones") {
-                    SomaScoreZones(SomaPreviewSamples.todayScores, onSelect: { _ in })
+                    VStack(spacing: theme.metrics.leadSpacing) {
+                        SomaScoreZones(SomaPreviewSamples.todayScores, onSelect: { _ in })
+                        SomaScoreZones(SomaPreviewSamples.todayScoresUsual, onSelect: { _ in })
+                    }
                 }
 
                 entry("SomaEnergyGauge, SomaEnergyCell, SomaEnergyTimeline") {

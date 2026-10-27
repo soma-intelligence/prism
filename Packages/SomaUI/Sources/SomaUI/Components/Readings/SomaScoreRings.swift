@@ -20,11 +20,9 @@ public struct SomaRingScore: Identifiable, Sendable {
     /// usual, or a target for the day. Nil when there is none yet.
     public var range: ClosedRange<Double>?
     /// The person's usual for this score, 0 to 100, or nil while it is
-    /// still being learned. The rings leave it out; the other styles mark it.
+    /// still being learned. The rings leave it out; ``SomaScoreZones`` marks
+    /// it with a tick when there is no range.
     public var usual: Int?
-    /// The last seven days, oldest first, ending today, nil on a day with
-    /// no score. Empty when the caller has no history to give.
-    public var week: [Int?]
 
     public init(
         aspect: SomaAspect,
@@ -32,8 +30,7 @@ public struct SomaRingScore: Identifiable, Sendable {
         trend: SomaTrend? = nil,
         cue: LocalizedStringResource? = nil,
         range: ClosedRange<Double>? = nil,
-        usual: Int? = nil,
-        week: [Int?] = []
+        usual: Int? = nil
     ) {
         self.aspect = aspect
         self.value = value
@@ -41,7 +38,6 @@ public struct SomaRingScore: Identifiable, Sendable {
         self.cue = cue
         self.range = range
         self.usual = usual
-        self.week = week
     }
 }
 

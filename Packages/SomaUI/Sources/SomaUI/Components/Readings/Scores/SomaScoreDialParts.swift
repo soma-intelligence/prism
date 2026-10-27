@@ -1,94 +1,11 @@
 //
-//  SomaScoresStyle.swift
+//  SomaScoreDialParts.swift
 //  SomaUI
 //
 
 import SwiftUI
 
-/// The ways Today's three scores can be drawn under the orb.
-///
-/// ``rings`` is what ships. The others are radial proposals the owner
-/// compares side by side in a Debug build (`-today.scores <name>`): each
-/// draws three separate dials in a row, takes the same scores, the same zoom
-/// and the same tap, and marks the person's usual its own way.
-public enum SomaScoresStyle: String, CaseIterable, Identifiable, Sendable {
-    /// Three compact rings, the number in each: ``SomaScoreRings``.
-    case rings
-    /// A watch bezel of fine ticks lit up to the score, the usual a longer
-    /// tick: ``SomaScoreBezel``.
-    case bezel
-    /// An open arch on a soft gradient, the name in its gap:
-    /// ``SomaScoreArch``.
-    case arch
-    /// A hairline halo with a glowing head and a large light number:
-    /// ``SomaScoreHalo``.
-    case halo
-    /// Today's ring over a thin inner ring drawn to the usual:
-    /// ``SomaScoreEcho``.
-    case echo
-    /// The last seven days as seven petals round the number, today's in
-    /// full colour: ``SomaScoreSeven``.
-    case seven
-    /// A ring in three zones with a bead riding at the score:
-    /// ``SomaScoreZones``.
-    case zones
-
-    public var id: String { rawValue }
-
-    /// The name the gallery and the comparison board print.
-    public var title: LocalizedStringResource {
-        switch self {
-        case .rings: "Rings"
-        case .bezel: "Bezel"
-        case .arch: "Arch"
-        case .halo: "Halo"
-        case .echo: "Echo"
-        case .seven: "Seven"
-        case .zones: "Zones"
-        }
-    }
-}
-
-/// Today's three scores in the chosen ``SomaScoresStyle``.
-///
-/// Every style takes the same inputs: the scores, the namespace each score
-/// marks itself in as the source of the zoom into its page, the id that
-/// zoom goes by, and what a tap does.
-public struct SomaTodayScores: View {
-    private let style: SomaScoresStyle
-    private let scores: [SomaRingScore]
-    private let zoom: Namespace.ID?
-    private let zoomID: (SomaAspect) -> AnyHashable
-    private let onSelect: ((SomaAspect) -> Void)?
-
-    public init(
-        _ scores: [SomaRingScore],
-        style: SomaScoresStyle,
-        zoom: Namespace.ID? = nil,
-        zoomID: @escaping (SomaAspect) -> AnyHashable = { AnyHashable($0) },
-        onSelect: ((SomaAspect) -> Void)? = nil
-    ) {
-        self.style = style
-        self.scores = scores
-        self.zoom = zoom
-        self.zoomID = zoomID
-        self.onSelect = onSelect
-    }
-
-    public var body: some View {
-        switch style {
-        case .rings: SomaScoreRings(scores, zoom: zoom, zoomID: zoomID, onSelect: onSelect)
-        case .bezel: SomaScoreBezel(scores, zoom: zoom, zoomID: zoomID, onSelect: onSelect)
-        case .arch: SomaScoreArch(scores, zoom: zoom, zoomID: zoomID, onSelect: onSelect)
-        case .halo: SomaScoreHalo(scores, zoom: zoom, zoomID: zoomID, onSelect: onSelect)
-        case .echo: SomaScoreEcho(scores, zoom: zoom, zoomID: zoomID, onSelect: onSelect)
-        case .seven: SomaScoreSeven(scores, zoom: zoom, zoomID: zoomID, onSelect: onSelect)
-        case .zones: SomaScoreZones(scores, zoom: zoom, zoomID: zoomID, onSelect: onSelect)
-        }
-    }
-}
-
-// MARK: - What every style reads off a score
+// MARK: - What a dial reads off a score
 
 extension SomaRingScore {
     /// The score as a share of 100, nil when it was not measured.
@@ -96,7 +13,7 @@ extension SomaRingScore {
         value.map { Self.share($0) }
     }
 
-    /// The usual as a share of 100.
+    /// The usual as a share of 100, nil when there is none.
     var usualFraction: Double? {
         usual.map { Self.share($0) }
     }
@@ -106,18 +23,29 @@ extension SomaRingScore {
         value.map { "\($0)" }
     }
 
-    /// What VoiceOver reads after the aspect's name.
-    var spoken: Text {
-        guard let value else { return Text("Not measured") }
-        guard let cue else { return Text("\(value)") }
-        return Text("\(value), \(Text(cue))")
+    /// The range as shares of 100, low end first, nil when there is none.
+    var rangeShares: ClosedRange<Double>? {
+        range.map { range in
+            let low = min(1, max(0, range.lowerBound / 100))
+            return low...min(1, max(low, range.upperBound / 100))
+        }
     }
 
-    /// The last seven days, padded at the front with empty days, today
-    /// always last.
-    var lastSeven: [Int?] {
-        let last = Array(week.suffix(7))
-        return Array(repeating: nil, count: 7 - last.count) + last
+    /// What VoiceOver reads after the aspect's name: the number, which way
+    /// it moved, what it means against the usual, and the range.
+    var spoken: Text {
+        guard let value else { return Text("Not measured") }
+        var read = Text("\(value)")
+        switch trend {
+        case .up: read = Text("\(read), rising")
+        case .down: read = Text("\(read), falling")
+        case nil: break
+        }
+        if let cue { read = Text("\(read), \(Text(cue))") }
+        if let range {
+            read = Text("\(read), range \(Int(range.lowerBound.rounded())) to \(Int(range.upperBound.rounded()))")
+        }
+        return read
     }
 
     static func share(_ value: Int) -> Double {
@@ -128,7 +56,7 @@ extension SomaRingScore {
 // MARK: - Three dials in a row
 
 /// Three dials side by side, each a tap target that opens its score's page,
-/// with the name under the dial unless the dial carries it itself.
+/// with the name under the dial.
 ///
 /// The row owns the arrival: once a score is there to draw, every dial is
 /// told it is shown, with its own small delay so the three fill a beat
@@ -138,8 +66,6 @@ struct SomaScoreDialRow<Dial: View>: View {
     let zoom: Namespace.ID?
     let zoomID: (SomaAspect) -> AnyHashable
     let onSelect: ((SomaAspect) -> Void)?
-    /// True when the dial draws the aspect's name inside itself.
-    var namesInside = false
     @ViewBuilder let dial: (_ score: SomaRingScore, _ shown: Bool, _ delay: Double) -> Dial
 
     @Environment(\.somaTheme) private var theme
@@ -156,9 +82,7 @@ struct SomaScoreDialRow<Dial: View>: View {
                     VStack(spacing: metrics.scoreDialLabelSpacing) {
                         dial(score, shown, reduceMotion ? 0 : Double(index) * theme.motion.scoreArrivalStep)
                             .frame(width: metrics.scoreDialDiameter, height: metrics.scoreDialDiameter)
-                        if !namesInside {
-                            SomaDialName(aspect: score.aspect)
-                        }
+                        SomaDialName(aspect: score.aspect)
                     }
                 }
                 .frame(maxWidth: .infinity)
@@ -213,9 +137,11 @@ struct SomaDialFigure: View {
 
     var body: some View {
         let figure = shown ? score.figure : nil
+        let colors = theme.colors
         Text(figure ?? "-")
             .somaFont(font)
-            .foregroundStyle(theme.colors.inkPrimary.color)
+            // A score that was not measured is a quiet dash, not a number.
+            .foregroundStyle(score.value == nil ? colors.inkSecondary.color : colors.inkPrimary.color)
             .somaRollingNumber(figure)
             .lineLimit(1)
             .overlay(alignment: .trailing) {
@@ -227,7 +153,7 @@ struct SomaDialFigure: View {
     }
 }
 
-/// The aspect's name, small and quiet, under a dial or inside it.
+/// The aspect's name, small and quiet, under a dial.
 struct SomaDialName: View {
     let aspect: SomaAspect
 
@@ -294,34 +220,25 @@ enum SomaDialGeometry {
     }
 }
 
-/// The scores every style's preview draws: a good night, a middling mind,
-/// a fair day, each with its usual and its week.
-enum SomaScoreStylePreview {
-    static let scores: [SomaRingScore] = [
-        SomaRingScore(aspect: .sleep, value: 87, trend: .up, usual: 78, week: [72, 80, 76, nil, 83, 79, 87]),
-        SomaRingScore(aspect: .mind, value: 41, trend: .down, usual: 58, week: [61, 55, 64, 52, 47, 50, 41]),
-        SomaRingScore(aspect: .activity, value: 68, trend: .up, usual: 52, week: [52, 38, 61, 44, 30, 47, 68]),
+/// The scores the dials' previews draw: a good night, a middling mind, a
+/// fair day, the way Today hands them over (with a range), the way a caller
+/// with only the usual does, and with a score missing.
+enum SomaScoreZonesPreview {
+    static let ranged: [SomaRingScore] = [
+        SomaRingScore(aspect: .sleep, value: 87, trend: .up, range: 70...85),
+        SomaRingScore(aspect: .mind, value: 41, trend: .down, range: 48...68),
+        SomaRingScore(aspect: .activity, value: 68, trend: .up, range: 55...75),
+    ]
+
+    static let usual: [SomaRingScore] = [
+        SomaRingScore(aspect: .sleep, value: 87, trend: .up, usual: 78),
+        SomaRingScore(aspect: .mind, value: 41, trend: .down, usual: 58),
+        SomaRingScore(aspect: .activity, value: 68, trend: .up, usual: 52),
     ]
 
     static let missing: [SomaRingScore] = [
-        SomaRingScore(aspect: .sleep, value: 87, trend: .up, usual: 78, week: [72, 80, 76, nil, 83, 79, 87]),
-        SomaRingScore(aspect: .mind, value: nil, usual: 58),
+        SomaRingScore(aspect: .sleep, value: 87, trend: .up, range: 70...85),
+        SomaRingScore(aspect: .mind, value: nil, range: 48...68),
         SomaRingScore(aspect: .activity, value: 4, trend: .down),
     ]
-}
-
-#Preview("Every score style") {
-    ScrollView {
-        VStack(spacing: 40) {
-            ForEach(SomaScoresStyle.allCases) { style in
-                VStack(alignment: .leading, spacing: 12) {
-                    Text(style.title)
-                    SomaTodayScores(SomaScoreStylePreview.scores, style: style, onSelect: { _ in })
-                    SomaTodayScores(SomaScoreStylePreview.missing, style: style, onSelect: { _ in })
-                }
-            }
-        }
-        .padding()
-    }
-    .background(SomaPreviewBackdrop())
 }

@@ -160,10 +160,8 @@ private struct PulseLead: View {
                 .accessibilityAction(named: "Add to today") { quickAdd = .quickAdd }
                 .homeSheets($quickAdd)
 
-            // One tap on a score opens its page.
-            SomaScoreDials(scoreRow, zoom: zoomNamespace.map { namespace in
-                SomaScoreDials.Zoom(namespace: namespace) { AnyHashable(ScoreRoute.aspect($0)) }
-            }) { tapped in
+            // One tap on a score opens its page, zooming out of its dial.
+            SomaScoreZones(scoreRow, zoom: zoomNamespace, zoomID: { AnyHashable(ScoreRoute.aspect($0)) }) { tapped in
                 open(ScoreRoute.aspect(tapped))
             }
                 .padding(.top, metrics.heroSpacing * 2)
@@ -204,8 +202,8 @@ private struct PulseLead: View {
         ]
     }
 
-    /// A score as a ring; its cue against its usual is read aloud, not printed.
-    /// The ring marks the usual band unless a range is given.
+    /// A score as a dial; its cue against its usual is read aloud, not printed.
+    /// The dial's range arc spans the usual band unless a range is given.
     private func ring(
         _ aspect: SomaAspect, _ value: Int?, _ trend: SomaTrend?, _ insight: Insight,
         range: ClosedRange<Double>? = nil

@@ -4,6 +4,7 @@
 //
 
 import Foundation
+import Security
 import Testing
 import SyncSupabase
 @testable import Prism
@@ -87,10 +88,34 @@ struct ProfileCloudTests {
 
     @Test("This installation keeps one id")
     func installationID() {
-        let first = InstallationID.current()
-        #expect(InstallationID.current() == first)
+        let store = MemoryIDStore()
+        let first = InstallationID.current(in: store.store)
+        #expect(InstallationID.current(in: store.store) == first)
         #expect(UUID(uuidString: first) != nil)
         #expect(first == first.lowercased())
+    }
+
+    @Test("Two first calls that race hand on the id that was stored")
+    func installationIDRace() {
+        let store = MemoryIDStore()
+        // The other caller stores its id between this call's read and write.
+        let winner = "0f6c1a52-2f0b-4c56-9a59-6c3f4f3b8e11"
+        let racing = InstallationID.Store(
+            read: { store.store.read() },
+            add: { _ in
+                _ = store.store.add(winner)
+                return errSecDuplicateItem
+            }
+        )
+        #expect(InstallationID.current(in: racing) == winner)
+    }
+
+    /// The real Keychain needs the app's entitlement, which a test build made
+    /// with `CODE_SIGNING_ALLOWED=NO` does not carry: there the check is off.
+    @Test("The Keychain keeps one id", .enabled(if: MemoryIDStore.keychainWorks))
+    func installationIDKeychain() {
+        let first = InstallationID.current()
+        #expect(InstallationID.current() == first)
     }
 
     @Test("A photo's hash is short, stable and changes with the photo")
@@ -103,4 +128,38 @@ struct ProfileCloudTests {
         #expect(ProfileCloud.photoHash(photo) == hash)
         #expect(ProfileCloud.photoHash(Data("another photo".utf8)) != hash)
     }
+}
+
+/// An id store in memory, standing in for the Keychain.
+private final class MemoryIDStore: @unchecked Sendable {
+    private let lock = NSLock()
+    private var id: String?
+
+    var store: InstallationID.Store {
+        InstallationID.Store(
+            read: { [self] in lock.withLock { id } },
+            add: { [self] made in
+                lock.withLock {
+                    guard id == nil else { return errSecDuplicateItem }
+                    id = made
+                    return errSecSuccess
+                }
+            }
+        )
+    }
+
+    /// Whether this test process may write to the Keychain at all.
+    static let keychainWorks: Bool = {
+        let key: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: "Soma.Prism.tests.probe",
+            kSecAttrAccount as String: UUID().uuidString,
+            kSecUseDataProtectionKeychain as String: true,
+        ]
+        var item = key
+        item[kSecValueData as String] = Data("probe".utf8)
+        let status = SecItemAdd(item as CFDictionary, nil)
+        SecItemDelete(key as CFDictionary)
+        return status == errSecSuccess
+    }()
 }

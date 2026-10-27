@@ -37,11 +37,10 @@ public extension SomaMetrics {
     var scoreRingStroke: CGFloat { 16 }
     /// The dials at the head of Today, across, range arc included.
     var scoreDialDiameter: CGFloat { 96 }
-    /// The dial's track and fill: one width for both.
-    var scoreDialStroke: CGFloat { 6 }
-    /// The gap between the dial and the thin arc that marks its range.
+    /// The gap between a score page's gauge and the thin arc that marks its
+    /// range.
     var scoreDialRangeGap: CGFloat { 4 }
-    /// The range arc's width.
+    /// The range arc's width, on a score page's gauge and on Today's dials.
     var scoreDialRangeStroke: CGFloat { 2 }
     /// The numbered bullet of the page guide.
     var scoreGuideBullet: CGFloat { 28 }

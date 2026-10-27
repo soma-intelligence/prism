@@ -193,6 +193,8 @@ public enum HealthMetricCatalog {
         c("appleWalkingSteadinessEvent", .normal),
         c("toothbrushingEvent", .normal),
         c("handwashingEvent", .normal),
+        // Apple renamed the Swift member to `environmentalAudioExposureEvent`
+        // and kept the identifier it stored before: `AudioExposureEvent`.
         c("audioExposureEvent", .normal),
         c("headphoneAudioExposureEvent", .normal),
         // The symptoms the cycle log writes (cramps, bloating, headache, hot

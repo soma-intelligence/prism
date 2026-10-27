@@ -19,6 +19,22 @@ nonisolated enum InstallationID {
         kSecUseDataProtectionKeychain as String: true,
     ]
 
+    /// Where the id is kept: the Keychain in the app, memory in a test that
+    /// runs without the Keychain entitlement.
+    struct Store: Sendable {
+        /// The stored id, or nil when there is none.
+        var read: @Sendable () -> String?
+        /// Stores `id`; the Keychain status of the write.
+        var add: @Sendable (_ id: String) -> OSStatus
+
+        static let keychain = Store(read: stored, add: { made in
+            var item = query
+            item[kSecValueData as String] = Data(made.utf8)
+            item[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+            return SecItemAdd(item as CFDictionary, nil)
+        })
+    }
+
     /// The stored id, made and stored on the first call.
     ///
     /// Two first calls can race (cloud sync and the device row both ask at
@@ -26,12 +42,13 @@ nonisolated enum InstallationID {
     /// The one that loses reads back the stored id rather than handing on an
     /// id the Keychain never kept.
     static func current() -> String {
-        if let stored = stored() { return stored }
+        current(in: .keychain)
+    }
+
+    static func current(in store: Store) -> String {
+        if let stored = store.read() { return stored }
         let made = UUID().uuidString.lowercased()
-        var item = query
-        item[kSecValueData as String] = Data(made.utf8)
-        item[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-        if SecItemAdd(item as CFDictionary, nil) == errSecDuplicateItem, let stored = stored() {
+        if store.add(made) == errSecDuplicateItem, let stored = store.read() {
             return stored
         }
         return made

@@ -6,8 +6,14 @@
 import SwiftUI
 
 /// Today's three scores as rings in three zones, low, fair and high, with
-/// a bead riding at the score. The band fills zone by zone behind the bead;
-/// a short ink tick across the band marks the person's usual.
+/// a bead riding at the score. The band fills zone by zone behind the bead,
+/// each zone a step deeper in the aspect's colour.
+///
+/// Where a score has a range, a thin arc in the secondary ink just outside
+/// the band spans it, so a value inside it, short of it or past it reads at
+/// a glance without a legend. Without a range, a short ink tick across the
+/// band marks the person's usual, if there is one. A missing score is a
+/// dash over an empty track, with no bead.
 ///
 /// Each dial is its own tap target and the source of the zoom into its
 /// page. Under Reduce Motion the dials are drawn settled.
@@ -36,8 +42,9 @@ public struct SomaScoreZones: View {
     }
 }
 
-/// One zoned ring: the three zones' track, the band filled zone by zone to
-/// the score, the usual's tick across it and the bead at the score.
+/// One zoned ring: the range arc outside it, the three zones' track, the
+/// band filled zone by zone to the score, the usual's tick across it when
+/// there is no range, and the bead at the score.
 private struct SomaZonesDial: View {
     let score: SomaRingScore
     let shown: Bool
@@ -47,43 +54,53 @@ private struct SomaZonesDial: View {
 
     var body: some View {
         let metrics = theme.metrics
+        let ink = theme.colors.inkSecondary.color
         let hue = theme.aspects[score.aspect].identity.color
         let filled = shown ? (score.fraction ?? 0) : 0
         let band = StrokeStyle(lineWidth: metrics.scoreZonesStroke, lineCap: .butt)
         let gap = metrics.scoreZonesGapDegrees / 360
+        // The range arc keeps the outer rim whether a score has a range or
+        // not, so the three rings in a row are always one size.
+        let rangeWidth = metrics.scoreDialRangeStroke
+        let ringInset = rangeWidth + metrics.scoreZonesRangeClearance + metrics.scoreZonesBead / 2
 
         ZStack {
-            SomaZoneBand(gap: gap, upTo: 1)
-                .stroke(hue.opacity(metrics.scoreTrackOpacity), style: band)
-            // Each zone a step deeper than the one before, so a high score
-            // reads as the colour gathering, not just the band growing.
-            ForEach(0..<3, id: \.self) { zone in
-                SomaZoneBand(gap: gap, upTo: filled, only: zone)
-                    .stroke(hue.opacity(metrics.scoreZonesDepth[zone]), style: band)
+            if let range = score.rangeShares {
+                SomaRangeArc(from: range.lowerBound, to: range.upperBound)
+                    .stroke(ink, style: StrokeStyle(lineWidth: rangeWidth, lineCap: .round))
+                    .padding(rangeWidth / 2)
+                    .opacity(shown ? 1 : 0)
             }
-            if let usual = score.usualFraction {
-                SomaUsualTick(
-                    share: usual,
-                    length: metrics.scoreZonesUsualLength,
-                    inset: -metrics.scoreZonesUsualLength / 2
-                )
-                .stroke(
-                    theme.colors.inkSecondary.color,
-                    style: StrokeStyle(lineWidth: metrics.scoreZonesUsualWidth, lineCap: .round)
-                )
-                .opacity(shown ? 1 : 0)
+            ZStack {
+                SomaZoneBand(gap: gap, upTo: 1)
+                    .stroke(hue.opacity(metrics.scoreTrackOpacity), style: band)
+                // Each zone a step deeper than the one before, so a high score
+                // reads as the colour gathering, not just the band growing.
+                ForEach(0..<3, id: \.self) { zone in
+                    SomaZoneBand(gap: gap, upTo: filled, only: zone)
+                        .stroke(hue.opacity(metrics.scoreZonesDepth[zone]), style: band)
+                }
+                if score.range == nil, let usual = score.usualFraction {
+                    SomaUsualTick(
+                        share: usual,
+                        length: metrics.scoreZonesUsualLength,
+                        inset: -metrics.scoreZonesUsualLength / 2
+                    )
+                    .stroke(ink, style: StrokeStyle(lineWidth: metrics.scoreZonesUsualWidth, lineCap: .round))
+                    .opacity(shown ? 1 : 0)
+                }
+                SomaDialBead(share: filled) {
+                    Circle()
+                        .fill(hue)
+                        .padding(metrics.scoreZonesBeadRim)
+                        .background(Circle().fill(theme.colors.canvas.color))
+                        .frame(width: metrics.scoreZonesBead, height: metrics.scoreZonesBead)
+                }
+                .opacity(score.value == nil ? 0 : 1)
             }
-            SomaDialBead(share: filled) {
-                Circle()
-                    .fill(hue)
-                    .padding(metrics.scoreZonesBeadRim)
-                    .background(Circle().fill(theme.colors.canvas.color))
-                    .frame(width: metrics.scoreZonesBead, height: metrics.scoreZonesBead)
-            }
-            .opacity(score.value == nil ? 0 : 1)
+            .padding(ringInset)
             SomaDialFigure(score: score, font: theme.typography.scoreDialFigure, shown: shown)
         }
-        .padding(metrics.scoreZonesBead / 2)
         .somaDialMotion(shown: shown, delay: delay, value: score.value)
     }
 }
@@ -119,12 +136,70 @@ struct SomaZoneBand: Shape {
     }
 }
 
+/// The thin arc that spans a score's range, on the dial's clock: twelve
+/// o'clock is zero, all the way round is 100. Empty for a range with no
+/// width, so a degenerate range never draws a stray dot.
+struct SomaRangeArc: Shape {
+    let from: Double
+    let to: Double
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        guard to > from else { return path }
+        let centre = CGPoint(x: rect.midX, y: rect.midY)
+        let radius = min(rect.width, rect.height) / 2
+        path.move(to: SomaDialGeometry.point(from, radius: radius, centre: centre))
+        path.addArc(center: centre, radius: radius,
+                    startAngle: SomaDialGeometry.angle(from), endAngle: SomaDialGeometry.angle(to), clockwise: false)
+        return path
+    }
+}
+
+/// One radial tick at `share` of the turn, `inset` in from the rim.
+struct SomaUsualTick: Shape {
+    var share: Double
+    let length: CGFloat
+    let inset: CGFloat
+
+    var animatableData: Double {
+        get { share }
+        set { share = newValue }
+    }
+
+    func path(in rect: CGRect) -> Path {
+        let centre = CGPoint(x: rect.midX, y: rect.midY)
+        let outer = min(rect.width, rect.height) / 2 - inset
+        var path = Path()
+        path.move(to: SomaDialGeometry.point(share, radius: outer, centre: centre))
+        path.addLine(to: SomaDialGeometry.point(share, radius: outer - length, centre: centre))
+        return path
+    }
+}
+
+/// A mark carried round the dial's circle to `share` of the turn by a
+/// rotation, so it moves in step with an arc drawn to the same share.
+struct SomaDialBead<Mark: View>: View {
+    let share: Double
+    @ViewBuilder let mark: Mark
+
+    var body: some View {
+        GeometryReader { proxy in
+            let radius = min(proxy.size.width, proxy.size.height) / 2
+            mark
+                .offset(y: -radius)
+                .frame(width: proxy.size.width, height: proxy.size.height)
+                .rotationEffect(.degrees(share * 360))
+        }
+    }
+}
+
 #Preview("Score zones") {
     ZStack {
         SomaPreviewBackdrop()
         VStack(spacing: 32) {
-            SomaScoreZones(SomaScoreStylePreview.scores, onSelect: { _ in })
-            SomaScoreZones(SomaScoreStylePreview.missing, onSelect: { _ in })
+            SomaScoreZones(SomaScoreZonesPreview.ranged, onSelect: { _ in })
+            SomaScoreZones(SomaScoreZonesPreview.usual, onSelect: { _ in })
+            SomaScoreZones(SomaScoreZonesPreview.missing, onSelect: { _ in })
         }
         .padding()
     }

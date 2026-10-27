@@ -239,12 +239,20 @@ public extension SomaPreviewSamples {
 }
 
 public extension SomaPreviewSamples {
-    /// Today's three scores with their usual and their week: a good night,
-    /// a middling mind, a fair day. Every ``SomaScoresStyle`` in the gallery
-    /// draws these.
+    /// Today's three scores the way Today hands them over, each with its
+    /// range: a good night past its range, a mind short of it, a day inside
+    /// it. ``SomaScoreZones`` in the gallery draws these.
     static let todayScores: [SomaRingScore] = [
-        SomaRingScore(aspect: .sleep, value: 87, trend: .up, usual: 78, week: [72, 80, 76, nil, 83, 79, 87]),
-        SomaRingScore(aspect: .mind, value: 41, trend: .down, usual: 58, week: [61, 55, 64, 52, 47, 50, 41]),
-        SomaRingScore(aspect: .activity, value: 68, trend: .up, usual: 52, week: [52, 38, 61, 44, 30, 47, 68]),
+        SomaRingScore(aspect: .sleep, value: 87, trend: .up, range: 70...85),
+        SomaRingScore(aspect: .mind, value: 41, trend: .down, range: 48...68),
+        SomaRingScore(aspect: .activity, value: 68, trend: .up, range: 55...75),
+    ]
+
+    /// The same three scores with only the person's usual, for a caller that
+    /// has no range to give: each dial marks the usual with a tick.
+    static let todayScoresUsual: [SomaRingScore] = [
+        SomaRingScore(aspect: .sleep, value: 87, trend: .up, usual: 78),
+        SomaRingScore(aspect: .mind, value: 41, trend: .down, usual: 58),
+        SomaRingScore(aspect: .activity, value: nil, usual: 52),
     ]
 }

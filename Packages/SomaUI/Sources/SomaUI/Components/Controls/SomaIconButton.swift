@@ -66,7 +66,7 @@ public struct SomaIconLabel: View {
 
     public var body: some View {
         Image(systemName: symbol)
-            .font(.system(size: size * 0.42, weight: .medium))
+            .somaGlyph(theme.typography.glyph, size: size * 0.42)
             .foregroundStyle(
                 style == .glass
                     ? theme.colors.inkPrimary.color

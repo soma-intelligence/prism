@@ -241,6 +241,8 @@ final class LongevityCache {
     @ObservationIgnored private var running: [Lens: Task<Void, Never>] = [:]
     @ObservationIgnored private var store: LongevitySnapshotStore?
     @ObservationIgnored private var hasPreloaded = false
+    /// The last write handed off the main actor; the next one waits for it.
+    @ObservationIgnored private var lastWrite: Task<Void, Never>?
 
     init(store: LongevitySnapshotStore? = nil, now: Date = Date(), calendar: Calendar = .current) {
         attach(store, now: now, calendar: calendar)
@@ -309,13 +311,19 @@ final class LongevityCache {
     }
 
     /// Writes what the lenses show for the next launch: encoded here, written
-    /// off the main actor.
+    /// off the main actor, one write after the other. Two detached writes
+    /// could land in either order, and an older snapshot written last would
+    /// put back a lens the file had already lost.
     private func persist(now: Date) {
         if readAt.count == Lens.allCases.count { cachedAt = nil }
         guard let store else { return }
         let snapshot = LongevitySnapshot(savedAt: now, body: body, mind: mind, environment: environment, outside: outside)
         guard let data = try? JSONEncoder().encode(snapshot) else { return }
-        Task.detached(priority: .utility) { try? store.write(data) }
+        let previous = lastWrite
+        lastWrite = Task.detached(priority: .utility) {
+            await previous?.value
+            try? store.write(data)
+        }
     }
 
     // MARK: - Reads
@@ -418,7 +426,7 @@ enum LongevityLoad {
         let moodStart = calendar.date(byAdding: .day, value: -MindLensModel.moodDays, to: calendar.startOfDay(for: now)) ?? now
         async let scoresRead: Void = health.loadScores()
         async let moodsRead = MindJourneyLoad.moods(since: moodStart, store: .shared)
-        let inputs = await MindLoad.inputs(health)
+        let inputs = await MindLoad.inputs(health, now: now, calendar: calendar)
         var today = ScoreInputsCache.shared.value(for: parts)
         if !ScoreInputsCache.shared.isFresh(parts),
            let source = await health.prepare(ScoreDetailInputs.metrics(for: parts)) {
@@ -426,7 +434,7 @@ enum LongevityLoad {
             today = read
             ScoreInputsCache.shared.store(read, for: parts)
         }
-        let stress = await MindLoad.stress(health, inputs: inputs)
+        let stress = await MindLoad.stress(health, inputs: inputs, calendar: calendar)
         await scoresRead
         return LongevityMindParts(inputs: inputs, stress: stress, today: today, moods: await moodsRead)
     }
