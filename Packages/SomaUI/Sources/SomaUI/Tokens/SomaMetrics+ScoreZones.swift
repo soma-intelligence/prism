@@ -17,6 +17,9 @@ public extension SomaMetrics {
     var scoreDialMarkSpacing: CGFloat { 3 }
     /// A track under a score, as a share of the score's hue.
     var scoreTrackOpacity: Double { 0.14 }
+    /// The same track on a dark ground, where a light share of the hue
+    /// sinks into the page.
+    var scoreTrackOpacityDark: Double { 0.24 }
 
     /// The band the three zones share.
     var scoreZonesStroke: CGFloat { 7 }
@@ -24,6 +27,9 @@ public extension SomaMetrics {
     var scoreZonesGapDegrees: Double { 6 }
     /// How deep each zone's fill is, low to high, as a share of the hue.
     var scoreZonesDepth: [Double] { [0.5, 0.75, 1] }
+    /// The same steps on a dark ground: the low zone at half the hue was
+    /// barely there against the page, so the steps start higher.
+    var scoreZonesDepthDark: [Double] { [0.72, 0.86, 1] }
     /// The bead riding at the score, and the canvas ring that cuts it out of
     /// the band.
     var scoreZonesBead: CGFloat { 13 }

@@ -26,6 +26,17 @@ struct SomaScoreZonesTests {
         #expect(SomaRingScore(aspect: .mind, value: 80).rangeShares == nil)
     }
 
+    @Test("On a dark ground every zone stays deeper than on a light one, and still steps up")
+    func darkDepth() {
+        let metrics = SomaMetrics.standard
+        let light = metrics.scoreZonesDepth
+        let dark = metrics.scoreZonesDepthDark
+        #expect(dark.count == 3)
+        #expect(zip(dark, light).allSatisfy { $0 >= $1 })
+        #expect(dark == dark.sorted())
+        #expect(metrics.scoreTrackOpacityDark > metrics.scoreTrackOpacity)
+    }
+
     @Test("Zones fill one after the next and leave their gaps empty")
     func zones() {
         func zones(_ share: Double) -> Int {

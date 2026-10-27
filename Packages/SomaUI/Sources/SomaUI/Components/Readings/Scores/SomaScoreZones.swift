@@ -51,9 +51,12 @@ private struct SomaZonesDial: View {
     let delay: Double
 
     @Environment(\.somaTheme) private var theme
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         let metrics = theme.metrics
+        let dark = colorScheme == .dark
+        let depth = dark ? metrics.scoreZonesDepthDark : metrics.scoreZonesDepth
         let ink = theme.colors.inkSecondary.color
         let hue = theme.aspects[score.aspect].identity.color
         let filled = shown ? (score.fraction ?? 0) : 0
@@ -73,12 +76,12 @@ private struct SomaZonesDial: View {
             }
             ZStack {
                 SomaZoneBand(gap: gap, upTo: 1)
-                    .stroke(hue.opacity(metrics.scoreTrackOpacity), style: band)
+                    .stroke(hue.opacity(dark ? metrics.scoreTrackOpacityDark : metrics.scoreTrackOpacity), style: band)
                 // Each zone a step deeper than the one before, so a high score
                 // reads as the colour gathering, not just the band growing.
                 ForEach(0..<3, id: \.self) { zone in
                     SomaZoneBand(gap: gap, upTo: filled, only: zone)
-                        .stroke(hue.opacity(metrics.scoreZonesDepth[zone]), style: band)
+                        .stroke(hue.opacity(depth[zone]), style: band)
                 }
                 if score.range == nil, let usual = score.usualFraction {
                     SomaUsualTick(
