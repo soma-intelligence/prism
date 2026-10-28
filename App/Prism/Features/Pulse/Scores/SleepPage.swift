@@ -7,8 +7,8 @@ import SwiftUI
 import SomaUI
 import HealthScoring
 
-/// Last night as Apple Health's sleep data view lays it out: time in bed
-/// and time asleep large, the night's stages, then the night in three parts
+/// Last night with its stages first: the hypnogram, then time in bed and
+/// time asleep, then the night in three parts
 /// (heart, stages, context) the way the reference design sets them under its hypnogram.
 /// The score and the long run are ``SleepTrendsPage``, which opens this one.
 struct SleepPage: View {
@@ -27,20 +27,14 @@ struct SleepPage: View {
         let night = SleepNightSummary.make(scoring: page.stages, inBedStart: inputs?.inBedStart, parts: page.parts)
 
         ScorePageScaffold(aspect: .sleep, title: "Last night") {
-            SomaSleepTotals(inBed: night?.inBed, asleep: night?.asleep)
+            // The night's shape leads: the stages first, the totals under
+            // them (owner, 2026-10-27).
+            SleepNightHypnogram(night: night)
                 .padding(.top, theme.metrics.heroTopPadding)
                 .somaColumnSpan(.full)
 
-            SomaCard {
-                if let night, !night.runs.isEmpty {
-                    SomaHypnogram(runs: night.runs,
-                                  bed: ScoreMath.clock(night.bed),
-                                  wake: ScoreMath.clock(night.wake))
-                } else {
-                    ScoreEmptyPlot(message: "Stages draw here from a night your watch records.")
-                }
-            }
-            .somaColumnSpan(.full)
+            SomaSleepTotals(inBed: night?.inBed, asleep: night?.asleep)
+                .somaColumnSpan(.full)
 
             SleepNightFacts(night: night, dip: ScorePages.nightDip(health.scores, inputs), inputs: inputs)
 

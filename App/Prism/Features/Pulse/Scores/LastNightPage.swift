@@ -41,6 +41,9 @@ struct LastNightPage: View {
                                       nights: scores?.detail.sleepHours ?? [])
 
         ScorePageScaffold(aspect: .sleep, title: "Last night") {
+            // The stages lead, the time asleep under them (owner, 2026-10-27).
+            SleepNightHypnogram(night: summary, calendar: calendar)
+                .padding(.top, theme.metrics.heroTopPadding)
             SomaScoreHero(
                 aspect: .sleep,
                 // The bar already names the page.
