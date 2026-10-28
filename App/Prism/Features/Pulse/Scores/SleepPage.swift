@@ -10,14 +10,17 @@ import HealthScoring
 /// Last night set the way the earlier app's sleep sheet set it (owner,
 /// 2026-10-27): the night full bleed at the head, then its title, its span,
 /// the score's ring and the two totals; then the night read in a sentence,
-/// its parts graded, its stages split, the time asleep against the need, and
-/// the heart and the context through the night. What moved the score and
-/// the move close the page. The long run is ``SleepTrendsPage``.
+/// how you felt on waking, its parts graded, its stages split, the time
+/// asleep against the need, the fourteen night debt, the time it took to
+/// fall asleep, the night's vitals on one toggle and the context around it.
+/// What moved the score and the move follow, and who recorded the night
+/// closes the page (owner, 2026-10-28). The long run is ``SleepTrendsPage``.
 struct SleepPage: View {
     @Environment(HealthDashboard.self) private var health
     @Environment(\.somaTheme) private var theme
     @State private var inputs: ScoreDetailInputs?
     @State private var sheet: Sheet?
+    @State private var rating: TrackRoute?
 
     enum Sheet: String, Identifiable {
         case debt, dip, breathing, environment, built, history
@@ -43,6 +46,8 @@ struct SleepPage: View {
 
             SleepNightRead(lead: page.lead)
 
+            SleepFeltCard { rating = .wake }
+
             SomaCard {
                 VStack(alignment: .leading, spacing: theme.metrics.cardHeaderSpacing) {
                     SomaCardHeader("Sleep quality")
@@ -59,15 +64,44 @@ struct SleepPage: View {
 
             SleepNeedCard(asleep: night?.asleep, needHours: health.scores?.sleepNeedHours)
 
-            SleepNightFacts(night: night, dip: ScorePages.nightDip(health.scores, inputs), inputs: inputs,
-                            parts: [.heart, .context])
+            SleepDebtTile(scores: health.scores) { sheet = .debt }
 
-            ScoreUsualCard(title: "What moved it", aspect: .sleep, lines: page.lines)
+            // Only a night that says when bed was measured this (the earlier
+            // app gated it the same way).
+            if let latency = night?.latency {
+                SleepFallAsleepCard(latency: latency)
+            }
+
+            // The heart through the night is here now, so the facts under it
+            // keep only the context.
+            SleepNightVitals(night: night, inputs: inputs)
+
+            SleepNightFacts(night: night, dip: ScorePages.nightDip(health.scores, inputs), inputs: inputs,
+                            parts: [.context])
+
+            // With the scale above, the time to fall asleep is not printed a
+            // second time among what moved the score.
+            ScoreUsualCard(title: "What moved it", aspect: .sleep,
+                           lines: night?.latency == nil ? page.lines : page.lines.filter { $0.title != "Fell asleep in" })
             if let move = page.move {
                 ScoreMoveCard(move: move, aspect: .sleep)
             }
+
+            SleepSourceFooter(source: inputs?.lastNightSource, night: night)
+                .somaColumnSpan(.full)
         }
-        .scoreInputs([.nights, .heart, .nightHeart, .breathing, .sound], into: $inputs)
+        .scoreInputs([.nights, .heart, .nightHeart, .breathing, .sound, .nightVitals], into: $inputs)
+        .sheet(item: $sheet) { sheet in
+            switch sheet {
+            case .debt: SleepDebtSheet(scores: health.scores)
+            case .dip: NightDipSheet(scores: health.scores, inputs: inputs)
+            case .breathing: BreathingSheet(inputs: inputs)
+            case .environment: SleepEnvironmentSheet(scores: health.scores, inputs: inputs)
+            case .built: SleepBuiltSheet(score: health.scores?.sleep, parts: page.parts)
+            case .history: ScoreHistorySheet(kind: .sleep, scores: health.scores)
+            }
+        }
+        .trackEntrySheet(item: $rating)
     }
 }
 

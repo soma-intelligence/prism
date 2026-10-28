@@ -46,9 +46,16 @@ struct SleepNightFacts: View {
 
     var body: some View {
         VStack(spacing: theme.metrics.cardSpacing) {
-            SomaSegmentedControl(segments: parts.map { SomaSegment(id: $0, title: $0.title) }, selection: part)
+            // One part needs no switch: its name heads the card instead.
+            if parts.count > 1 {
+                SomaSegmentedControl(segments: parts.map { SomaSegment(id: $0, title: $0.title) }, selection: part)
+            }
             SomaCard {
                 VStack(spacing: 0) {
+                    if parts.count == 1 {
+                        SomaCardHeader(part.wrappedValue.title)
+                            .padding(.bottom, theme.metrics.spaceS)
+                    }
                     let facts = facts(part.wrappedValue)
                     ForEach(Array(facts.enumerated()), id: \.element.id) { index, fact in
                         if index > 0 {
@@ -111,27 +118,20 @@ struct SleepNightFacts: View {
                 return Fact(symbol: "circle.fill", title: String(localized: stage.title), value: value, tint: stage.color(theme))
             }
         case .context:
+            // The time to fall asleep, the breathing and the sound have their
+            // own blocks on the Sleep page (the scale and the vitals), so the
+            // context keeps the rest.
             let stages = night?.runs ?? []
             let wakes = stages.filter { $0.stage == .awake && $0.start > (night?.bed ?? .distantPast) }.count
-            var latency: String?
-            if let inBed = inputs?.inBedStart, let first = stages.first(where: { $0.stage != .awake }) {
-                let minutes = first.start.timeIntervalSince(inBed) / 60
-                if minutes >= 0 && minutes < 180 { latency = SomaFormat.duration(minutes * 60) as String }
-            }
             let temperature = inputs?.wristTemperature ?? []
             let center = ScoreMath.median(temperature.dropLast())
             let lastTemp = temperature.last ?? nil
             return [
                 Fact(symbol: "moon.stars.fill", title: "Bedtime", value: night.map { ScoreMath.clock($0.bed, calendar: calendar) }),
                 Fact(symbol: "sunrise.fill", title: "Wake time", value: night.map { ScoreMath.clock($0.wake, calendar: calendar) }),
-                Fact(symbol: "hourglass", title: "Fell asleep in", value: latency),
                 Fact(symbol: "eye.fill", title: "Woke up", value: night == nil ? nil : (wakes == 1 ? "Once" : "\(wakes) times")),
-                Fact(symbol: "lungs.fill", title: "Breathing",
-                     value: (inputs?.respiratory.last ?? nil).map { "\(ScoreMath.number($0, decimals: 1)) /min" }),
                 Fact(symbol: "thermometer.medium", title: "Wrist temperature",
                      value: lastTemp.flatMap { t in center.map { "\(ScoreMath.signed(t - $0, decimals: 1)) °C" } }),
-                Fact(symbol: "ear.fill", title: "Sound",
-                     value: (inputs?.nightSound.last ?? nil).map { "\(Int($0.rounded())) dB" }),
             ]
         }
     }

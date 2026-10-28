@@ -174,4 +174,26 @@ struct ScoreDetailInputsTests {
         #expect(inputs.standHours == nil)
         #expect(inputs.age == nil)
     }
+
+    @Test("Last night's vitals are its own readings in time order, oxygen in percent, nothing from the day")
+    func nightVitals() async {
+        let readings = lastNight + [
+            .test(Metric.oxygen, 0.95, at: at(3)),
+            .test(Metric.oxygen, 0.97, at: at(1)),
+            .test(Metric.oxygen, 0.99, at: at(12)),
+            .test(Metric.respiratory, 14, at: at(2)),
+            .test(Metric.sound, 34, at: at(4)),
+        ]
+        let inputs = await read([.nightVitals], readings)
+        #expect(inputs.lastNightVitals.oxygen.map { $0.value.rounded() } == [97, 95])
+        #expect(inputs.lastNightVitals.breathing.map(\.value) == [14])
+        #expect(inputs.lastNightVitals.sound.map(\.value) == [34])
+        #expect(inputs.lastNightVitals.hrv.isEmpty)
+    }
+
+    @Test("Without the vitals part nothing is read through the night")
+    func noNightVitals() async {
+        let inputs = await read([.nights], lastNight + [.test(Metric.oxygen, 0.95, at: at(3))])
+        #expect(inputs.lastNightVitals == ScoreDetailInputs.NightVitals())
+    }
 }

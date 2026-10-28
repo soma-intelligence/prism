@@ -70,6 +70,9 @@ struct FixtureHealthSource: HealthSampleSource {
         return usual + wobble + jitter + move
     }
 
+    /// The nights read through, reading by reading, rather than once.
+    private static let overnightDays = 30
+
     private static func build(now: Date, calendar: Calendar) -> [String: [HealthReading]] {
         let today = calendar.startOfDay(for: now)
         var out: [String: [HealthReading]] = [:]
@@ -90,8 +93,12 @@ struct FixtureHealthSource: HealthSampleSource {
         for day in 0..<365 {
             add(q + "RestingHeartRate", day: day, hour: 7, value: value(56, wave: 1.5, noise: 1.2, day: day, seed: 1, recent: 9, recentDays: 4))
             add(q + "HeartRateVariabilitySDNN", day: day, hour: 6, value: value(52, wave: 4, noise: 4, day: day, seed: 2, recent: -16, recentDays: 5))
-            add(q + "RespiratoryRate", day: day, hour: 4, value: value(14.5, wave: 0.3, noise: 0.3, day: day, seed: 3))
-            add(q + "OxygenSaturation", day: day, hour: 4, value: value(0.97, wave: 0.004, noise: 0.004, day: day, seed: 4))
+            // Breathing and blood oxygen: one reading a night past the last
+            // month, read through the night within it (below).
+            if day >= overnightDays {
+                add(q + "RespiratoryRate", day: day, hour: 4, value: value(14.5, wave: 0.3, noise: 0.3, day: day, seed: 3))
+                add(q + "OxygenSaturation", day: day, hour: 4, value: value(0.97, wave: 0.004, noise: 0.004, day: day, seed: 4))
+            }
             add(q + "AppleSleepingWristTemperature", day: day, hour: 5, value: value(35.9, wave: 0.1, noise: 0.08, day: day, seed: 5, recent: 0.6, recentDays: 3))
             add(q + "VO2Max", day: day, hour: 18, value: value(41, wave: 0.6, noise: 0.3, day: day, seed: 6) + Double(365 - day) * 0.006, every: 4)
             add(q + "HeartRateRecoveryOneMinute", day: day, hour: 18, value: value(28, wave: 2, noise: 2, day: day, seed: 7), every: 3)
@@ -127,20 +134,52 @@ struct FixtureHealthSource: HealthSampleSource {
             // A night: core, deep and REM, ending on the morning of `day`.
             let asleep = value(7.2, wave: 0.4, noise: 0.5, day: day, seed: 19)
             let bed = -1.0 + value(23, wave: 0.3, noise: 0.3, day: day, seed: 20) - 24
+            // Into bed a while before the first stage, as a watch records it:
+            // the time it took to fall asleep.
+            let latency = max(3, value(14, wave: 5, noise: 6, day: day, seed: 32)) / 60
+            add("HKCategoryTypeIdentifierSleepAnalysis", day: day, hour: bed - latency, value: 0,
+                length: (asleep + latency) * 3600)
             add("HKCategoryTypeIdentifierSleepAnalysis", day: day, hour: bed, value: 4, length: 1.2 * 3600)
             add("HKCategoryTypeIdentifierSleepAnalysis", day: day, hour: bed + 1.2, value: 3, length: (asleep - 2.8) * 3600)
             add("HKCategoryTypeIdentifierSleepAnalysis", day: day, hour: bed + asleep - 1.6, value: 5, length: 1.6 * 3600)
+            // Readings through the night key their wobble on the hour from
+            // the evening before (hour + 24), never on a negative day: the
+            // usual's recent move divides by zero there and the reading
+            // comes out as no number at all.
             // The watch through the night: a heart that settles after the
             // first hours and stirs before waking, and HRV every two hours
             // round the day's own value, so the stress line has a night.
             for hour in stride(from: bed + 0.25, to: bed + asleep, by: 0.5) {
                 let into = hour - bed
                 let settle = 6 * exp(-into / 1.5) + (into > asleep - 1 ? 4 : 0)
-                add(q + "HeartRate", day: day, hour: hour, value: value(51, wave: 1.5, noise: 2, day: day * 31 + Int(hour * 2), seed: 31) + settle)
+                add(q + "HeartRate", day: day, hour: hour, value: value(51, wave: 1.5, noise: 2, day: day * 31 + Int((hour + 24) * 2), seed: 31) + settle)
             }
             for hour in stride(from: bed + 1, to: bed + asleep, by: 2) {
                 add(q + "HeartRateVariabilitySDNN", day: day, hour: hour,
                     value: value(52, wave: 4, noise: 4, day: day, seed: 2, recent: -16, recentDays: 5) + sin(hour) * 6)
+            }
+            // Over the last month the night's breathing, oxygen and the
+            // room's sound reading by reading, for the Sleep page's vitals:
+            // breathing that slows in deep sleep, oxygen that dips a point
+            // in the small hours, and a quiet room with a loud half hour.
+            if day < overnightDays {
+                for hour in stride(from: bed + 0.4, to: bed + asleep, by: 0.5) {
+                    let into = hour - bed
+                    add(q + "RespiratoryRate", day: day, hour: hour,
+                        value: value(14.5, wave: 0.3, noise: 0.5, day: day * 29 + Int((hour + 24) * 2), seed: 3) - (into < 3 ? 0.8 : 0))
+                }
+                for hour in stride(from: bed + 0.7, to: bed + asleep, by: 1) {
+                    let into = hour - bed
+                    add(q + "OxygenSaturation", day: day, hour: hour,
+                        value: min(1, value(0.966, wave: 0.003, noise: 0.006, day: day * 23 + Int(hour + 24), seed: 4) - (into > 3 && into < 5 ? 0.01 : 0)))
+                }
+                for hour in stride(from: bed, to: bed + asleep, by: 1.0 / 3) {
+                    let into = hour - bed
+                    let loud = into > 4.2 && into < 4.8 ? 14.0 : 0
+                    add(q + "EnvironmentalAudioExposure", day: day, hour: hour,
+                        value: max(22, value(31, wave: 2, noise: 4, day: day * 37 + Int((hour + 24) * 3), seed: 33) + loud),
+                        length: 20 * 60)
+                }
             }
             FixtureCalendar.heartRate(day: day, calendar: calendar).forEach { reading in
                 add(q + "HeartRate", day: day, hour: reading.hour, value: reading.value)

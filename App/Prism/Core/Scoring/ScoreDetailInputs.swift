@@ -32,6 +32,18 @@ nonisolated struct ScoreDetailInputs: Sendable, Equatable {
         case today
         /// Heart rate recovery one minute after exercise.
         case heartRecovery
+        /// Last night's breathing, blood oxygen, HRV and sound, reading by
+        /// reading, for the night's vitals.
+        case nightVitals
+    }
+
+    /// Last night's readings, one by one through its window: the series the
+    /// Sleep page's vitals draw. Oxygen in percent, 0 to 100.
+    struct NightVitals: Sendable, Equatable {
+        var breathing: [ScoringTimedValue] = []
+        var oxygen: [ScoringTimedValue] = []
+        var hrv: [ScoringTimedValue] = []
+        var sound: [ScoringTimedValue] = []
     }
 
     /// Days in every series.
@@ -41,6 +53,11 @@ nonisolated struct ScoreDetailInputs: Sendable, Equatable {
     var nights: [ScoringNightWindow?] = []
     /// When last night's time in bed began, where a tracker wrote it.
     var inBedStart: Date?
+    /// What recorded last night: the source that wrote most of its sleep,
+    /// by name as Apple Health keeps it ("Apple Watch", an app).
+    var lastNightSource: String?
+    /// With `.nightVitals`.
+    var lastNightVitals = NightVitals()
     var hrv: [Double?] = []
     var resting: [Double?] = []
     var nightHeartRate: [Double?] = []
@@ -65,6 +82,7 @@ nonisolated struct ScoreDetailInputs: Sendable, Equatable {
         static let restingHeartRate = "HKQuantityTypeIdentifierRestingHeartRate"
         static let hrv = "HKQuantityTypeIdentifierHeartRateVariabilitySDNN"
         static let respiratory = "HKQuantityTypeIdentifierRespiratoryRate"
+        static let oxygen = "HKQuantityTypeIdentifierOxygenSaturation"
         static let wristTemperature = "HKQuantityTypeIdentifierAppleSleepingWristTemperature"
         static let sound = "HKQuantityTypeIdentifierEnvironmentalAudioExposure"
         static let steps = "HKQuantityTypeIdentifierStepCount"
@@ -89,6 +107,7 @@ nonisolated struct ScoreDetailInputs: Sendable, Equatable {
                 out.formUnion([Metric.heartRate, Metric.steps, Metric.activeEnergy, Metric.standHour,
                                Metric.workout, Metric.dateOfBirth])
             case .heartRecovery: out.insert(Metric.heartRecovery)
+            case .nightVitals: out.formUnion([Metric.respiratory, Metric.oxygen, Metric.hrv, Metric.sound])
             }
         }
         return out.sorted()
@@ -131,6 +150,7 @@ nonisolated struct ScoreDetailInputs: Sendable, Equatable {
             inputs.inBedStart = sleepReadings
                 .filter { $0.code == 0 && $0.end > last.start.addingTimeInterval(-3 * 3600) && $0.start <= last.start }
                 .map(\.start).min()
+            inputs.lastNightSource = dominantSource(sleepReadings, in: last)
         }
         let nights = inputs.nights
 
@@ -202,6 +222,21 @@ nonisolated struct ScoreDetailInputs: Sendable, Equatable {
             }
         }
 
+        if parts.contains(.nightVitals), let last = nights.last ?? nil {
+            @Sendable func night(_ identifier: String) async -> [ScoringTimedValue] {
+                await samples(identifier, from: last.start, to: last.end)
+                    .filter { $0.start >= last.start && $0.start <= last.end }
+                    .map { ScoringTimedValue(start: $0.start, end: $0.end, value: $0.value) }
+                    .sorted { $0.start < $1.start }
+            }
+            async let breathing = night(Metric.respiratory)
+            async let oxygen = night(Metric.oxygen)
+            async let hrv = night(Metric.hrv)
+            async let sound = night(Metric.sound)
+            inputs.lastNightVitals = NightVitals(breathing: await breathing, oxygen: percent(await oxygen),
+                                                 hrv: await hrv, sound: await sound)
+        }
+
         if parts.contains(.heartRecovery) {
             let readings = await samples(Metric.heartRecovery, from: first, to: now)
             inputs.heartRecovery = SomaScoresReader.dailyMeans(readings, dayStarts: starts, calendar: calendar)
@@ -211,6 +246,26 @@ nonisolated struct ScoreDetailInputs: Sendable, Equatable {
     }
 
     // MARK: - Pieces
+
+    /// The source that wrote most of the night's sleep, weighed by the time
+    /// each one's stages cover inside `night`. Time in bed alone (code 0)
+    /// does not count: a phone that only noted bedtime did not record the
+    /// night. A tie goes to the name first in order, so the pick is stable.
+    static func dominantSource(_ readings: [HealthReading], in night: ScoringNightWindow) -> String? {
+        var seconds: [String: TimeInterval] = [:]
+        for reading in readings where reading.code != 0 {
+            guard let source = reading.source, !source.isEmpty else { continue }
+            let overlap = min(reading.end, night.end).timeIntervalSince(max(reading.start, night.start))
+            if overlap > 0 { seconds[source, default: 0] += overlap }
+        }
+        return seconds.max { $0.value == $1.value ? $0.key > $1.key : $0.value < $1.value }?.key
+    }
+
+    /// Oxygen as Apple Health stores it, a share of one, in percent; a value
+    /// already past one is taken as percent.
+    static func percent(_ values: [ScoringTimedValue]) -> [ScoringTimedValue] {
+        values.map { $0.value <= 1 ? ScoringTimedValue(start: $0.start, end: $0.end, value: $0.value * 100) : $0 }
+    }
 
     private static func latest(_ identifier: String, in source: any HealthSampleSource) async -> Double? {
         guard let metric = HealthMetricCatalog.metric(for: identifier) else { return nil }

@@ -99,4 +99,18 @@ public extension SomaMetrics {
     var sleepStageRingStroke: CGFloat { 5 }
     /// The track under that ring, against the ink.
     var sleepStageRingTrackOpacity: Double { 0.12 }
+
+    /// The time to fall asleep: the scale's track, the band the night fell
+    /// in set in the sleep colour this strong, and the marker on the track
+    /// with the ring that lifts it off it.
+    var fallAsleepTrackHeight: CGFloat { 6 }
+    var fallAsleepBandOpacity: Double { 0.45 }
+    var fallAsleepMarker: CGFloat { 16 }
+    var fallAsleepMarkerRing: CGFloat { 3 }
+
+    /// The sleep debt plot's legend: the stroke standing for the debt line.
+    var sleepDebtLegendLine: CGFloat { 12 }
+
+    /// The moon on the morning's rating card.
+    var sleepFeltMoon: CGFloat { 40 }
 }

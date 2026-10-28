@@ -30,6 +30,11 @@ struct SleepNightSummary: Equatable, Sendable {
     var runs: [SomaStageRun]
     /// The six parts of the score, a part not scored without a grade.
     var grades: [SomaSleepFactorGrade]
+    /// Seconds awake in bed before the first stage of sleep: from bed, as a
+    /// tracker recorded it or as the night's first awake stretch began, to
+    /// the first stretch asleep. Nil when the night began asleep with no
+    /// bedtime before it, which measured nothing.
+    var latency: TimeInterval? = nil
 
     /// How far before the first stage a recorded bedtime still counts as this
     /// night's: past that it belongs to an earlier one.
@@ -55,7 +60,8 @@ struct SleepNightSummary: Equatable, Sendable {
         let asleep = stages.filter { $0.key != .awake }.values.reduce(0, +)
 
         return SleepNightSummary(bed: bed, wake: wake, inBed: wake.timeIntervalSince(bed), asleep: asleep,
-                                 stages: stages, runs: runs, grades: grades(parts))
+                                 stages: stages, runs: runs, grades: grades(parts),
+                                 latency: latency(runs: runs, bed: bed, bedRecorded: bed < first))
     }
 
     /// From the scoring engine's runs, named the way it names stages.
@@ -76,6 +82,19 @@ struct SleepNightSummary: Equatable, Sendable {
             }
             return SomaStageRun(stage: stage, start: segment.start, end: segment.end)
         }, inBedStart: night.night.bedtime, parts: parts)
+    }
+
+    /// The time from bed to the first stretch asleep, when the night says
+    /// when bed was: a recorded bedtime, or awake stretches before sleep.
+    /// Past ``bedReach`` it is not this night's, and a night with no sleep
+    /// in it has none.
+    static func latency(runs: [SomaStageRun], bed: Date, bedRecorded: Bool) -> TimeInterval? {
+        guard let firstAsleep = runs.first(where: { $0.stage != .awake })?.start else { return nil }
+        let leadsAwake = runs.first?.stage == .awake
+        guard bedRecorded || leadsAwake else { return nil }
+        let seconds = firstAsleep.timeIntervalSince(bed)
+        guard seconds >= 0, seconds <= bedReach else { return nil }
+        return seconds
     }
 
     /// The share of the night a stage took, 0 to 1.

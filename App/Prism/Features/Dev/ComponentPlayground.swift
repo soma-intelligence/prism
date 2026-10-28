@@ -497,6 +497,24 @@ struct ComponentPlayground: View {
                     }
                 }
 
+                entry("SomaFallAsleepScale") {
+                    SomaCard {
+                        SomaFallAsleepScale(latency: SomaPreviewSamples.fallAsleep)
+                    }
+                }
+
+                entry("SomaNightVitals") {
+                    SomaNightVitals(SomaPreviewSamples.nightVitals, window: SomaPreviewSamples.nightWindow,
+                                    labels: SomaPreviewSamples.nightClock)
+                }
+
+                entry("SomaSleepDebtChart") {
+                    SomaCard {
+                        SomaSleepDebtChart(debt: SomaPreviewSamples.debtCarried, shortfall: SomaPreviewSamples.debtShortfall,
+                                           labels: ["14 nights ago", "Last night"])
+                    }
+                }
+
                 entry("SomaSleepTotals") {
                     SomaCard {
                         SomaSleepTotals(inBed: SomaPreviewSamples.nightStages.values.reduce(0, +),

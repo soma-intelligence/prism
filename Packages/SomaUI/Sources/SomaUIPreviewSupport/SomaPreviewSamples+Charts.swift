@@ -70,6 +70,43 @@ public extension SomaPreviewSamples {
     ]
 }
 
+/// The blocks under the night: the time it took to fall asleep, its
+/// vitals and fourteen nights of debt.
+public extension SomaPreviewSamples {
+    /// Twelve minutes awake in bed before the first stage.
+    static let fallAsleep: TimeInterval = 12 * 60
+
+    /// That night, bed to waking.
+    static var nightWindow: DateInterval {
+        DateInterval(start: night.first?.start ?? .now, end: night.last?.end ?? .now)
+    }
+
+    /// The night's clock under its vitals.
+    static let nightClock = ["23:34", "06:39"]
+
+    /// The night's vitals: a heart that settles after the first hours,
+    /// breathing every half hour, HRV a few times, oxygen hourly and the
+    /// room every twenty minutes with one loud half hour.
+    static var nightVitals: [SomaNightVital: [SomaNightReading]] {
+        let start = nightWindow.start
+        func series(every minutes: Double, count: Int, _ value: (Int) -> Double) -> [SomaNightReading] {
+            (0..<count).map { SomaNightReading(start: start.addingTimeInterval(Double($0) * minutes * 60 + 600), value: value($0)) }
+        }
+        return [
+            .heart: series(every: 10, count: 40) { 51 + 7 * exp(-Double($0) / 8) + Double(($0 * 7) % 5) * 0.6 },
+            .breathing: series(every: 30, count: 13) { 14.2 + Double(($0 * 3) % 4) * 0.3 },
+            .hrv: series(every: 120, count: 4) { [48, 61, 66, 54][$0] },
+            .oxygen: series(every: 60, count: 7) { [97, 96.5, 96, 95, 95.5, 96.5, 97][$0] },
+            .noise: series(every: 20, count: 20) { $0 == 12 || $0 == 13 ? 46 : 30 + Double(($0 * 5) % 6) },
+        ]
+    }
+
+    /// Fourteen nights of debt carried, one night missing, and each night's
+    /// own shortfall against the need, over it below zero.
+    static let debtCarried: [Double?] = [1.2, 1.6, 2.4, nil, 2.1, 2.9, 3.4, 3.0, 2.2, 2.6, 3.1, 2.8, 2.0, 1.7]
+    static let debtShortfall: [Double?] = [0.4, 0.4, 0.8, nil, -0.3, 0.8, 0.5, -0.4, -0.8, 0.4, 0.5, -0.3, -0.8, -0.3]
+}
+
 /// Sizes other components still read, kept from the parallel design lines.
 public extension SomaPreviewSamples {
     /// A kept read and the fresh ones after it, for a number rolling
