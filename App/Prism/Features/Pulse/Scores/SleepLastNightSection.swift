@@ -46,20 +46,19 @@ struct SleepLastNightSection: View {
     }
 }
 
-/// The night's stages in lanes, the first thing a sleep page shows (owner,
-/// 2026-10-27). Time in each stage is on the lanes: one graph for the night
-/// (owner, 2026-10-24).
+/// The night's stages, the first thing a sleep page shows (owner,
+/// 2026-10-27), drawn the way the earlier app's sleep sheet led with them:
+/// full bleed on the night's sky, no card and no lane names
+/// (``SomaHypnogram/init(fullBleed:)``). Both night pages, Sleep and Last
+/// night, lead with it. With no stages recorded it says so in a card.
 struct SleepNightHypnogram: View {
     let night: SleepNightSummary?
-    var calendar: Calendar = .current
 
     var body: some View {
-        SomaCard {
-            if let night, !night.runs.isEmpty {
-                SomaHypnogram(runs: night.runs,
-                              bed: night.runs.first.map { ScoreMath.clock($0.start, calendar: calendar) },
-                              wake: ScoreMath.clock(night.wake, calendar: calendar))
-            } else {
+        if let night, !night.runs.isEmpty {
+            SomaHypnogram(fullBleed: night.runs)
+        } else {
+            SomaCard {
                 ScoreEmptyPlot(message: "Stages draw here from a night your watch records.")
             }
         }

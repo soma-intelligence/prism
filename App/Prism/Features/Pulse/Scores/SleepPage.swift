@@ -7,10 +7,12 @@ import SwiftUI
 import SomaUI
 import HealthScoring
 
-/// Last night with its stages first: the hypnogram, then time in bed and
-/// time asleep, then the night in three parts
-/// (heart, stages, context) the way the reference design sets them under its hypnogram.
-/// The score and the long run are ``SleepTrendsPage``, which opens this one.
+/// Last night set the way the earlier app's sleep sheet set it (owner,
+/// 2026-10-27): the night full bleed at the head, then its title, its span,
+/// the score's ring and the two totals; then the night read in a sentence,
+/// its parts graded, its stages split, the time asleep against the need, and
+/// the heart and the context through the night. What moved the score and
+/// the move close the page. The long run is ``SleepTrendsPage``.
 struct SleepPage: View {
     @Environment(HealthDashboard.self) private var health
     @Environment(\.somaTheme) private var theme
@@ -25,18 +27,40 @@ struct SleepPage: View {
     var body: some View {
         let page = ScorePages.sleep(health.scores, inputs)
         let night = SleepNightSummary.make(scoring: page.stages, inBedStart: inputs?.inBedStart, parts: page.parts)
+        let scale = Double(max(page.lead.scale, 1))
 
         ScorePageScaffold(aspect: .sleep, title: "Last night") {
-            // The night's shape leads: the stages first, the totals under
-            // them (owner, 2026-10-27).
+            // The night's shape leads (owner, 2026-10-27), full bleed.
             SleepNightHypnogram(night: night)
                 .padding(.top, theme.metrics.heroTopPadding)
                 .somaColumnSpan(.full)
 
-            SomaSleepTotals(inBed: night?.inBed, asleep: night?.asleep)
+            SomaSleepHeadline(bed: night.map { ScoreMath.clock($0.bed) }, wake: night.map { ScoreMath.clock($0.wake) },
+                              asleep: night?.asleep, inBed: night?.inBed,
+                              score: page.lead.value.map { Double($0) / scale },
+                              usual: page.lead.range.map { ($0.lowerBound / scale)...($0.upperBound / scale) })
                 .somaColumnSpan(.full)
 
-            SleepNightFacts(night: night, dip: ScorePages.nightDip(health.scores, inputs), inputs: inputs)
+            SleepNightRead(lead: page.lead)
+
+            SomaCard {
+                VStack(alignment: .leading, spacing: theme.metrics.cardHeaderSpacing) {
+                    SomaCardHeader("Sleep quality")
+                    SomaSleepGradeGrid(night?.grades ?? SleepNightSummary.grades([]))
+                }
+            }
+
+            SomaCard {
+                VStack(alignment: .leading, spacing: theme.metrics.cardPadding) {
+                    SomaCardHeader("Sleep stages")
+                    SomaStageBreakdown(night?.stages ?? [:])
+                }
+            }
+
+            SleepNeedCard(asleep: night?.asleep, needHours: health.scores?.sleepNeedHours)
+
+            SleepNightFacts(night: night, dip: ScorePages.nightDip(health.scores, inputs), inputs: inputs,
+                            parts: [.heart, .context])
 
             ScoreUsualCard(title: "What moved it", aspect: .sleep, lines: page.lines)
             if let move = page.move {
@@ -44,6 +68,48 @@ struct SleepPage: View {
             }
         }
         .scoreInputs([.nights, .heart, .nightHeart, .breathing, .sound], into: $inputs)
+    }
+}
+
+/// What the night was, in a sentence, under the head: the earlier app's
+/// night read, from the score's own headline and reason.
+private struct SleepNightRead: View {
+    let lead: ScorePages.Lead
+
+    @Environment(\.somaTheme) private var theme
+
+    var body: some View {
+        SomaCard {
+            VStack(alignment: .leading, spacing: theme.metrics.cardHeaderSpacing) {
+                Text("The night")
+                    .somaFont(theme.typography.eyebrow)
+                    .foregroundStyle(theme.colors.inkSecondary.color)
+                ScoreParagraph(lead: lead.headline,
+                               rest: [lead.reason, lead.aside ?? ""].filter { !$0.isEmpty }.joined(separator: " "))
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
+/// The time asleep against the need, side by side, as the earlier app closed
+/// its night: what you slept, and what you need.
+private struct SleepNeedCard: View {
+    let asleep: TimeInterval?
+    let needHours: Double?
+
+    @Environment(\.somaTheme) private var theme
+
+    var body: some View {
+        SomaCard {
+            VStack(alignment: .leading, spacing: theme.metrics.cardHeaderSpacing) {
+                SomaCardHeader("Against your need")
+                SomaStatRow([
+                    SomaStat("Slept", value: SomaFormat.duration(asleep)),
+                    SomaStat("Needed", value: SomaFormat.duration(needHours.map { $0 * 3600 })),
+                ])
+            }
+        }
     }
 }
 

@@ -35,6 +35,57 @@ public extension SomaMetrics {
     var hypnogramLaneLabelWidth: CGFloat { 52 }
     var hypnogramPlotInset: CGFloat { 6 }
 
+    /// The full bleed night, read off the earlier app's sleep sheet (owner,
+    /// 2026-10-27): no card, no lane names, four lanes with a block in the
+    /// middle of each at a little over half its height, cornered and ringed
+    /// in a shade of its colour, a minute awake still a pill, and a hairline
+    /// on the seam between two stages. Under the plot, the room the night's
+    /// ground takes to fade into the page.
+    var hypnogramBleedLaneHeight: CGFloat { 58 }
+    var hypnogramBleedBlockShare: CGFloat { 0.62 }
+    var hypnogramBleedBlockRadius: CGFloat { 6 }
+    var hypnogramBleedMinBlockWidth: CGFloat { 2.5 }
+    var hypnogramBleedRimWidth: CGFloat { 4 }
+    var hypnogramBleedThreadWidth: CGFloat { 1.5 }
+    var hypnogramBleedFoot: CGFloat { 48 }
+    /// How far a stage's colour sinks into the page for its rim, and for the
+    /// thread that joins it to the next stage.
+    var hypnogramBleedRimShade: Double { 0.58 }
+    var hypnogramBleedThreadShade: Double { 0.42 }
+    /// While a finger reads the night, how far the blocks it is not on fade.
+    var hypnogramBleedDimmed: Double { 0.45 }
+    /// The finger's cursor, and the reading floating over the plot.
+    var hypnogramBleedCursorWidth: CGFloat { 1.5 }
+    /// The cursor's strength at its ends and in its middle, so it fades out
+    /// both ways and reads as a cursor rather than a hard rule.
+    var hypnogramBleedCursorEnds: Double { 0.05 }
+    var hypnogramBleedCursorPeak: Double { 0.6 }
+    /// How strong the night's sky already is halfway down the plot, before
+    /// it reaches its full colour at the deep lane.
+    var hypnogramBleedSkyRise: Double { 0.55 }
+    var hypnogramBleedReadingWidth: CGFloat { 104 }
+    var hypnogramBleedReadingDot: CGFloat { 6 }
+
+    /// The head under the full bleed night, set as the earlier app set its
+    /// hero: a moon in a disc beside the title and the night's span, the
+    /// score's ring on the trailing edge, and the two totals under them.
+    var sleepHeadlineDisc: CGFloat { 38 }
+    var sleepHeadlineDiscGlyph: CGFloat { 18 }
+    var sleepHeadlineDiscFill: Double { 0.12 }
+    var sleepHeadlineDiscRim: Double { 0.2 }
+    var sleepHeadlineDiscRimWidth: CGFloat { 1 }
+    var sleepHeadlineDial: CGFloat { 78 }
+    var sleepHeadlineSpacing: CGFloat { 16 }
+
+    /// The stage breakdown: the stacked bar's height, its corner and the gap
+    /// between two stages, the dot leading a row, and the pill a share sits in.
+    var sleepStageBarHeight: CGFloat { 18 }
+    var sleepStageBarRadius: CGFloat { 6 }
+    var sleepStageBarGap: CGFloat { 3 }
+    var sleepStageDot: CGFloat { 10 }
+    var sleepStageShareWidth: CGFloat { 56 }
+    var sleepStageShareHeight: CGFloat { 24 }
+
     /// The glyph at the head of the period row, and of each grade cell.
     var sleepGlyphSize: CGFloat { 15 }
     /// A grade's progress bar: its length, and its height.

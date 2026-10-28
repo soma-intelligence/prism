@@ -650,6 +650,7 @@ public struct SomaHypnogram: View {
     private let laneHeight: CGFloat?
     private let ends: (bed: String?, wake: String?)?
     private let showsLaneTitles: Bool
+    private let bleeds: Bool
 
     @Environment(\.somaTheme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -668,6 +669,7 @@ public struct SomaHypnogram: View {
         self.laneHeight = laneHeight
         self.ends = nil
         self.showsLaneTitles = laneTitles
+        self.bleeds = false
     }
 
     /// Full width, the night's two ends under it: bed under a moon, wake under
@@ -678,13 +680,29 @@ public struct SomaHypnogram: View {
         self.laneHeight = laneHeight
         self.ends = (bed, wake)
         self.showsLaneTitles = false
+        self.bleeds = false
+    }
+
+    /// The night leading a page, the way the earlier app's sleep sheet led
+    /// with it: full bleed on the night's sky, no card, no lane names and no
+    /// axis, ringed blocks and hairline seams, read with a sideways drag.
+    /// The page gives the bed and wake times elsewhere.
+    public init(fullBleed runs: [SomaStageRun]) {
+        self.runs = runs.sorted { $0.start < $1.start }
+        self.xLabels = []
+        self.laneHeight = nil
+        self.ends = nil
+        self.showsLaneTitles = false
+        self.bleeds = true
     }
 
     public var body: some View {
         let metrics = theme.metrics
         let lane = laneHeight ?? (ends == nil ? metrics.hypnogramLaneHeight : metrics.hypnogramTallLaneHeight)
 
-        if let ends {
+        if bleeds {
+            SomaBleedNight(runs: runs)
+        } else if let ends {
             night(lane: lane, ends: ends)
         } else {
             compact(lane: lane)

@@ -351,6 +351,202 @@ public struct SomaStageTile: View {
     }
 }
 
+// MARK: - Headline
+
+/// The head of a sleep page under its full bleed night, set the way the
+/// earlier app set the foot of its sleep hero (owner, 2026-10-27): a moon in
+/// a faint disc, the title over the night's span from bed to wake, the score's
+/// ring on the trailing edge, and under them the two totals, time asleep
+/// first, each a large duration over its name.
+///
+/// A missing time or total reads as the drawn missing mark; with no score
+/// the ring is left out.
+public struct SomaSleepHeadline: View {
+    private let title: LocalizedStringResource
+    private let bed: String?
+    private let wake: String?
+    private let asleep: TimeInterval?
+    private let inBed: TimeInterval?
+    private let score: Double?
+    private let usual: ClosedRange<Double>?
+
+    @Environment(\.somaTheme) private var theme
+
+    /// - Parameters:
+    ///   - bed: the clock time the night began, as the app prints it.
+    ///   - wake: the clock time it ended.
+    ///   - score: the night's score as a share of its ring, 0 to 1.
+    ///   - usual: the person's usual score, in the same shares.
+    public init(title: LocalizedStringResource = "Sleep", bed: String?, wake: String?,
+                asleep: TimeInterval?, inBed: TimeInterval?, score: Double? = nil,
+                usual: ClosedRange<Double>? = nil) {
+        self.title = title
+        self.bed = bed
+        self.wake = wake
+        self.asleep = asleep
+        self.inBed = inBed
+        self.score = score
+        self.usual = usual
+    }
+
+    public var body: some View {
+        let metrics = theme.metrics
+        let type = theme.typography
+        let colors = theme.colors
+        let ink = colors.inkPrimary.color
+        let span: String? = if let bed, let wake { "\(bed) to \(wake)" } else { nil }
+
+        VStack(alignment: .leading, spacing: metrics.sleepHeadlineSpacing) {
+            HStack(alignment: .bottom, spacing: metrics.spaceM) {
+                Circle()
+                    .fill(ink.opacity(metrics.sleepHeadlineDiscFill))
+                    .overlay(Circle().strokeBorder(ink.opacity(metrics.sleepHeadlineDiscRim),
+                                                lineWidth: metrics.sleepHeadlineDiscRimWidth))
+                    .overlay {
+                        Image(systemName: "moon.stars.fill")
+                            .somaGlyph(type.headerTitle, size: metrics.sleepHeadlineDiscGlyph)
+                            .foregroundStyle(ink)
+                    }
+                    .frame(width: metrics.sleepHeadlineDisc, height: metrics.sleepHeadlineDisc)
+                    .accessibilityHidden(true)
+
+                VStack(alignment: .leading, spacing: metrics.spaceXS) {
+                    Text(title)
+                        .somaFont(type.title)
+                        .foregroundStyle(ink)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                    HStack(spacing: metrics.spaceXS) {
+                        Image(systemName: "clock")
+                            .somaGlyph(type.caption, size: type.caption.size * 0.85)
+                            .accessibilityHidden(true)
+                        SomaNumber(span, type.captionValue)
+                    }
+                    .foregroundStyle(colors.inkSecondary.color)
+                }
+                .accessibilityElement(children: .combine)
+
+                Spacer(minLength: metrics.spaceS)
+
+                if let score {
+                    SomaScoreDial(aspect: .sleep, dial: .fill(score), usual: usual,
+                                  number: "\(Int((score * 100).rounded()))")
+                        .frame(width: metrics.sleepHeadlineDial, height: metrics.sleepHeadlineDial)
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel(Text("Sleep score"))
+                        .accessibilityValue(Text(verbatim: "\(Int((score * 100).rounded()))"))
+                }
+            }
+
+            HStack(alignment: .top, spacing: metrics.spaceS) {
+                figure(asleep, "Asleep")
+                figure(inBed, "In bed")
+            }
+        }
+    }
+
+    private func figure(_ seconds: TimeInterval?, _ name: LocalizedStringResource) -> some View {
+        let type = theme.typography
+
+        return VStack(alignment: .leading, spacing: theme.metrics.spaceXS / 2) {
+            SomaDurationText(seconds, figures: type.metricCompact, units: type.caption)
+                .foregroundStyle(theme.colors.inkPrimary.color)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            Text(name)
+                .somaFont(type.caption)
+                .foregroundStyle(theme.colors.inkSecondary.color)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+// MARK: - Stage breakdown
+
+/// The night split by stage, as the earlier app's sleep sheet split it: one
+/// bar across the width cut into the stages in their colours, deepest first,
+/// then a row a stage with its dot, its name, its time and its share of the
+/// night in a pill. A stage never reached takes no room in the bar.
+public struct SomaStageBreakdown: View {
+    private let durations: [SomaSleepStage: TimeInterval]
+
+    @Environment(\.somaTheme) private var theme
+
+    /// Deepest first, the order the bar and the rows read in.
+    nonisolated static let order: [SomaSleepStage] = [.deep, .core, .rem, .awake]
+
+    /// Seconds in each stage; a stage left out reads as a dash.
+    public init(_ durations: [SomaSleepStage: TimeInterval]) {
+        self.durations = durations
+    }
+
+    /// Each stage's width in a bar `width` wide with `gap` between two
+    /// stages shown, in ``order``: the shown stages and their gaps fill the
+    /// width exactly, and a stage with no time gets none.
+    nonisolated static func widths(_ durations: [SomaSleepStage: TimeInterval], width: CGFloat, gap: CGFloat) -> [CGFloat] {
+        let seconds = order.map { max(0, durations[$0] ?? 0) }
+        let total = seconds.reduce(0, +)
+        let shown = seconds.filter { $0 > 0 }.count
+        guard total > 0, shown > 0, width > 0 else { return order.map { _ in 0 } }
+        let room = max(0, width - CGFloat(shown - 1) * gap)
+        return seconds.map { $0 > 0 ? room * CGFloat($0 / total) : 0 }
+    }
+
+    public var body: some View {
+        let metrics = theme.metrics
+        let total = durations.values.reduce(0, +)
+
+        VStack(alignment: .leading, spacing: metrics.cardPadding) {
+            GeometryReader { proxy in
+                let widths = Self.widths(durations, width: proxy.size.width, gap: metrics.sleepStageBarGap)
+                HStack(spacing: metrics.sleepStageBarGap) {
+                    ForEach(Array(Self.order.enumerated()), id: \.element) { index, stage in
+                        if widths[index] > 0 {
+                            RoundedRectangle(cornerRadius: metrics.sleepStageBarRadius, style: .continuous)
+                                .fill(stage.color(theme))
+                                .frame(width: widths[index])
+                        }
+                    }
+                }
+            }
+            .frame(height: metrics.sleepStageBarHeight)
+            .accessibilityHidden(true)
+
+            VStack(spacing: metrics.spaceM) {
+                ForEach(Self.order, id: \.self) { stage in
+                    row(stage, seconds: durations[stage], share: total > 0 ? durations[stage].map { $0 / total } : nil)
+                }
+            }
+        }
+    }
+
+    private func row(_ stage: SomaSleepStage, seconds: TimeInterval?, share: Double?) -> some View {
+        let metrics = theme.metrics
+        let type = theme.typography
+        let colors = theme.colors
+
+        return HStack(spacing: metrics.spaceM) {
+            Circle()
+                .fill(stage.color(theme))
+                .frame(width: metrics.sleepStageDot, height: metrics.sleepStageDot)
+            Text(stage.title)
+                .somaFont(type.body)
+                .foregroundStyle(colors.inkPrimary.color)
+            Spacer(minLength: metrics.spaceS)
+            SomaNumber(SomaFormat.duration(seconds), type.rowValue)
+                .foregroundStyle(colors.inkPrimary.color)
+            SomaNumber(share.map { "\(Int(($0 * 100).rounded()))%" }, type.captionValue)
+                .foregroundStyle(colors.inkSecondary.color)
+                .padding(.horizontal, metrics.spaceS)
+                .frame(height: metrics.sleepStageShareHeight)
+                .background(Capsule().fill(colors.surfaceRecessed.color))
+                .frame(width: metrics.sleepStageShareWidth, alignment: .trailing)
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
 // MARK: - Previews
 
 #Preview("Sleep period and totals") {
@@ -387,5 +583,22 @@ public struct SomaStageTile: View {
         SomaPreviewBackdrop()
         SomaStageTiles([.awake: 903, .rem: 6_358, .core: 15_578, .deep: 2_681])
             .padding()
+    }
+}
+
+#Preview("Headline and stage breakdown") {
+    ZStack {
+        SomaPreviewBackdrop()
+        VStack(spacing: SomaMetrics.standard.cardSpacing) {
+            SomaSleepHeadline(bed: "23:34", wake: "06:39", asleep: 24_619, inBed: 25_522, score: 0.82, usual: 0.7...0.86)
+            SomaSleepHeadline(bed: nil, wake: nil, asleep: nil, inBed: nil)
+            SomaCard {
+                VStack(alignment: .leading, spacing: SomaMetrics.standard.cardHeaderSpacing) {
+                    SomaCardHeader("Sleep stages")
+                    SomaStageBreakdown([.awake: 903, .rem: 6_358, .core: 15_578, .deep: 2_681])
+                }
+            }
+        }
+        .padding()
     }
 }

@@ -21,6 +21,11 @@ public extension SomaMotion {
     var chartMorph: Animation { .spring(duration: 0.5, bounce: 0.08) }
     /// The readout and the rule following a finger across the plot.
     var chartScrub: Animation { .interactiveSpring(duration: 0.18) }
+    /// A full bleed night filling in left to right the first time it shows:
+    /// the earlier app's sweep, a firm spring with no visible bounce.
+    var nightSweep: Animation { .spring(response: 0.5, dampingFraction: 0.88) }
+    /// The blocks a finger is not on dimming back, and coming back up.
+    var nightEmphasis: Animation { .easeInOut(duration: 0.18) }
     /// The still counterpart of a morph under Reduce Motion.
     var chartFade: Animation { .easeOut(duration: 0.2) }
     /// A number rolling to its new value.

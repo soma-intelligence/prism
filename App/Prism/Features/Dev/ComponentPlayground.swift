@@ -372,6 +372,8 @@ struct ComponentPlayground: View {
 
                 entry("SomaHypnogram") {
                     VStack(spacing: theme.metrics.cardSpacing) {
+                        // The full bleed night that leads the two night pages.
+                        SomaHypnogram(fullBleed: SomaPreviewSamples.night)
                         SomaCard {
                             SomaHypnogram(runs: SomaPreviewSamples.night, bed: "23:34", wake: "06:39")
                         }
@@ -479,6 +481,19 @@ struct ComponentPlayground: View {
                 entry("SomaSleepPeriodRow") {
                     SomaCard {
                         SomaSleepPeriodRow(bed: "23:34", wake: "06:39")
+                    }
+                }
+
+                entry("SomaSleepHeadline") {
+                    let stages = SomaPreviewSamples.nightStages
+                    SomaSleepHeadline(bed: "23:34", wake: "06:39",
+                                      asleep: stages.filter { $0.key != .awake }.values.reduce(0, +),
+                                      inBed: stages.values.reduce(0, +), score: 0.82, usual: 0.7...0.86)
+                }
+
+                entry("SomaStageBreakdown") {
+                    SomaCard {
+                        SomaStageBreakdown(SomaPreviewSamples.nightStages)
                     }
                 }
 

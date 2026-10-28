@@ -189,6 +189,9 @@ struct SomaScoreDial: View {
     let aspect: SomaAspect
     let dial: SomaScoreHero.Dial
     let usual: ClosedRange<Double>?
+    /// The score itself in the middle, in place of the aspect's glyph, for
+    /// a ring that stands alone with no number beside it.
+    var number: String? = nil
 
     @Environment(\.somaTheme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -233,8 +236,13 @@ struct SomaScoreDial: View {
             case .none:
                 EmptyView()
             }
-            SomaAspectGlyph(aspect, style: .caption)
-                .foregroundStyle(hue)
+            if let number {
+                SomaNumber(number, theme.typography.metricCompact)
+                    .foregroundStyle(theme.colors.inkPrimary.color)
+            } else {
+                SomaAspectGlyph(aspect, style: .caption)
+                    .foregroundStyle(hue)
+            }
         }
         .padding(stroke / 2)
         .onAppear {

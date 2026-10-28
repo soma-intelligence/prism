@@ -15,6 +15,8 @@ struct SleepNightFacts: View {
     let dip: ScorePages.NightDip?
     let inputs: ScoreDetailInputs?
     var calendar: Calendar = .current
+    /// The parts offered, in order; the first shows first.
+    var parts: [Part] = Part.allCases
 
     enum Part: String, CaseIterable, Hashable {
         case heart, stages, context
@@ -35,15 +37,19 @@ struct SleepNightFacts: View {
         var tint: Color?
     }
 
-    @State private var part: Part = .heart
+    @State private var chosen: Part?
     @Environment(\.somaTheme) private var theme
+
+    private var part: Binding<Part> {
+        Binding(get: { chosen ?? parts.first ?? .heart }, set: { chosen = $0 })
+    }
 
     var body: some View {
         VStack(spacing: theme.metrics.cardSpacing) {
-            SomaSegmentedControl(segments: Part.allCases.map { SomaSegment(id: $0, title: $0.title) }, selection: $part)
+            SomaSegmentedControl(segments: parts.map { SomaSegment(id: $0, title: $0.title) }, selection: part)
             SomaCard {
                 VStack(spacing: 0) {
-                    let facts = facts(part)
+                    let facts = facts(part.wrappedValue)
                     ForEach(Array(facts.enumerated()), id: \.element.id) { index, fact in
                         if index > 0 {
                             Rectangle()
