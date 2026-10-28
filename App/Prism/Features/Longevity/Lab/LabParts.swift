@@ -118,8 +118,7 @@ struct LabBandLine: View {
                         Text(verbatim: status.word).foregroundStyle(status.color)
                         Text(verbatim: "·").foregroundStyle(colors.inkSecondary.color)
                     }
-                    Text(item.value ?? "-")
-                        .somaFont(theme.typography.rowValue)
+                    SomaNumber(item.value, theme.typography.rowValue)
                         .foregroundStyle(colors.inkPrimary.color)
                 }
                 .somaFont(theme.typography.caption)
@@ -195,7 +194,7 @@ extension LabBandItem {
         var detail = reading.rangeText ?? "no reference range"
         if let previous {
             let before = LabMath.reading(previous.value)
-            let number = LabMath.format(before.value, decimals: LabMath.decimals(for: before.value)) ?? "-"
+            let number = SomaFormat.number(before.value, decimals: LabMath.decimals(for: before.value))
             detail += " · \(number) in \(previous.date.formatted(.dateTime.month(.wide)))"
         }
         let band: ClosedRange<Double>? = (reading.low != nil || reading.high != nil)

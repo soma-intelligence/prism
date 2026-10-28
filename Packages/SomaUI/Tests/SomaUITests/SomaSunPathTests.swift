@@ -41,15 +41,16 @@ struct SomaSunPathTests {
 
     @Test("Daylight and what comes next, in hours and minutes")
     func words() {
-        #expect(SomaSunGeometry.duration(day.length) == "12h 0m")
-        #expect(SomaSunGeometry.duration(45 * 60) == "45m")
+        let english = Locale(identifier: "en_US")
+        #expect(SomaSunGeometry.duration(day.length, locale: english) == "12h")
+        #expect(SomaSunGeometry.duration(45 * 60, locale: english) == "45m")
         #expect(day.isUp(at: start.addingTimeInterval(12 * 3_600)))
         #expect(!day.isUp(at: start.addingTimeInterval(20 * 3_600)))
         let before = String(localized: day.next(at: start.addingTimeInterval(5 * 3_600)))
         let during = String(localized: day.next(at: start.addingTimeInterval(17 * 3_600)))
         let after = String(localized: day.next(at: start.addingTimeInterval(20 * 3_600)))
-        #expect(before == "Sunrise in 2h 0m")
-        #expect(during == "Sunset in 2h 0m")
-        #expect(after == "Sun set 1h 0m ago")
+        #expect(before == "Sunrise in 2h")
+        #expect(during == "Sunset in 2h")
+        #expect(after == "Sun set 1h ago")
     }
 }

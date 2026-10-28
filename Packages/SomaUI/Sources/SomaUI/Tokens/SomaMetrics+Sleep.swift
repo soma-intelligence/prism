@@ -49,11 +49,3 @@ public extension SomaMetrics {
     /// The track under that ring, against the ink.
     var sleepStageRingTrackOpacity: Double { 0.12 }
 }
-
-/// Sizes other components still read, kept from the parallel design lines.
-public extension SomaMetrics {
-    /// The glyph in the moon and sun chips under the hypnogram.
-    var hypnogramEndGlyph: CGFloat { 10 }
-    /// The chips' inner padding, across and down.
-    var hypnogramEndPadding: CGFloat { 6 }
-}

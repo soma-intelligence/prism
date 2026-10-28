@@ -168,7 +168,9 @@ struct TrackCustomizeView: View {
         }
     }
 
-    /// One tile or step: a plus or a minus, its glyph and its name.
+    /// One tile or step: a plus or a minus, its glyph and its name. The
+    /// minus only moves a tile to "More to add", so it is a quiet neutral
+    /// disc, never the red that reads as deleting; the plus wears the same.
     private func itemRow(_ title: String, glyph: SomaTrackGlyph.Kind, tone: SomaTrackTone,
                          control: Control, action: @escaping () -> Void) -> some View {
         let metrics = theme.metrics
@@ -177,9 +179,9 @@ struct TrackCustomizeView: View {
             Button(action: action) {
                 Image(systemName: control == .add ? "plus" : "minus")
                     .font(.system(size: metrics.trackAnswerGlyph, weight: .bold))
-                    .foregroundStyle(colors.surface.color)
+                    .foregroundStyle(colors.inkSecondary.color)
                     .frame(width: metrics.journalMarkDiameter * 0.8, height: metrics.journalMarkDiameter * 0.8)
-                    .background(Circle().fill(control == .add ? SomaTrackTone.sage.color : SomaTrackTone.clay.color))
+                    .background(Circle().fill(colors.surfaceRecessed.color))
                     .frame(width: metrics.minimumTapTarget, height: metrics.minimumTapTarget)
                     .contentShape(.rect)
             }
@@ -223,7 +225,7 @@ struct TrackCustomizeView: View {
         let style = TrackTagStyle.of(tag.id)
         return HStack(spacing: theme.metrics.browseRowSpacing) {
             SomaTrackGlyph(style.glyph, tone: style.tone, style: .row)
-                .opacity(tag.isOffered ? 1 : 0.5)
+                .opacity(tag.isOffered ? 1 : theme.motion.dimOpacity)
             Toggle(tag.title, isOn: Binding(
                 get: { tag.isOffered },
                 set: { journal.setOffered($0, tag: tag.id) }

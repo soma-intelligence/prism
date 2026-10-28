@@ -203,8 +203,8 @@ public struct SomaLinkPair: View {
                                 .fill(lane.color)
                                 .frame(width: metrics.linkPairLaneWidth, height: metrics.linkTrackHeight)
                                 .position(point)
-                            Text(verbatim: lane.text ?? SomaLinkPairLayout.number(index == 0 ? layout.lowAverage : layout.highAverage))
-                                .somaFont(theme.typography.rowValue)
+                            SomaNumber(lane.text ?? SomaLinkPairLayout.number(index == 0 ? layout.lowAverage : layout.highAverage),
+                                       theme.typography.rowValue)
                                 .foregroundStyle(index == 0 ? colors.inkSecondary.color : colors.inkPrimary.color)
                                 .fixedSize()
                                 .position(x: point.x, y: point.y - metrics.linkPairLabelRoom / 2 - metrics.linkTrackHeight)
@@ -275,8 +275,8 @@ struct SomaLinkPairLayout: Equatable {
     }
 
     /// An average as the column writes it: whole past ten, one decimal under.
-    static func number(_ value: Double?) -> String {
-        guard let value else { return "-" }
+    static func number(_ value: Double?) -> String? {
+        guard let value else { return nil }
         return abs(value) >= 10 ? String(Int(value.rounded())) : String(format: "%.1f", value)
     }
 }

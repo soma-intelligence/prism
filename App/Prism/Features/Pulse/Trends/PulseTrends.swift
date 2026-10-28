@@ -304,7 +304,7 @@ private struct PulseTrendsBuilder {
         switch aspect {
         case .sleep: return "\(direction) \(words.span(abs(gap))) a night"
         case .mind: return "\(direction) \(words.whole(abs(gap))) ms"
-        default: return "\(direction) \(words.whole(abs(gap))) min a day"
+        default: return "\(direction) \(words.duration(abs(gap) * 60)) a day"
         }
     }
 
@@ -354,7 +354,7 @@ private struct PulseTrendsBuilder {
         case .mind:
             "Your HRV \(gap > 0 ? "rose" : "fell") \(words.whole(abs(gap))) ms against the 30 days before."
         default:
-            "You exercised \(words.whole(abs(gap))) min \(gap > 0 ? "more" : "less") a day than the 30 days before."
+            "You exercised \(words.duration(abs(gap) * 60)) \(gap > 0 ? "more" : "less") a day than the 30 days before."
         }
     }
 
@@ -362,7 +362,7 @@ private struct PulseTrendsBuilder {
         switch aspect {
         case .sleep: "nights are \(words.span(abs(gap))) shorter"
         case .mind: "HRV is down \(words.whole(abs(gap))) ms"
-        default: "exercise is down \(words.whole(abs(gap))) min a day"
+        default: "exercise is down \(words.duration(abs(gap) * 60)) a day"
         }
     }
 
@@ -449,7 +449,7 @@ private struct PulseTrendsBuilder {
         }
         let average = PulseTrends.mean(known.map(\.1)) ?? 0
         guard known.count >= 30 else {
-            return PulseTrends.Year(nights: nights, average: words.clock(average * 3600),
+            return PulseTrends.Year(nights: nights, average: words.duration(average * 3600),
                                     note: "\(words.count(known.count, "night", "nights").capitalizedFirst) so far. The spiral fills one night at a time.",
                                     peakLabel: nil, peakNights: [])
         }
@@ -489,7 +489,7 @@ private struct PulseTrendsBuilder {
 
         return PulseTrends.Year(
             nights: nights,
-            average: words.clock(average * 3600),
+            average: words.duration(average * 3600),
             note: sentences.isEmpty ? "Nights over the last year, one dot each." : sentences.joined(separator: " "),
             peakLabel: peakLabel,
             peakNights: peakNights

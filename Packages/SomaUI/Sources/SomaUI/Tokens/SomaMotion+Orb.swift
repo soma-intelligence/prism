@@ -17,8 +17,6 @@ public extension SomaMotion {
     /// How far the orb grows at the top of a breath, as a share of its size.
     /// Small enough to be felt rather than seen.
     var orbBreathDepth: Double { 0.014 }
-    /// How much brighter the halo glows at the top of a breath.
-    var orbHaloBreath: Double { 0.22 }
     /// The weather's pace at rest against the aspect's own speed: the
     /// website's flow, slowed until it drifts.
     var orbFlowRate: Double { 0.3 }
@@ -46,12 +44,4 @@ public enum SomaOrbIdle {
     public static func scale(at time: Double, period: Double, depth: Double) -> Double {
         1 + depth * breath(at: time, period: period)
     }
-}
-
-public extension SomaMotion {
-    /// The longest the orb waits between frames while it rests, with no
-    /// travel to a new look: its drift is slow enough that thirty frames a
-    /// second read as smooth, where a ProMotion screen would otherwise draw
-    /// the shader a hundred and twenty times a second.
-    var orbRestFrameInterval: Double { 1.0 / 30.0 }
 }

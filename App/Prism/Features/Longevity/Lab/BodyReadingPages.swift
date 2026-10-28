@@ -29,7 +29,7 @@ struct WeightPage: View {
         TabPartScaffold(
             aspect: nil,
             eyebrow: latest.map { "Last weighed · \($0.date.formatted(.dateTime.weekday(.wide).day().month(.wide)))" },
-            title: latest.map { "\(LabMath.format($0.value, decimals: 1) ?? "-") kg\(abs(twelve ?? 1) < 0.5 ? ", and steady." : ".")" } ?? "No weight yet.",
+            title: latest.map { "\(SomaFormat.number($0.value, decimals: 1)) kg\(abs(twelve ?? 1) < 0.5 ? ", and steady." : ".")" } ?? "No weight yet.",
             reason: reason(twelve: twelve),
             stats: []
         ) {
@@ -45,11 +45,11 @@ struct WeightPage: View {
             coaching(MetricCoaching.weight, latest?.value, usual: band)
             LabRowGroup(heading: "By period", rows: [(7, "7 days"), (30, "30 days"), (84, "12 weeks")].map { days, title in
                 LabRow(title, detail: LabMath.change(weights, days: days, now: now, calendar: .current)
-                    .flatMap { LabMath.signed($0, decimals: 1) }.map { "\($0) kg" } ?? "-")
+                    .flatMap { LabMath.signed($0, decimals: 1) }.map { "\($0) kg" })
             })
             LabRowGroup(heading: "What it is made of", rows: [
-                LabRow("Lean body mass", detail: lean.flatMap { LabMath.format($0.value, decimals: 1) }.map { "\($0) kg" } ?? "-", route: .leanMass),
-                LabRow("Body fat", detail: fat.flatMap { LabMath.format($0.value * 100, decimals: 1) }.map { "\($0)%" } ?? "-"),
+                LabRow("Lean body mass", detail: lean.flatMap { LabMath.format($0.value, decimals: 1) }.map { "\($0) kg" }, route: .leanMass),
+                LabRow("Body fat", detail: fat.flatMap { LabMath.format($0.value * 100, decimals: 1) }.map { "\($0)%" }),
             ])
             LabLogCard(eyebrow: "Weigh-in", title: "Mornings, before breakfast",
                        detail: "Same scale, same time: the line stays honest.", actionTitle: "Log weight",
@@ -148,8 +148,10 @@ struct BloodPressurePage: View {
             value: "\(Int(value))", band: band.map { p($0.lowerBound)...p($0.upperBound) }, position: p(value))
     }
 
-    private func text(_ readings: [PressureReading]) -> String {
-        guard let s = LabMath.mean(readings.map(\.systolic)), let d = LabMath.mean(readings.map(\.diastolic)) else { return "-" }
+    /// The mean pressure of `readings`, nil when there are none: the row
+    /// then carries no value rather than a dash.
+    private func text(_ readings: [PressureReading]) -> String? {
+        guard let s = LabMath.mean(readings.map(\.systolic)), let d = LabMath.mean(readings.map(\.diastolic)) else { return nil }
         return "\(Int(s.rounded()))/\(Int(d.rounded()))"
     }
 
@@ -179,7 +181,7 @@ struct LeanMassPage: View {
             eyebrow: first.map { "Since \($0.date.labDay)" },
             title: latest.map { l in
                 let change = first.map { l.value - $0.value } ?? 0
-                let base = "\(LabMath.format(l.value, decimals: 1) ?? "-") kg"
+                let base = "\(SomaFormat.number(l.value, decimals: 1)) kg"
                 guard abs(change) >= 0.1, let first else { return base + "." }
                 return base + ", \(LabMath.format(abs(change), decimals: 1) ?? "") \(change > 0 ? "more" : "less") than on \(first.date.labDay)."
             } ?? "No lean mass yet.",
@@ -200,12 +202,9 @@ struct LeanMassPage: View {
                 if lean.count >= 2 { LabLineChart(points: lean) }
             }
             coaching(MetricCoaching.leanMass, latest?.value, usual: LabMath.usualBand(lean.suffix(10).map(\.value)))
-            SomaChartCard(eyebrow: "By region", value: nil, unit: "kg lean", note: "Your first visit to the pod draws this.") {
-                BodySilhouette()
-            }
             if !lean.isEmpty {
                 LabRowGroup(heading: "Reading by reading", rows: lean.suffix(5).reversed().map { point in
-                    LabRow(point.date.labDay, detail: "\(LabMath.format(point.value, decimals: 1) ?? "-") kg")
+                    LabRow(point.date.labDay, detail: "\(SomaFormat.number(point.value, decimals: 1)) kg")
                 })
             }
             LabLogCard(eyebrow: "Log", title: "From a scale or a scan",
@@ -488,8 +487,7 @@ struct LabLogSheet: View {
         VStack(spacing: theme.metrics.spaceS) {
             if let title { LabEyebrow(title) }
             HStack(alignment: .firstTextBaseline, spacing: theme.metrics.spaceS) {
-                Text(LabMath.format(value.wrappedValue, decimals: kind.step < 1 ? 1 : 0) ?? "-")
-                    .somaFont(theme.typography.metric)
+                SomaNumber(LabMath.format(value.wrappedValue, decimals: kind.step < 1 ? 1 : 0), theme.typography.metric)
                     .foregroundStyle(theme.colors.inkPrimary.color)
                 Text(kind.unit)
                     .somaFont(theme.typography.callout)

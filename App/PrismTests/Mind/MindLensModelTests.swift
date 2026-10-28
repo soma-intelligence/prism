@@ -93,11 +93,12 @@ struct MindLensModelTests {
         #expect(days.last?.valence == nil)
     }
 
-    @Test("Minutes read as hours and minutes on a clock face")
+    @Test("Minutes read as hours and minutes, the way every duration in the app reads")
     func duration() {
-        #expect(MindLensFormat.duration(336) == "5:36")
-        #expect(MindLensFormat.duration(59.6) == "1:00")
-        #expect(MindLensFormat.duration(0) == "0:00")
+        let english = Locale(identifier: "en_US")
+        #expect(MindLensFormat.duration(336, locale: english) == "5h 36m")
+        #expect(MindLensFormat.duration(59.6, locale: english) == "1h")
+        #expect(MindLensFormat.duration(0, locale: english) == "0m")
     }
 
     // MARK: Reading

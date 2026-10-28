@@ -195,7 +195,6 @@ struct VaultDataTypePage: View {
             VStack(alignment: .leading, spacing: theme.metrics.cardSpacing) {
                 Text("Sources")
                     .somaFont(theme.typography.eyebrow)
-                    .textCase(.uppercase)
                     .foregroundStyle(theme.colors.inkSecondary.color)
                     .accessibilityAddTraits(.isHeader)
                 SomaSourceList(listed) {
@@ -203,7 +202,7 @@ struct VaultDataTypePage: View {
                         SomaBrowseRow(title: "All readings")
                             .contentShape(.rect)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(.somaBrowseRow)
                 }
                 .animation(reduceMotion ? nil : theme.motion.chartFade, value: listed)
             }
@@ -386,7 +385,7 @@ struct VaultDataTypePage: View {
 
     private func format(_ value: Double) -> String {
         if isSleep || score?.isDuration == true {
-            return Duration.seconds((value * 3600).rounded()).formatted(.units(allowed: [.hours, .minutes], width: .narrow))
+            return SomaFormat.duration(value * 3600)
         }
         if score?.isClock == true {
             let hour = value.truncatingRemainder(dividingBy: 24)

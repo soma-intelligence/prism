@@ -139,12 +139,13 @@ struct MindBreatheSheet: View {
                 .foregroundStyle(colors.inkPrimary.color)
                 .accessibilityAddTraits(.isHeader)
             HStack(alignment: .firstTextBaseline, spacing: theme.metrics.spaceS) {
-                Text(minutes >= 1 ? "\(minutes)" : "-")
-                    .somaFont(type.display)
+                SomaNumber(minutes >= 1 ? "\(minutes)" : nil, type.display)
                     .foregroundStyle(colors.inkPrimary.color)
-                Text(minutes == 1 ? "minute" : "minutes")
-                    .somaFont(type.callout)
-                    .foregroundStyle(colors.inkSecondary.color)
+                if minutes >= 1 {
+                    Text(minutes == 1 ? "minute" : "minutes")
+                        .somaFont(type.callout)
+                        .foregroundStyle(colors.inkSecondary.color)
+                }
             }
             .accessibilityElement(children: .combine)
             Text(minutes >= 1

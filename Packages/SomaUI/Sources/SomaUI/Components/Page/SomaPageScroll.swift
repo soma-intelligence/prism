@@ -12,8 +12,11 @@ import SwiftUI
 /// a column a third of a point wider than the screen (a rounded padding, a
 /// label that will not wrap, a fixed size chart) lets a finger drag the
 /// whole page sideways and leaves it there. Here the column is framed to the
-/// scroll view's own width (`containerRelativeFrame(.horizontal)`), so there
-/// is nothing to scroll across. Anything wider than that is a layout bug to
+/// scroll view's own width, so there is nothing to scroll across. Not
+/// `containerRelativeFrame(.horizontal)`: a vertical scroll view
+/// is no container along the horizontal axis, so that frame took the window's
+/// width, and a page scroll narrower than the window (a drawer, a split pane)
+/// overflowed and was clipped. Anything wider than that is a layout bug to
 /// fix where it is; this only keeps it from moving the page.
 ///
 /// Modifiers that act on the scroll views within a view (`scrollPosition`,
@@ -31,11 +34,19 @@ public struct SomaPageScroll<Content: View>: View {
     @Environment(\.somaPartIsCurrent) private var isCurrent
     @Environment(\.somaEdgeFadeSink) private var fadeSink
     @State private var last = SomaPageScrollReading()
+    /// The width the column is shown at; nil until the first layout, when
+    /// the column takes the width the scroll view offers.
+    @State private var width: CGFloat?
 
     public var body: some View {
         ScrollView(.vertical, showsIndicators: showsIndicators) {
             content
-                .containerRelativeFrame(.horizontal)
+                .frame(width: width)
+        }
+        .onGeometryChange(for: CGFloat.self) { proxy in
+            proxy.size.width
+        } action: { shown in
+            width = shown
         }
         // Kept without redrawing the page, for the moment its part of a tab
         // comes on screen and the fade over the bar has to read this scroll.

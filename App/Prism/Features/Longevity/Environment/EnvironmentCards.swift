@@ -103,7 +103,7 @@ struct EnvironmentLensContent: View {
                             PulseYearGridView(grid: report.grid, style: .squares, levels: [1, 15, EnvironmentReport.outsideMinutes, 60])
                                 .accessibilityElement()
                                 .accessibilityLabel("Days outside this year")
-                                .accessibilityValue(report.daysOutside.map { "\($0) days" } ?? "-")
+                                .accessibilityValue(report.daysOutside.map { "\($0) days" } ?? SomaFormat.notMeasured)
                         }
                     }
                 }
@@ -155,8 +155,7 @@ private struct EnvironmentDaylightCard: View {
             HStack(alignment: .center, spacing: metrics.cardSpacing) {
                 SomaArcGauge(scale: .daylight, value: report.daylight, band: report.daylightUsual) {
                     VStack(spacing: 0) {
-                        Text(verbatim: report.daylight.map(EnvironmentMeasure.daylight.format) ?? "-")
-                            .somaFont(type.metric)
+                        SomaNumber(report.daylight.map(EnvironmentMeasure.daylight.format), type.metric)
                             .foregroundStyle(colors.inkPrimary.color)
                         Text("min")
                             .somaFont(type.caption)
@@ -179,7 +178,7 @@ private struct EnvironmentDaylightCard: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Daylight")
-        .accessibilityValue(report.daylight.map { "\(Int($0.rounded())) minutes" } ?? "-")
+        .accessibilityValue(report.daylight.map { "\(Int($0.rounded())) minutes" } ?? SomaFormat.notMeasured)
     }
 }
 
@@ -204,7 +203,7 @@ private struct EnvironmentScaleCard: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(verbatim: measure.title))
-        .accessibilityValue(Text(verbatim: value.map(measure.format) ?? "-"))
+        .accessibilityValue(Text(verbatim: value.map(measure.format) ?? SomaFormat.notMeasured))
     }
 }
 
@@ -268,8 +267,7 @@ private struct EnvironmentPollenCard: View {
             Text(verbatim: kind.title)
                 .somaFont(theme.typography.caption)
                 .foregroundStyle(theme.colors.inkSecondary.color)
-            Text(verbatim: level?.word ?? "-")
-                .somaFont(theme.typography.rowValue)
+            SomaNumber(level?.word, theme.typography.rowValue)
                 .foregroundStyle(level.map(Self.color) ?? theme.colors.inkSecondary.color)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -343,7 +341,7 @@ private struct EnvironmentWeekCard: View {
         .accessibilityLabel("This week")
         .accessibilityValue(hasDaylight
             ? "\(week.daylightDaysReached) of \(EnvironmentWeek.days) days with \(Int(EnvironmentWeek.daylightTarget.lowerBound)) minutes of daylight or more"
-            : "-")
+            : SomaFormat.notMeasured)
     }
 }
 
@@ -457,12 +455,13 @@ private struct EnvironmentLevelRow: View {
                     .lineLimit(1)
             }
             HStack(alignment: .firstTextBaseline, spacing: metrics.spaceXS) {
-                Text(verbatim: value.map(measure.format) ?? "-")
-                    .somaFont(type.metricCompact)
-                    .foregroundStyle(value == nil ? colors.inkSecondary.color : colors.inkPrimary.color)
-                Text("dB")
-                    .somaFont(type.caption)
-                    .foregroundStyle(colors.inkSecondary.color)
+                SomaNumber(value.map(measure.format), type.metricCompact)
+                    .foregroundStyle(colors.inkPrimary.color)
+                if value != nil {
+                    Text("dB")
+                        .somaFont(type.caption)
+                        .foregroundStyle(colors.inkSecondary.color)
+                }
             }
             Text(verbatim: status?.word ?? (measure == .headphones ? "7 day average" : "Now"))
                 .somaFont(type.caption)
@@ -488,7 +487,7 @@ private struct EnvironmentLevelRow: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(verbatim: measure.title))
-        .accessibilityValue(Text(verbatim: value.map { "\(measure.format($0)) decibels" } ?? "-"))
+        .accessibilityValue(Text(verbatim: value.map { "\(measure.format($0)) decibels" } ?? SomaFormat.notMeasured))
     }
 
     /// Where a level sits on the meter, which runs from 30 to 100 dB.
@@ -612,7 +611,7 @@ private struct EnvironmentBedroomCard: View {
                         Text("Last night")
                             .foregroundStyle(colors.inkSecondary.color)
                         Spacer(minLength: 0)
-                        Text(verbatim: bedroom.place ?? "-")
+                        Text(verbatim: bedroom.place ?? String(localized: "Unnamed place"))
                             .foregroundStyle(colors.inkPrimary.color)
                         Image(systemName: "chevron.right")
                             .foregroundStyle(colors.inkSecondary.color)
@@ -641,8 +640,7 @@ private struct EnvironmentBedroomFact: View {
                 .somaFont(theme.typography.body)
                 .foregroundStyle(tint)
                 .frame(width: theme.metrics.environmentPillDisc, height: theme.metrics.environmentPillDisc)
-            Text(verbatim: value ?? "-")
-                .somaFont(theme.typography.rowValue)
+            SomaNumber(value, theme.typography.rowValue)
                 .foregroundStyle(value == nil ? colors.inkSecondary.color : colors.inkPrimary.color)
             Text(label)
                 .somaFont(theme.typography.caption)
@@ -742,8 +740,7 @@ struct EnvironmentValue: View {
     var body: some View {
         let colors = theme.colors
         HStack(alignment: .firstTextBaseline, spacing: 4) {
-            Text(verbatim: text ?? "-")
-                .somaFont(theme.typography.metric)
+            SomaNumber(text, theme.typography.metric)
                 .foregroundStyle(text == nil ? colors.inkSecondary.color : (tint ?? colors.inkPrimary.color))
             if text != nil, !unit.isEmpty {
                 Text(verbatim: unit)
@@ -769,8 +766,7 @@ private struct EnvironmentFigure: View {
                 .somaFont(theme.typography.eyebrow)
                 .foregroundStyle(colors.inkSecondary.color)
             HStack(alignment: .firstTextBaseline, spacing: theme.metrics.spaceXS) {
-                Text(verbatim: value ?? "-")
-                    .somaFont(theme.typography.rowValue)
+                SomaNumber(value, theme.typography.rowValue)
                     .foregroundStyle(value == nil ? colors.inkSecondary.color : colors.inkPrimary.color)
                 if let unit, value != nil {
                     Text(verbatim: unit)

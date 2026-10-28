@@ -19,7 +19,7 @@ struct HomeTodayExtraCard: View {
             TileLink(value: HomeRoute.nutrition) { HomeNutritionCard() }
         case .stand:
             Button { open(.stand) } label: { HomeStandCard() }
-                .buttonStyle(TilePressStyle())
+                .buttonStyle(.somaGlassPress)
         case .cycle:
             TileLink(value: HomeRoute.cycle) { HomeCycleCard() }
         default:
@@ -138,7 +138,7 @@ struct HomeTodayFoot: View {
                     SomaQuietPill("All measures", systemImage: "magnifyingglass")
                 }
             }
-            .buttonStyle(TilePressStyle())
+            .buttonStyle(.somaGlassPress)
             .frame(maxWidth: .infinity)
             .padding(.top, metrics.cardSpacing)
         }

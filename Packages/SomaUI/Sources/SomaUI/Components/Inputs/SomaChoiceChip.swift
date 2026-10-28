@@ -83,6 +83,10 @@ public struct SomaChoiceChip: View {
 
 /// The one primary action at the foot of a screen: a full width capsule in
 /// the accent. The secondary style is the quiet choice beside it, "Skip".
+///
+/// Disabled, either role sits on the recessed surface with its label in the
+/// secondary ink at full strength: it reads as not yet, and still reads. A
+/// faded accent was grey on grey, nearly gone on the dark ground.
 public struct SomaActionButton: View {
     public enum Role: Sendable {
         case primary
@@ -109,14 +113,25 @@ public struct SomaActionButton: View {
         Button(action: action) {
             Text(title)
                 .somaFont(theme.typography.body)
-                .foregroundStyle(role == .primary ? colors.onAccent.color : colors.inkPrimary.color)
+                .foregroundStyle(ink)
                 .lineLimit(1)
                 .frame(maxWidth: .infinity, minHeight: metrics.minimumTapTarget + metrics.cardSpacing)
-                .background(Capsule().fill(role == .primary ? colors.accent.color : colors.surface.color))
-                .opacity(isEnabled ? 1 : 0.4)
+                .background(Capsule().fill(fill))
                 .contentShape(.capsule)
         }
         .buttonStyle(.somaGlassPress)
+    }
+
+    private var ink: Color {
+        let colors = theme.colors
+        guard isEnabled else { return colors.inkSecondary.color }
+        return role == .primary ? colors.onAccent.color : colors.inkPrimary.color
+    }
+
+    private var fill: Color {
+        let colors = theme.colors
+        guard isEnabled else { return colors.surfaceRecessed.color }
+        return role == .primary ? colors.accent.color : colors.surface.color
     }
 }
 
@@ -138,6 +153,7 @@ public struct SomaActionButton: View {
                 SomaChoiceChip("Family", symbol: "house", style: .tinted(.gut)) {}
             }
             SomaActionButton("Save") {}
+            SomaActionButton("Log it") {}.disabled(true)
             SomaActionButton("Skip", role: .secondary) {}
         }
         .padding()

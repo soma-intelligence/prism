@@ -19,6 +19,9 @@ public struct SomaStat: Identifiable, Sendable {
     public var unit: LocalizedStringResource?
     /// Nil when it held steady, or when there is nothing to compare it with.
     public var trend: SomaTrend?
+    /// Which way is good news, so the trend mark can say so: neither by
+    /// default, which draws the mark in the secondary ink.
+    public var better: SomaBetterSide
     /// A few words on what the value means, set under it. Under a dash, what
     /// the reading is waiting for. Never a sentence.
     public var cue: LocalizedStringResource?
@@ -29,6 +32,7 @@ public struct SomaStat: Identifiable, Sendable {
         value: String?,
         unit: LocalizedStringResource? = nil,
         trend: SomaTrend? = nil,
+        better: SomaBetterSide = .neither,
         cue: LocalizedStringResource? = nil,
         cueTone: SomaCueTone = .neutral
     ) {
@@ -36,6 +40,7 @@ public struct SomaStat: Identifiable, Sendable {
         self.value = value
         self.unit = unit
         self.trend = trend
+        self.better = better
         self.cue = cue
         self.cueTone = cueTone
     }
@@ -63,7 +68,7 @@ public struct SomaStatRow: View {
             ForEach(stats) { stat in
                 let view = SomaStatView(
                     label: stat.label, value: stat.value, unit: stat.unit, trend: stat.trend,
-                    cue: stat.cue, cueTone: stat.cueTone
+                    better: stat.better, cue: stat.cue, cueTone: stat.cueTone
                 )
                 .frame(maxWidth: .infinity)
                 if let onSelect {
@@ -83,6 +88,7 @@ struct SomaStatView: View {
     let value: String?
     let unit: LocalizedStringResource?
     let trend: SomaTrend?
+    var better: SomaBetterSide = .neither
     var cue: LocalizedStringResource? = nil
     var cueTone: SomaCueTone = .neutral
 
@@ -120,7 +126,7 @@ struct SomaStatView: View {
                 .minimumScaleFactor(0.7)
 
                 if let trend, value != nil {
-                    SomaTrendMark(trend: trend)
+                    SomaTrendMark(trend: trend, better: better)
                 }
             }
 

@@ -14,9 +14,6 @@ public extension SomaMetrics {
     var questionProgressDot: CGFloat { 6 }
     /// Gap between two progress dots.
     var questionProgressSpacing: CGFloat { 6 }
-    /// Inset between a question sheet's edges and what it holds, the same on
-    /// every platform: the pills and the orbs never run to the edge.
-    var questionSheetInset: CGFloat { 24 }
     /// Gap between the question and its answer.
     var questionAnswerGap: CGFloat { 32 }
     /// Opacity of what is not chosen: a dot to come, the pill passed over.
@@ -70,7 +67,4 @@ public extension SomaMotion {
     var cardAdvance: Animation { .spring(duration: 0.42, bounce: 0.16) }
     /// The same change under Reduce Motion: a crossfade, nothing travels.
     var cardAdvanceReduced: Animation { .easeInOut(duration: 0.2) }
-    /// How long a chosen answer holds before the next question comes, in
-    /// seconds: long enough to see the orb grow, short enough not to wait.
-    var answerHold: Double { 0.34 }
 }

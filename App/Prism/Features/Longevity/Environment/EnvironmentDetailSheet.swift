@@ -82,9 +82,10 @@ struct EnvironmentDetailBody: View {
                                    format: { $0.formatted(.number.precision(.fractionLength(0))) })
                         .frame(height: 200)
                 } else {
-                    Text(verbatim: "-")
-                        .somaFont(theme.typography.metric)
+                    Text("A few more days of readings draw this chart.")
+                        .somaFont(theme.typography.callout)
                         .foregroundStyle(colors.inkSecondary.color)
+                        .multilineTextAlignment(.center)
                         .frame(maxWidth: .infinity, minHeight: 200)
                 }
             }
@@ -102,8 +103,9 @@ struct EnvironmentDetailBody: View {
                         SomaBrowseRow(title: "All records", detail: nil)
                             .contentShape(.rect)
                     }
-                    .zoomSource(VaultRoute.dataType(link.type))
-                    .buttonStyle(.plain)
+                    // A list row: the row's wash on press and a plain push,
+                    // as every browse row opens, never a card zoom.
+                    .buttonStyle(.somaBrowseRow)
                 }
             }
         }

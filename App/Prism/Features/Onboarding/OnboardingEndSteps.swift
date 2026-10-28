@@ -26,8 +26,7 @@ struct OnboardingReadyView: View {
     private var stepsValue: String? { health.value(Self.steps) }
     private var asleepValue: String? {
         guard let seconds = health.durations[Self.sleep], seconds > 0 else { return nil }
-        let minutes = Int((seconds / 60).rounded())
-        return String(format: "%d:%02d", minutes / 60, minutes % 60)
+        return SomaFormat.duration(seconds) as String
     }
     private var variabilityValue: String? { health.value(Self.variability) }
 

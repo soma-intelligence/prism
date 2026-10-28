@@ -648,7 +648,7 @@ public struct SomaHypnogram: View {
     private let runs: [SomaStageRun]
     private let xLabels: [String]
     private let laneHeight: CGFloat?
-    private let ends: (bed: String, wake: String)?
+    private let ends: (bed: String?, wake: String?)?
     private let showsLaneTitles: Bool
 
     @Environment(\.somaTheme) private var theme
@@ -671,12 +671,12 @@ public struct SomaHypnogram: View {
     }
 
     /// Full width, the night's two ends under it: bed under a moon, wake under
-    /// a sun. A missing time reads as a dash.
+    /// a sun. A missing time is the drawn missing mark.
     public init(runs: [SomaStageRun], bed: String?, wake: String?, laneHeight: CGFloat? = nil) {
         self.runs = runs.sorted { $0.start < $1.start }
         self.xLabels = []
         self.laneHeight = laneHeight
-        self.ends = (bed ?? "-", wake ?? "-")
+        self.ends = (bed, wake)
         self.showsLaneTitles = false
     }
 
@@ -698,7 +698,7 @@ public struct SomaHypnogram: View {
     /// clock under it from bed to wake, and a readout over it that a
     /// sideways drag turns into the stage and time under the finger, the
     /// block there lit and the others dimmed.
-    private func night(lane: CGFloat, ends: (bed: String, wake: String)) -> some View {
+    private func night(lane: CGFloat, ends: (bed: String?, wake: String?)) -> some View {
         let metrics = theme.metrics
         let colors = theme.colors
         let type = theme.typography
@@ -766,11 +766,10 @@ public struct SomaHypnogram: View {
 
                 // Bed under the night's first edge, wake under its last.
                 HStack {
-                    Text(verbatim: ends.bed)
+                    SomaNumber(ends.bed, type.captionValue)
                     Spacer(minLength: 0)
-                    Text(verbatim: ends.wake)
+                    SomaNumber(ends.wake, type.captionValue)
                 }
-                .somaFont(type.captionValue)
                 .foregroundStyle(colors.inkSecondary.color)
                 .padding(.leading, gutter)
                 .accessibilityHidden(true)
@@ -1054,7 +1053,8 @@ public struct SomaHypnogram: View {
             minutes[stage].map { "\(String(localized: stage.title)) \($0) min" }
         }.joined(separator: ", ")
         guard let ends else { return stages }
-        return "\(ends.bed) to \(ends.wake). " + stages
+        let missing = SomaFormat.notMeasured
+        return "\(ends.bed ?? missing) to \(ends.wake ?? missing). " + stages
     }
 }
 

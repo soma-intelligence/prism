@@ -166,9 +166,7 @@ public struct SomaHabitMark: View {
                 }
                 .padding(metrics.journalMarkLine)
             case .missing:
-                Text("-")
-                    .somaFont(theme.typography.rowValue)
-                    .foregroundStyle(colors.inkSecondary.color)
+                SomaMissingValue(theme.typography.rowValue)
             }
         }
         .frame(width: diameter, height: diameter)
@@ -286,21 +284,18 @@ public struct SomaTriStateControl: View {
     }
 
     /// The chosen segment's pill: a wash of ink over the track on the dark
-    /// ground, the card's own surface with a soft shadow on the light one.
-    @ViewBuilder
+    /// ground, the card's own surface on the light one, and the card's rim
+    /// around it on both. Flat: a tonal step and a line, never a shadow.
     private var raisedPill: some View {
         let metrics = theme.metrics
         let colors = theme.colors
-        if scheme == .dark {
-            Capsule()
-                .fill(colors.inkPrimary.color.opacity(metrics.journalChoiceLiftOpacity))
-                .overlay(Capsule().strokeBorder(colors.inkPrimary.color.opacity(metrics.hairlineOpacity), lineWidth: 0.5))
-        } else {
-            Capsule()
-                .fill(colors.surface.color)
-                .shadow(color: colors.inkPrimary.color.opacity(metrics.journalChoiceShadowOpacity),
-                        radius: metrics.journalChoiceShadowRadius, y: 0.5)
-        }
+        let fill = scheme == .dark
+            ? colors.inkPrimary.color.opacity(metrics.journalChoiceLiftOpacity)
+            : colors.surface.color
+        return Capsule()
+            .fill(fill)
+            .overlay(Capsule().strokeBorder(colors.inkPrimary.color.opacity(metrics.hairlineOpacity),
+                                            lineWidth: metrics.surfaceRimWidth))
     }
 
     private static func symbol(_ answer: Bool?) -> String {
@@ -386,7 +381,7 @@ public struct SomaAnswerSwitch: View {
 
     public var body: some View {
         let metrics = theme.metrics
-        let slot = metrics.trackAnswerSlotWidth
+        let slot = metrics.journalChoiceWidth
         let height = metrics.trackAnswerCellHeight
         let knob = RoundedRectangle(cornerRadius: metrics.trackAnswerCornerRadius - metrics.trackAnswerInset, style: .continuous)
         let offset = CGFloat(Self.slot(value)) * slot
@@ -453,7 +448,7 @@ public struct SomaAnswerSwitch: View {
         return HStack(spacing: 0) {
             ForEach(Array(Self.order.enumerated()), id: \.offset) { _, answer in
                 let ink: Color = if !chosen {
-                    colors.inkSecondary.color.opacity(metrics.trackAnswerIdleOpacity)
+                    colors.inkSecondary.color.opacity(metrics.journalChoiceIdleOpacity)
                 } else {
                     switch answer {
                     case true?: colors.surface.color
@@ -464,7 +459,7 @@ public struct SomaAnswerSwitch: View {
                 SomaAnswerMarkShape(answer: answer)
                     .stroke(ink, style: stroke)
                     .frame(width: metrics.trackAnswerGlyph, height: metrics.trackAnswerGlyph)
-                    .frame(width: metrics.trackAnswerSlotWidth, height: metrics.trackAnswerCellHeight)
+                    .frame(width: metrics.journalChoiceWidth, height: metrics.trackAnswerCellHeight)
             }
         }
         .allowsHitTesting(false)
@@ -472,8 +467,9 @@ public struct SomaAnswerSwitch: View {
     }
 
     /// The knob: the row's tone on a yes, else a raised surface (an ink
-    /// wash over the track in dark, where the surface is the card's own).
-    /// One shape whose colour moves with it, never two crossfading.
+    /// wash over the track in dark, where the surface is the card's own)
+    /// held by the card's rim. Flat, no shadow. One shape whose colour moves
+    /// with it, never two crossfading.
     private func knobFill(_ knob: RoundedRectangle) -> some View {
         let metrics = theme.metrics
         let colors = theme.colors
@@ -483,8 +479,8 @@ public struct SomaAnswerSwitch: View {
 
         return knob.fill(base)
             .overlay(knob.fill(colors.inkPrimary.color.opacity(isDark && !isYes ? metrics.trackAnswerNoOpacity : 0)))
-            .shadow(color: colors.inkPrimary.color.opacity(isDark ? 0 : metrics.journalChoiceShadowOpacity),
-                    radius: metrics.journalChoiceShadowRadius, y: 0.5)
+            .overlay(knob.strokeBorder(colors.inkPrimary.color.opacity(isYes ? 0 : metrics.hairlineOpacity),
+                                       lineWidth: metrics.surfaceRimWidth))
             .allowsHitTesting(false)
     }
 }
@@ -530,8 +526,8 @@ public struct SomaAnswerMarkShape: Shape {
 // MARK: - Quantity
 
 /// The trailing edge of a habit card that counts rather than answers: the
-/// day's amount and its unit, a dash before the unit while nothing is
-/// logged, then an arrow in the same recessed square as
+/// day's amount and its unit, the drawn missing mark with no unit while
+/// nothing is logged, then an arrow in the same recessed square as
 /// ``SomaAnswerSwitch``. The card itself is the button; the arrow says so.
 public struct SomaHabitQuantity: View {
     private let value: String?
@@ -552,8 +548,7 @@ public struct SomaHabitQuantity: View {
         let colors = theme.colors
 
         HStack(spacing: metrics.cardSpacing) {
-            Text("\(value ?? "-") \(unit)")
-                .somaFont(theme.typography.rowValue)
+            SomaNumber(value, theme.typography.rowValue, unit: unit, unitSpec: theme.typography.rowValue)
                 .foregroundStyle(colors.inkSecondary.color)
                 .lineLimit(1)
                 .fixedSize()

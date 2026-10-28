@@ -85,7 +85,7 @@ struct ScoreHistorySheet: View {
         let weekMean = ScoreMath.mean(series.suffix(7))
         let monthAgo = ScoreMath.mean(series.dropLast(28).suffix(7))
 
-        ScoreSheet(eyebrow: "\(kind.title) · \(today.map(String.init) ?? "-")", title: "\(kind.title) over time") {
+        ScoreSheet(eyebrow: today.map { "\(kind.title) · \($0)" } ?? "\(kind.title)", title: "\(kind.title) over time") {
             ScoreParagraph(lead: lead(weekMean: weekMean, monthAgo: monthAgo),
                            rest: usual.map { "Usually \(Int($0.low.rounded())) to \(Int($0.high.rounded()))." })
             SomaSegmentedControl(segments: Range.allCases.map { SomaSegment(id: $0, title: $0.title) }, selection: $range)

@@ -34,8 +34,8 @@ struct TrackRitualSummary: Equatable, Sendable {
 
     var isKeptToday: Bool { steps > 0 && doneToday == steps }
 
-    /// "2 of 3", or a dash with no steps.
-    var progressText: String { steps == 0 ? "-" : "\(doneToday) of \(steps)" }
+    /// "2 of 3", or nil with no steps, which a view draws as the missing mark.
+    var progressText: String? { steps == 0 ? nil : "\(doneToday) of \(steps)" }
 
     /// "5 days running", "Kept yesterday", or nil with no run.
     var streakText: String? {

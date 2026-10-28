@@ -6,8 +6,8 @@
 import SwiftUI
 import SomaUI
 
-/// Last night as the reference design lays it out, for the Home sheet: the sleep period and
-/// its two totals, the stages in lanes, and a tile per stage. Labels only,
+/// Last night as the reference design lays it out: the sleep period and,
+/// when it differs, the time in bed (the page's hero gives the time asleep), the stages in lanes, and a tile per stage. Labels only,
 /// the numbers and the drawing do the telling.
 struct SleepLastNightSection: View {
     let night: SleepNightSummary?
@@ -24,10 +24,15 @@ struct SleepLastNightSection: View {
             SomaCard {
                 VStack(spacing: metrics.cardPadding) {
                     SomaSleepPeriodRow(bed: bed, wake: wake)
-                    Rectangle()
-                        .fill(theme.colors.inkPrimary.color.opacity(metrics.hairlineOpacity))
-                        .frame(height: 0.5)
-                    SomaSleepTotals(inBed: night?.inBed, asleep: night?.asleep)
+                    // The hero above gives the time asleep: said once on the
+                    // page. Time in bed shows only when it says something
+                    // else, which a night with no in bed record does not.
+                    if showsTimeInBed {
+                        Rectangle()
+                            .fill(theme.colors.inkPrimary.color.opacity(metrics.hairlineOpacity))
+                            .frame(height: 0.5)
+                        SomaSleepTotals(inBed: night?.inBed, asleep: night?.asleep, showsAsleep: false)
+                    }
                 }
             }
 
@@ -43,5 +48,13 @@ struct SleepLastNightSection: View {
             // Time in each stage is on the chart's lanes now: one graph for
             // the night (owner, 2026-10-24).
         }
+    }
+
+    /// Time in bed as it reads, set apart from the time asleep: equal to the
+    /// minute, it would repeat the hero.
+    private var showsTimeInBed: Bool {
+        guard let inBed = night?.inBed else { return false }
+        guard let asleep = night?.asleep else { return true }
+        return SomaFormat.duration(inBed) != SomaFormat.duration(asleep)
     }
 }

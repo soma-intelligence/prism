@@ -105,9 +105,7 @@ struct MindMoodStrip: View {
                             .somaFont(type.callout)
                             .foregroundStyle(MindMoodPalette.color(valence))
                     } else {
-                        Text(verbatim: "-")
-                            .somaFont(type.callout)
-                            .foregroundStyle(colors.inkSecondary.color)
+                        SomaMissingValue(type.callout)
                     }
                 }
                 if !day.words.isEmpty || !day.themes.isEmpty {

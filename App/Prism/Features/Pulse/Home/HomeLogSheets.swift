@@ -157,8 +157,8 @@ struct HomeEffortSheet: View {
     }
 
     private func detail(_ workout: PulseWorkout) -> String {
-        var parts = ["\(Int(workout.minutes.rounded())) min"]
-        if let zone = workout.zoneThreeMinutes { parts.append("\(Int(zone.rounded())) in zone 3 and above") }
+        var parts = [SomaFormat.duration(workout.minutes * 60)]
+        if let zone = workout.zoneThreeMinutes { parts.append("\(SomaFormat.duration(zone * 60)) in zone 3 and above") }
         if let steps = workout.steps { parts.append("\(HomeFormat.whole(steps)) steps") }
         return parts.joined(separator: " · ")
     }

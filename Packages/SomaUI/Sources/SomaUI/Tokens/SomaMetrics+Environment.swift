@@ -49,9 +49,6 @@ public extension SomaMetrics {
     var environmentLegendDot: CGFloat { 12 }
     /// How much ground the map of where you are spans, in metres.
     var environmentMapSpan: Double { 9000 }
-    /// The span the map shows round the device's own position: close enough
-    /// to read the street you are on.
-    var environmentMapExactSpan: Double { 900 }
     /// The sleep places heat map: how tall the tile is, the least ground it
     /// frames (metres across), and each warm spot's glow: its reach in
     /// metres, how many rings build it and how dense each ring is.
@@ -61,9 +58,13 @@ public extension SomaMetrics {
     var heatSpotLayers: Int { 14 }
     var heatLayerOpacity: Double { 0.06 }
 
-    /// How far the chips over a map (the Sleep places name, its status)
-    /// sit in from the tile's corners.
-    var mapChipInset: CGFloat { 10 }
+    /// The corner of a tile inside an Environment card (a condition, the
+    /// map, the place prompt): a step rounder than a bar, a step tighter
+    /// than the card round it.
+    var environmentTileCornerRadius: CGFloat { chartBarCornerRadius + 6 }
+    /// The wash a condition tile takes in its reading's colour. Only a tile
+    /// with a reading takes one; an empty tile sits on the recessed surface.
+    var environmentTileWashOpacity: Double { 0.1 }
 }
 
 /// Sizes other components still read, kept from the parallel design lines.

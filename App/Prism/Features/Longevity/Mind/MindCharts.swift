@@ -96,7 +96,7 @@ struct MindWeekBars: View {
         }
         .accessibilityElement()
         .accessibilityLabel("Mindful minutes, last seven days")
-        .accessibilityValue(Text(bars.map { $0.minutes.map { "\(Int($0.rounded()))" } ?? "-" }.joined(separator: ", ")))
+        .accessibilityValue(Text(bars.map { $0.minutes.map { "\(Int($0.rounded()))" } ?? SomaFormat.notMeasured }.joined(separator: ", ")))
     }
 }
 
@@ -177,8 +177,7 @@ struct MindPrecursorBars: View {
                             .somaFont(type.body)
                             .foregroundStyle(colors.inkPrimary.color)
                         Spacer(minLength: 8)
-                        Text(total > 0 ? "\(item.count) of \(total)" : "-")
-                            .somaFont(type.captionValue)
+                        SomaNumber(total > 0 ? "\(item.count) of \(total)" : nil, type.captionValue)
                             .foregroundStyle(colors.inkSecondary.color)
                     }
                     GeometryReader { proxy in

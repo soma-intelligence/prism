@@ -41,9 +41,9 @@ struct TrackEveningView: View {
 
                 SomaCard {
                     VStack(spacing: metrics.cardSpacing) {
-                        row("How today went", value: journal.day(now).feeling.map { TrackJournal.feelingLabels[$0] } ?? "-") { opened = .mood }
+                        row("How today went", value: journal.day(now).feeling.map { TrackJournal.feelingLabels[$0] }) { opened = .mood }
                         TrackHairline()
-                        row("How you feel", value: log.moods(on: now).last { !$0.isDaily }.map { TrackJournal.feelingLabels[$0.valence] } ?? "-") { opened = .moodNow }
+                        row("How you feel", value: log.moods(on: now).last { !$0.isDaily }.map { TrackJournal.feelingLabels[$0.valence] }) { opened = .moodNow }
                     }
                 }
 
@@ -78,7 +78,7 @@ struct TrackEveningView: View {
         return Group {
             if let cost {
                 TrackLeadText(lead: "Go easy on \(cost.title.lowercased()) tonight.",
-                              rest: "\(cost.detailText): \(cost.valueText).")
+                              rest: "\(cost.detailText): \(cost.valueText ?? SomaFormat.notMeasured).")
             } else {
                 TrackLeadText(lead: "Close the day.",
                               rest: "Tag what happens tonight and Soma learns what each one does to your night.")
@@ -86,7 +86,7 @@ struct TrackEveningView: View {
         }
     }
 
-    private func row(_ title: String, value: String, open: @escaping () -> Void) -> some View {
+    private func row(_ title: String, value: String?, open: @escaping () -> Void) -> some View {
         let metrics = theme.metrics
         let colors = theme.colors
         return Button(action: open) {
@@ -95,8 +95,7 @@ struct TrackEveningView: View {
                     .somaFont(theme.typography.body)
                     .foregroundStyle(colors.inkPrimary.color)
                 Spacer()
-                Text(value)
-                    .somaFont(theme.typography.body)
+                SomaNumber(value, theme.typography.body)
                     .foregroundStyle(colors.inkSecondary.color)
                 Image(systemName: "chevron.right")
                     .font(.system(size: metrics.browseChevronSize, weight: .semibold))

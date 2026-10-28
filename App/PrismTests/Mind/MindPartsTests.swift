@@ -243,6 +243,28 @@ struct MindPartsTests {
         #expect(model.bestEffect == nil)
     }
 
+    @Test("An effect that rounds to zero is not presented as the best one")
+    func ritualsRoundedZero() {
+        let hrv = "HKQuantityTypeIdentifierHeartRateVariabilitySDNN"
+        let mindful = "HKCategoryTypeIdentifierMindfulSession"
+        var inputs = MindInputs(now: at(12))
+        for offset in 1...10 {
+            let breathed = offset <= 4
+            inputs.heartRateVariability.append(reading(hrv, breathed ? 44.3 : 44, at: at(22, day: -offset)))
+            if breathed {
+                inputs.mindful.append(reading(mindful, 1, at: at(19, day: -offset), lasting: 10 * 60))
+            }
+        }
+        let model = MindRituals.make(from: inputs, journal: MindJournal(), calendar: calendar)
+        let breathe = model.rituals.first { $0.kind == .breathe }
+        #expect(breathe?.signedDelta == "0", "the row still shows the measured move")
+        #expect(breathe?.isClear == false)
+        #expect(breathe?.isCost == false)
+        #expect(model.bestEffect == nil, "no effect is not the best effect")
+        #expect(model.tonight == nil)
+        #expect(model.tonightDetail.hasPrefix("10 minutes of slow breathing"))
+    }
+
     // MARK: - Breathing
 
     @Test("A breath is four seconds in and six out")

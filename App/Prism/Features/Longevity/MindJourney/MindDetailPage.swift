@@ -135,8 +135,7 @@ struct MindGauge: View {
                         .stroke(hue, style: StrokeStyle(lineWidth: line, lineCap: .round))
                 }
                 VStack(spacing: 2) {
-                    Text(score.map { "\($0)" } ?? "-")
-                        .somaFont(type.display)
+                    SomaNumber(score.map { "\($0)" }, type.display)
                         .foregroundStyle(colors.inkPrimary.color)
                     Text(word)
                         .somaFont(type.callout)

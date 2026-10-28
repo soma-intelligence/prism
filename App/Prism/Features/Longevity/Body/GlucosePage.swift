@@ -37,8 +37,8 @@ struct GlucosePage: View {
             reason: reason(summary),
             stats: [
                 SomaStat("In range", value: summary.timeInRange.map(Self.percent), unit: "%"),
-                SomaStat("GMI", value: summary.gmi.map { LabMath.format($0, decimals: 1) ?? "-" }, unit: "%"),
-                SomaStat("Variation", value: summary.cv.map { LabMath.format($0, decimals: 0) ?? "-" }, unit: "%"),
+                SomaStat("GMI", value: summary.gmi.map { SomaFormat.number($0, decimals: 1) }, unit: "%"),
+                SomaStat("Variation", value: summary.cv.map { SomaFormat.number($0) }, unit: "%"),
             ]
         ) {
             if let note = summary.urgentNote {
@@ -84,7 +84,7 @@ struct GlucosePage: View {
     // MARK: Words
 
     private static func percent(_ share: Double) -> String {
-        LabMath.format(share * 100, decimals: 0) ?? "-"
+        SomaFormat.number(share * 100)
     }
 
     private func eyebrow(_ summary: GlucoseSummary) -> String {
@@ -120,7 +120,7 @@ struct GlucosePage: View {
     private func ranges(_ summary: GlucoseSummary) -> [LabRow] {
         let unit = summary.unit
         func row(_ title: String, _ share: Double?, aim: String) -> LabRow {
-            LabRow(title, detail: share.map { "\(Self.percent($0))%, aim \(aim)" } ?? "-")
+            LabRow(title, detail: share.map { "\(Self.percent($0))%, aim \(aim)" })
         }
         let veryHigh = summary.timeAbove250
         let high = summary.timeAbove180.map { $0 - (veryHigh ?? 0) }
@@ -139,7 +139,7 @@ struct GlucosePage: View {
     private func mealRows(_ summary: GlucoseSummary) -> some View {
         let unit = summary.unit
         let rows = summary.meals.prefix(7).map { response in
-            let peak = "\(LabMath.format(response.peakMinutes, decimals: 0) ?? "-") min"
+            let peak = "\(SomaFormat.number(response.peakMinutes)) min"
             let rise = unit.text(milligrams: response.rise)
             let day = response.date.formatted(.dateTime.weekday(.abbreviated))
             return LabRow("\(response.name) · \(day) \(ScoreMath.clock(response.date))",

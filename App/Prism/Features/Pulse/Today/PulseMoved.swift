@@ -82,7 +82,7 @@ struct PulseInsights: Equatable, Sendable {
                     days: marker.days,
                     insight: marker.insight,
                     cue: marker.cue,
-                    status: marker.status.reading,
+                    status: marker.status.reading(spec.policy.preference),
                     band: marker.band
                 )
             }
@@ -91,15 +91,16 @@ struct PulseInsights: Equatable, Sendable {
             let nights = sleepHours.map { hours in hours.flatMap { $0 > 0 ? $0 : nil } }
             let insight = InsightEngine.interpret(metric, days: nights)
             let last = nights.suffix(2).compactMap { $0 }.last
-            let standing = MetricDetailMath.standing(nights, profile: MetricProfile.of(metric))
+            let profile = MetricProfile.of(metric)
+            let standing = MetricDetailMath.standing(nights, profile: profile)
             return PulseInsightItem(
                 metric: metric,
-                value: last.map { PulseWording(calendar: calendar, locale: .current).clock($0 * 3600) },
-                number: last.map { PulseWording(calendar: calendar, locale: .current).clock($0 * 3600) },
+                value: last.map { PulseWording(calendar: calendar, locale: .current).duration($0 * 3600) },
+                number: last.map { PulseWording(calendar: calendar, locale: .current).duration($0 * 3600) },
                 days: Array(nights.suffix(BodyBiomarkers.days)),
                 insight: insight,
                 cue: last == nil ? nil : insight.cue,
-                status: last == nil ? .none : standing.reading,
+                status: last == nil ? .none : standing.reading(profile.policy?.preference ?? .steady),
                 band: standing.band
             )
         }

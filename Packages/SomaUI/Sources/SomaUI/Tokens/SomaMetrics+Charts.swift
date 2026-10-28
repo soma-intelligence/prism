@@ -14,6 +14,14 @@ public extension SomaMetrics {
     var chartGridOpacity: Double { 0.15 }
     /// The normal range behind a line, in the status green.
     var chartBandOpacity: Double { 0.16 }
+    /// A sparkline's usual band: a faint neutral strip in the ink, never the
+    /// line's hue, the status word carrying the colour.
+    var sparkBandOpacity: Double { 0.06 }
+    /// The share of a sparkline's height past which its usual band is left
+    /// out: a band covering nearly all of it places nothing.
+    var sparkBandMaxShare: Double { 0.8 }
+    /// The band's corner.
+    var sparkBandRadius: CGFloat { 2 }
     /// The top of the soft fill under a sparkline; it fades to nothing.
     var chartFillOpacity: Double { 0.26 }
     /// A bar that is context rather than the one the chart is about.
@@ -65,7 +73,6 @@ public extension SomaMetrics {
 /// named on the chart's trailing side (the gap to them, their column, and
 /// the least room two labels need before they part).
 public extension SomaMetrics {
-    var trendTileSpacing: CGFloat { 8 }
     var trendTileLabelGap: CGFloat { 6 }
     var trendTileLabelWidth: CGFloat { 34 }
     var trendTileLabelLine: CGFloat { 16 }

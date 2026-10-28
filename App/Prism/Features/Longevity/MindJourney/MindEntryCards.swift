@@ -58,7 +58,7 @@ struct MindEntryCards: View {
         } label: {
             MindTile(title: "Rituals")
         }
-        .buttonStyle(TilePressStyle())
+        .buttonStyle(.somaGlassPress)
 
         Button {
             sheet = .choices

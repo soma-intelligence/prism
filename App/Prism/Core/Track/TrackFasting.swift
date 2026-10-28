@@ -8,6 +8,7 @@
 //
 
 import Foundation
+import SomaUI
 
 /// A fast being timed, or one that has ended. At most one runs at a time.
 nonisolated struct TrackFast: Codable, Equatable, Identifiable, Sendable {
@@ -99,14 +100,10 @@ nonisolated enum TrackFasting {
         return total
     }
 
-    /// "7 h 45", "14 h", "40 min": a length as the sheet writes it.
-    static func length(_ seconds: TimeInterval) -> String {
-        let minutes = Int((seconds / 60).rounded())
-        let hours = minutes / 60
-        let rest = minutes % 60
-        if hours == 0 { return "\(rest) min" }
-        if rest == 0 { return "\(hours) h" }
-        return "\(hours) h " + String(format: "%02d", rest)
+    /// "7h 45m", "14h", "40m": a length the way every duration in the app
+    /// is written, through ``SomaFormat``.
+    static func length(_ seconds: TimeInterval, locale: Locale = .autoupdatingCurrent) -> String {
+        SomaFormat.duration(seconds, locale: locale)
     }
 
     /// The usual night's sleep window, as clock hours: the median time of

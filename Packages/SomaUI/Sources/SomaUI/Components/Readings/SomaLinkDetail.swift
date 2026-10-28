@@ -418,8 +418,7 @@ public struct SomaLinkFacts: View {
                         SomaLinkStrengthMeter(level: strength, of: scale)
                             .frame(height: type.rowValue.size * 1.25, alignment: .leading)
                     } else {
-                        Text(verbatim: fact.value ?? "-")
-                            .somaFont(type.rowValue)
+                        SomaNumber(fact.value, type.rowValue)
                             .foregroundStyle(colors.inkPrimary.color)
                             .lineLimit(1)
                             .minimumScaleFactor(0.7)
@@ -428,7 +427,7 @@ public struct SomaLinkFacts: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(Text(verbatim: fact.label))
-                .accessibilityValue(Text(verbatim: fact.strength.map { "\($0) of \(scale)" } ?? fact.value ?? "-"))
+                .accessibilityValue(Text(verbatim: fact.strength.map { "\($0) of \(scale)" } ?? fact.value ?? SomaFormat.notMeasured))
             }
         }
     }

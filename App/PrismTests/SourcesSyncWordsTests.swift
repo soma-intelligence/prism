@@ -51,7 +51,7 @@ struct SourcesSyncWordsTests {
     @Test("The last read is a time today, with a twelve hour clock's mark as the unit")
     func lastRead() {
         let now = date(20, 18)
-        #expect(SourcesSyncWords.lastRead(nil, now: now, calendar: calendar).value == "-")
+        #expect(SourcesSyncWords.lastRead(nil, now: now, calendar: calendar).value == nil)
         let today = SourcesSyncWords.lastRead(date(20, 12, 41), now: now, calendar: calendar)
         #expect(today.value == "12:41")
         #expect(today.unit == "PM")

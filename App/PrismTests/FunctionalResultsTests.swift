@@ -93,8 +93,9 @@ struct FunctionalResultsTests {
         #expect(ratio.toStorage(72, from: "%") == 72)
         let fev1 = try #require(FunctionalCatalog.field("fev1", in: .spirometry))
         #expect(fev1.toStorage(3_200, from: "mL") == 3.2)
-        // A missing value is a dash, never a zero.
-        #expect(FunctionalCatalog.field("agatston", in: .calciumScore)?.text(nil, measures: .metric) == "-")
+        // A missing value is nil, never a zero, so the view draws the mark.
+        let agatston = try #require(FunctionalCatalog.field("agatston", in: .calciumScore))
+        #expect(agatston.text(nil, measures: .metric) == nil)
     }
 
     // MARK: Reading a report

@@ -215,7 +215,7 @@ struct TrackAddToday: View {
                     let started = fast.start <= now
                     link(.fasting,
                          title: started ? "Fasting" : "Fast starts at \(TrackClock.time(fast.start))",
-                         value: started ? "\(TrackFasting.length(fast.elapsed(at: now)))\(fast.objectiveHours.map { " of \(Int($0)) h" } ?? "")" : "-")
+                         value: started ? "\(TrackFasting.length(fast.elapsed(at: now)))\(fast.objectiveHours.map { " of \(TrackFasting.length($0 * 3600))" } ?? "")" : nil)
                 }
                 if let water {
                     link(.intake,
@@ -226,7 +226,9 @@ struct TrackAddToday: View {
         }
     }
 
-    private func link(_ route: TrackRoute, title: String, value: String) -> some View {
+    /// A running entry as a row that opens it. A nil value (a fast that has
+    /// not started) leaves the title alone, with no mark beside it.
+    private func link(_ route: TrackRoute, title: String, value: String?) -> some View {
         let metrics = theme.metrics
         let colors = theme.colors
         return NavigationLink(value: route) {
@@ -235,10 +237,12 @@ struct TrackAddToday: View {
                     .somaFont(theme.typography.body)
                     .foregroundStyle(colors.inkPrimary.color)
                 Spacer(minLength: metrics.cardSpacing)
-                Text(value)
-                    .somaFont(theme.typography.rowValue)
-                    .foregroundStyle(colors.inkSecondary.color)
-                    .lineLimit(1)
+                if let value {
+                    Text(value)
+                        .somaFont(theme.typography.rowValue)
+                        .foregroundStyle(colors.inkSecondary.color)
+                        .lineLimit(1)
+                }
                 Image(systemName: "chevron.right")
                     .font(.system(size: metrics.browseChevronSize, weight: .semibold))
                     .foregroundStyle(colors.inkSecondary.color)

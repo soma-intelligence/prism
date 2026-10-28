@@ -114,7 +114,7 @@ struct RecoveryBuiltSheet: View {
 
         SomaExplainer(title: "Recovery", summary: "How ready you are for load today. Starts at 50; each signal adds or takes.",
                       aspect: .heart, onClose: { dismiss() }) {
-            SomaExplainerRing(fraction: ScoreExplainerKit.fraction(value), value: value.map(String.init) ?? "-",
+            SomaExplainerRing(fraction: ScoreExplainerKit.fraction(value), value: value.map(String.init),
                               caption: page.lead.word ?? "After seven nights", aspect: .heart)
         } content: {
             if !page.terms.isEmpty {
@@ -178,7 +178,7 @@ struct SleepBuiltSheet: View {
 
         SomaExplainer(title: "Sleep", summary: "Six parts, each against your own need. A part with no data hands its weight to the others.",
                       aspect: .sleep, onClose: { dismiss() }) {
-            SomaExplainerDonut(parts: shown, value: score.map(String.init) ?? "-",
+            SomaExplainerDonut(parts: shown, value: score.map(String.init),
                                caption: score.map(ScorePages.sleepWord) ?? "After seven nights")
         } content: {
             SomaExplainerSection("How it’s built") {
@@ -237,12 +237,12 @@ struct StrainBuiltSheet: View {
 
         SomaExplainer(title: "Strain", summary: "The load your heart carried today. Resets at midnight.",
                       aspect: .activity, onClose: { dismiss() }) {
-            SomaExplainerRing(fraction: ScoreExplainerKit.fraction(value), value: value.map(String.init) ?? "-",
+            SomaExplainerRing(fraction: ScoreExplainerKit.fraction(value), value: value.map(String.init),
                               caption: page.lead.word ?? "No movement yet", aspect: .activity)
         } content: {
             if loads.contains(where: { $0 > 0 }) {
                 SomaExplainerMoves("What moved it today", moves: page.zones.map { zone in
-                    SomaExplainerMove(title: "Zone \(zone.id)", value: "\(Int(zone.minutes.rounded())) min",
+                    SomaExplainerMove(title: "Zone \(zone.id)", value: SomaFormat.duration(zone.minutes * 60),
                                       detail: "\(zone.bpm), each minute ×\(zone.id)",
                                       hue: zoneHues[max(0, min(4, zone.id - 1))],
                                       shape: .filled(zone.minutes * Double(zone.id) / top))
@@ -287,7 +287,7 @@ struct StressMeasuredSheet: View {
     var body: some View {
         SomaExplainer(title: "Stress", summary: "A signal from your body, not a verdict on your day.",
                       aspect: .mind, onClose: { dismiss() }) {
-            SomaExplainerDonut(parts: Self.parts, value: stress.map(String.init) ?? "-",
+            SomaExplainerDonut(parts: Self.parts, value: stress.map(String.init),
                                caption: stress.map(ScorePages.stressWord) ?? "No reading")
         } content: {
             SomaExplainerSection("Each morning") {
@@ -322,7 +322,7 @@ struct EnergyInfoSheet: View {
 
         SomaExplainer(title: "Energy", summary: "Sleep charges it; living spends it. A model, not a measurement.",
                       aspect: .mind, onClose: { dismiss() }) {
-            SomaExplainerRing(fraction: ScoreExplainerKit.fraction(value), value: value.map(String.init) ?? "-",
+            SomaExplainerRing(fraction: ScoreExplainerKit.fraction(value), value: value.map(String.init),
                               caption: page.lead.word ?? "After a night", aspect: .mind)
         } content: {
             if !page.ledger.isEmpty {

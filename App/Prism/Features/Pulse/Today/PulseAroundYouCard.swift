@@ -36,14 +36,9 @@ struct PulseAroundYouCard: View {
                             .foregroundStyle(colors.inkSecondary.color)
                     }
 
-                    HStack(alignment: .firstTextBaseline, spacing: theme.metrics.spaceXS) {
-                        Text(report.daylight.map { "\(Int($0.rounded()))" } ?? "-")
-                            .somaFont(type.metricCompact)
-                            .foregroundStyle(colors.inkPrimary.color)
-                        Text("min of daylight")
-                            .somaFont(type.caption)
-                            .foregroundStyle(colors.inkSecondary.color)
-                    }
+                    SomaNumber(report.daylight.map { "\(Int($0.rounded()))" }, type.metricCompact,
+                               unit: String(localized: "min of daylight"))
+                        .foregroundStyle(colors.inkPrimary.color)
                     .lineLimit(1)
 
                     Text(report.summary)

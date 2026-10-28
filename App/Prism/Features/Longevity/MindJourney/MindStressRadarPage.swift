@@ -39,7 +39,7 @@ struct MindStressRadarPage: View {
             navigationTitle: "Stress Radar",
             title: headline(episodes),
             stats: [
-                SomaStat("Day peak", value: MindFormat.whole(reading?.peak), trend: (reading?.peak ?? 0) >= MindStressRadar.elevated ? .up : nil),
+                SomaStat("Day peak", value: MindFormat.whole(reading?.peak), trend: (reading?.peak ?? 0) >= MindStressRadar.elevated ? .up : nil, better: .lower),
                 SomaStat("Elevated", value: reading.map { MindFormat.duration(Double($0.elevatedMinutes)) }),
                 SomaStat("Episodes", value: reading.map { "\($0.episodes.count)" }),
             ]
@@ -104,7 +104,7 @@ struct MindStressRadarPage: View {
     private func timelineNote(_ inputs: MindInputs?, episodes: [MindStressRadar.Episode], calendar: Calendar, words: PulseWording) -> String {
         let night = PulseNights.nights(from: inputs?.sleep ?? [], calendar: calendar).last { calendar.isDateInToday($0.day) }
         var parts: [String] = []
-        if let night { parts.append("Slept \(words.clock(night.asleep))") }
+        if let night { parts.append("Slept \(words.duration(night.asleep))") }
         let moves = (inputs?.workouts ?? []).filter { calendar.isDateInToday($0.start) }.count
         if moves > 0 { parts.append("moved \(words.count(moves, "time", "times"))") }
         parts.append(words.count(episodes.count, "stress episode", "stress episodes"))

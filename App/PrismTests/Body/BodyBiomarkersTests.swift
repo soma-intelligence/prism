@@ -6,6 +6,7 @@
 import Foundation
 import Testing
 import HealthExportCore
+import SomaUI
 @testable import Prism
 
 @Suite("Body biomarkers")
@@ -60,5 +61,38 @@ struct BodyBiomarkersTests {
         for spec in BodyBiomarkerSpec.allCases {
             #expect(HealthMetricCatalog.metric(for: spec.identifier) != nil, "\(spec.identifier)")
         }
+    }
+
+    // MARK: Status colour, by which side is better
+
+    /// How the status word is coloured: green for good news, amber for worth
+    /// a look. A plain above or below carries no direction and reads amber.
+    private func tone(_ status: SomaReadingStatus) -> SomaCueTone? {
+        switch status {
+        case .outside(let side, let better): better.tone(side)
+        case .above, .below: .watch
+        default: nil
+        }
+    }
+
+    @Test("Heart rate recovery above its usual reads as good news, not a warning")
+    func recoveryAboveIsGood() {
+        let status = BodyBiomarker.Status.above.reading(BodyBiomarkerSpec.heartRateRecoveryOneMinute.policy.preference)
+        #expect(tone(status) == .good)
+    }
+
+    @Test("HRV below its usual and resting heart rate above it read as worth a look")
+    func watchSides() {
+        let hrv = BodyBiomarker.Status.below.reading(BodyBiomarkerSpec.heartRateVariabilitySDNN.policy.preference)
+        let resting = BodyBiomarker.Status.above.reading(BodyBiomarkerSpec.restingHeartRate.policy.preference)
+        #expect(tone(hrv) == .watch)
+        #expect(tone(resting) == .watch)
+    }
+
+    @Test("A reading kept near its usual reads as worth a look on either side")
+    func steadyEitherSide() {
+        let preference = BodyBiomarkerSpec.respiratoryRate.policy.preference
+        #expect(tone(BodyBiomarker.Status.above.reading(preference)) == .watch)
+        #expect(tone(BodyBiomarker.Status.below.reading(preference)) == .watch)
     }
 }

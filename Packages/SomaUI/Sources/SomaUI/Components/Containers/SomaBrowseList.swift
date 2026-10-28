@@ -267,11 +267,14 @@ where Data.Element: Identifiable {
 ///
 /// Not ``SomaGlassPressStyle``: that one scales and dims a floating control, and
 /// a row scaling inside a group would slide out from under the hairlines that
-/// bound it.
-struct SomaBrowseRowStyle: ButtonStyle {
+/// bound it. Public as `.somaBrowseRow`, for a `NavigationLink` or a `Button`
+/// that wraps a ``SomaBrowseRow`` outside ``SomaBrowseGroup``'s own button.
+public struct SomaBrowseRowStyle: ButtonStyle {
     @Environment(\.somaTheme) private var theme
 
-    func makeBody(configuration: Configuration) -> some View {
+    public init() {}
+
+    public func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
@@ -280,6 +283,11 @@ struct SomaBrowseRowStyle: ButtonStyle {
                     : Color.clear
             )
     }
+}
+
+public extension ButtonStyle where Self == SomaBrowseRowStyle {
+    /// A list row's press: a wash across the whole row, edge to edge.
+    static var somaBrowseRow: SomaBrowseRowStyle { SomaBrowseRowStyle() }
 }
 
 #Preview("Browse List") {

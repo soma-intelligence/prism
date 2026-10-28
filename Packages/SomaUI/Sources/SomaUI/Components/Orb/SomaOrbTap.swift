@@ -6,47 +6,61 @@
 import SwiftUI
 
 public extension View {
-    /// Makes the orb answer a tap before it acts: a soft haptic, the sphere
-    /// squeezes and springs back, and only then `action` runs. No rings
-    /// ripple from the rim (owner, 2026-10-24). With Reduce Motion on, the
-    /// haptic and the action alone.
-    func somaOrbTap(aspect: SomaAspect, action: @escaping () -> Void) -> some View {
-        modifier(SomaOrbTap(aspect: aspect, action: action))
+    /// Makes the orb a button: it answers the moment the finger lands (the
+    /// theme's press, a scale and a dim, with its haptic) and `action` runs as
+    /// the finger lifts, with no wait in between. The page it opens zooms out
+    /// of the orb, which carries the continuity a squeeze used to. No rings
+    /// ripple from the rim (owner, 2026-10-24).
+    ///
+    /// `longPress`, when given, runs on a long press instead, and the lift
+    /// that ends that press does not also run `action`.
+    func somaOrbTap(aspect: SomaAspect, longPress: (() -> Void)? = nil, action: @escaping () -> Void) -> some View {
+        modifier(SomaOrbTap(aspect: aspect, longPress: longPress, action: action))
     }
 }
 
 struct SomaOrbTap: ViewModifier {
     let aspect: SomaAspect
+    let longPress: (() -> Void)?
     let action: () -> Void
 
-    @Environment(\.somaTheme) private var theme
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var squeeze = false
-    @State private var taps = 0
+    /// Set when a long press fired, so the button's own lift, which follows
+    /// it, is swallowed rather than opening the page under the sheet.
+    @State private var heldLong = false
 
     func body(content: Content) -> some View {
-        content
-            .scaleEffect(squeeze ? 0.94 : 1)
-            .contentShape(.circle)
-            .onTapGesture { tap() }
-            .sensoryFeedback(.impact(weight: .medium, intensity: 0.8), trigger: taps)
-    }
-
-    private func tap() {
-        taps &+= 1
-        guard !reduceMotion else {
+        Button {
+            if heldLong {
+                heldLong = false
+                return
+            }
             action()
-            return
+        } label: {
+            content.contentShape(.circle)
         }
-        // The theme's press in and its emphasized spring out: the squeeze
-        // lands like any control under a finger, and the overshoot on the
-        // way back is the orb springing rather than a button releasing.
-        withAnimation(theme.motion.press) { squeeze = true }
-        Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(140))
-            withAnimation(theme.motion.emphasized) { squeeze = false }
-            try? await Task.sleep(for: .milliseconds(160))
-            action()
+        // The theme's press: scale and dim on touch down, the same in every
+        // context. A three percent scale is feedback, not travel, so Reduce
+        // Motion keeps it and both paths open the page at the same moment.
+        .buttonStyle(.somaGlassPress)
+        .simultaneousGesture(
+            LongPressGesture().onEnded { _ in
+                guard let longPress else { return }
+                heldLong = true
+                longPress()
+            },
+            including: longPress == nil ? .subviews : .all
+        )
+    }
+}
+
+#Preview("Orb tap") {
+    @Previewable @State var taps = 0
+    ZStack {
+        SomaPreviewBackdrop()
+        VStack(spacing: 24) {
+            SomaOrb(aspect: .mind, label: "Slow down")
+                .somaOrbTap(aspect: .mind) { taps += 1 }
+            Text(verbatim: "\(taps)")
         }
     }
 }

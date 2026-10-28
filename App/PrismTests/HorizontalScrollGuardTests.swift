@@ -12,8 +12,8 @@ import Testing
 /// rails), and a vertical page whose column ran a fraction of a point wider
 /// than the screen, which a finger could then drag across. Rows wrap or sit
 /// in a grid instead (`SomaFlowLayout`, `LazyVGrid`), and every page scrolls
-/// through SomaUI's `SomaPageScroll`, which holds its column to the screen's
-/// width.
+/// through SomaUI's `SomaPageScroll`, which holds its column to the scroll
+/// view's own width.
 @Suite("Horizontal scroll guard")
 struct HorizontalScrollGuardTests {
     /// A scroll view given the horizontal axis, alone or with the vertical.
@@ -78,7 +78,7 @@ struct HorizontalScrollGuardTests {
         #expect(hits.isEmpty, "a sideways scroll view at: \(hits)")
     }
 
-    @Test("Pages scroll through SomaPageScroll, which holds the column to the screen")
+    @Test("Pages scroll through SomaPageScroll, which holds the column to its own width")
     func pagesUseSomaPageScroll() {
         // SomaPageScroll is the one scroll view a page may hold.
         let hits = Self.hits(Self.bare, in: Self.sources.filter { $0.lastPathComponent != "SomaPageScroll.swift" })

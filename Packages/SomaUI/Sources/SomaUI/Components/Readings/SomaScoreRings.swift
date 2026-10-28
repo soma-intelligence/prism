@@ -126,8 +126,7 @@ private struct SomaScoreRing: View {
                     .stroke(hue, style: StrokeStyle(lineWidth: stroke, lineCap: .round))
                     .rotationEffect(.degrees(-90))
                 HStack(alignment: .center, spacing: 2) {
-                    Text(score.value.map { "\($0)" } ?? "-")
-                        .somaFont(theme.typography.rowValue)
+                    SomaNumber(score.value.map { "\($0)" }, theme.typography.rowValue)
                         .foregroundStyle(colors.inkPrimary.color)
                         .lineLimit(1)
                         .minimumScaleFactor(0.6)

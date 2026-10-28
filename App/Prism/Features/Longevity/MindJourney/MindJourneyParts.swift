@@ -94,8 +94,7 @@ struct MindSignalRowView: View {
             }
             Spacer(minLength: 8)
             VStack(alignment: .trailing, spacing: theme.metrics.spaceS) {
-                Text(row.value ?? "-")
-                    .somaFont(type.rowValue)
+                SomaNumber(row.value, type.rowValue)
                     .foregroundStyle(row.isCost ? colors.danger.color : colors.inkPrimary.color)
                 if row.usual != nil || !row.marks.isEmpty {
                     MindUsualTrack(value: row.number, usual: row.usual, isCost: row.isCost, marks: row.marks)

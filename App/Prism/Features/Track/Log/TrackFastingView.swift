@@ -67,11 +67,12 @@ struct TrackFastingView: View {
                 isEditable: running == nil
             ) {
                 if let running {
-                    let minutes = Int(running.elapsed(at: now) / 60)
-                    SomaReadout("\(minutes / 60):" + String(format: "%02d", minutes % 60),
-                                caption: running.goalEnd.map { "of \(lengthText) h, ends \(endText($0, now: now))" } ?? "Open fast")
+                    TrackFastReadout(
+                        seconds: running.elapsed(at: now),
+                        caption: running.goalEnd.map { "of \(TrackFasting.length(length * 3600)), ends \(endText($0, now: now))" } ?? "Open fast"
+                    )
                 } else {
-                    SomaReadout(lengthText, unit: "h", caption: "Ends \(endText(end, now: now))")
+                    TrackFastReadout(seconds: length * 3600, caption: "Ends \(endText(end, now: now))")
                 }
             }
             .padding(.top, metrics.cardSpacing)
@@ -79,7 +80,7 @@ struct TrackFastingView: View {
             if running == nil {
                 HStack(spacing: metrics.spaceS) {
                     ForEach(TrackFasting.presets, id: \.self) { hours in
-                        SomaChoiceChip("\(Int(hours)) h", isOn: length == hours) {
+                        SomaChoiceChip(TrackFasting.length(hours * 3600), isOn: length == hours) {
                             length = hours
                         }
                     }
@@ -118,10 +119,6 @@ struct TrackFastingView: View {
         }
     }
 
-    private var lengthText: String {
-        length == length.rounded() ? "\(Int(length))" : String(format: "%.1f", length)
-    }
-
     private func plannedStart(now: Date) -> Date {
         TrackFasting.nextStart(at: startHour, from: now, calendar: calendar)
     }
@@ -134,6 +131,38 @@ struct TrackFastingView: View {
     private func endText(_ date: Date, now: Date) -> String {
         let day = TrackClock.day(date, now: now, calendar: calendar)
         return day == "Today" ? "at \(TrackClock.time(date))" : "\(day) \(TrackClock.time(date))"
+    }
+}
+
+/// The fast's length in the middle of the clock, the way every duration is
+/// set large: its figures in the readout's size, each unit small and grey
+/// after them ("14h", "7h 17m"), and one line under it.
+private struct TrackFastReadout: View {
+    let seconds: TimeInterval
+    let caption: String
+
+    @Environment(\.somaTheme) private var theme
+
+    var body: some View {
+        let metrics = theme.metrics
+        let type = theme.typography
+        var figures = type.metric
+        figures.size = metrics.readoutSize
+        figures.tracking = type.metric.tracking * metrics.readoutSize / type.metric.size
+        var units = type.body
+        units.size = metrics.readoutUnitSize
+
+        return VStack(spacing: metrics.spaceXS) {
+            SomaDurationText(seconds, figures: figures, units: units)
+                .foregroundStyle(theme.colors.inkPrimary.color)
+                .lineLimit(1)
+                .minimumScaleFactor(0.5)
+            Text(caption)
+                .somaFont(type.caption)
+                .foregroundStyle(theme.colors.inkSecondary.color)
+                .multilineTextAlignment(.center)
+        }
+        .accessibilityElement(children: .combine)
     }
 }
 

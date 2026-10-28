@@ -65,12 +65,13 @@ public struct SomaNightPass: View {
             SomaNightTrack(span: span, usualSpan: usualSpan, midnight: midnight, shown: hasAppeared || reduceMotion)
 
             HStack(alignment: .firstTextBaseline, spacing: metrics.identityDotSpacing) {
-                Text(verbatim: asleep ?? "-")
-                    .somaFont(type.rowValue)
+                SomaNumber(asleep, type.rowValue)
                     .foregroundStyle(colors.inkPrimary.color)
-                Text("asleep")
-                    .somaFont(type.caption)
-                    .foregroundStyle(colors.inkSecondary.color)
+                if asleep != nil {
+                    Text("asleep")
+                        .somaFont(type.caption)
+                        .foregroundStyle(colors.inkSecondary.color)
+                }
                 Spacer(minLength: metrics.nightPassSpacing)
                 if let usual {
                     Text(verbatim: usual)
@@ -97,8 +98,7 @@ public struct SomaNightPass: View {
             Text(title)
                 .somaFont(theme.typography.caption)
                 .foregroundStyle(theme.colors.inkSecondary.color)
-            Text(verbatim: time ?? "-")
-                .somaFont(theme.typography.metricCompact)
+            SomaNumber(time, theme.typography.metricCompact)
                 .foregroundStyle(theme.colors.inkPrimary.color)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
@@ -111,7 +111,8 @@ public struct SomaNightPass: View {
     }
 
     private var accessibilityValue: Text {
-        let span = "\(bed ?? "-") to \(woke ?? "-")"
+        let missing = SomaFormat.notMeasured
+        let span = "\(bed ?? missing) to \(woke ?? missing)"
         guard let asleep else { return Text(verbatim: span) }
         return Text("\(span), \(asleep) asleep")
     }

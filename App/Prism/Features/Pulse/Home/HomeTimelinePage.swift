@@ -198,16 +198,14 @@ struct HomeTimelinePage: View {
 
     /// A duration the way a stats line prints it: "7h 12m", "42m".
     private static func duration(_ seconds: TimeInterval) -> String {
-        let minutes = Int((seconds / 60).rounded())
-        guard minutes >= 60 else { return "\(minutes)m" }
-        return minutes % 60 == 0 ? "\(minutes / 60)h" : "\(minutes / 60)h \(minutes % 60)m"
+        SomaFormat.duration(seconds)
     }
 
     private var summary: String? {
         guard let day else { return nil }
         var parts: [String] = []
-        if let night = day.lastNight { parts.append("Slept \(HomeFormat.hoursMinutes(night.asleep))") }
-        if let exercise = day.inputs.exerciseToday, exercise > 0 { parts.append("moved \(HomeFormat.span(exercise * 60))") }
+        if let night = day.lastNight { parts.append("Slept \(SomaFormat.duration(night.asleep))") }
+        if let exercise = day.inputs.exerciseToday, exercise > 0 { parts.append("moved \(SomaFormat.duration(exercise * 60))") }
         let meals = track.meals(on: day.now).count
         if meals > 0 { parts.append(meals == 1 ? "one meal" : "\(meals) meals") }
         guard !parts.isEmpty else { return "Nothing recorded yet today." }

@@ -231,10 +231,9 @@ struct HomeValue: View {
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: theme.metrics.spaceS) {
-            Text(value ?? "-")
-                .somaFont(theme.typography.metric)
+            SomaNumber(value, theme.typography.metric)
                 .foregroundStyle(theme.colors.inkPrimary.color)
-            if let unit {
+            if let unit, value != nil {
                 Text(unit)
                     .somaFont(theme.typography.callout)
                     .foregroundStyle(theme.colors.inkSecondary.color)
@@ -318,9 +317,8 @@ struct HomeValueRow: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            Text(value ?? "-")
-                .somaFont(type.body)
-                .foregroundStyle(value == nil ? colors.inkSecondary.color : (isWorse ? colors.danger.color : colors.inkPrimary.color))
+            SomaNumber(value, type.body)
+                .foregroundStyle(isWorse ? colors.danger.color : colors.inkPrimary.color)
                 .multilineTextAlignment(.trailing)
         }
         .accessibilityElement(children: .combine)

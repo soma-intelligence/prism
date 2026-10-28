@@ -122,7 +122,7 @@ struct VaultScoreSummary: Equatable, Sendable {
     /// bedtime or a wake time as a clock time.
     static func format(_ score: ScoreMetric, _ value: Double, calendar: Calendar = .current) -> String {
         if score.isDuration {
-            return Duration.seconds((value * 3600).rounded()).formatted(.units(allowed: [.hours, .minutes], width: .narrow))
+            return SomaFormat.duration(value * 3600)
         }
         if score.isClock {
             let hour = value.truncatingRemainder(dividingBy: 24)

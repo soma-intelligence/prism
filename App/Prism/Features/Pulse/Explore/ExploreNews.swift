@@ -37,7 +37,7 @@ struct ExploreNewsRail: View {
                             .zoomSource(item.id)
                             .somaScrollEdge()
                     }
-                    .buttonStyle(TilePressStyle())
+                    .buttonStyle(.somaGlassPress)
                 }
             }
         }
@@ -94,7 +94,6 @@ struct NewsReader: View {
 
                 Text("\(item.sourceName) · \(item.age)")
                     .somaFont(type.eyebrow)
-                    .textCase(.uppercase)
                     .foregroundStyle(colors.inkSecondary.color)
                 Text(item.title)
                     .somaFont(type.articleReaderTitle)

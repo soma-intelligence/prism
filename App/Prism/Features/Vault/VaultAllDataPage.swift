@@ -49,7 +49,6 @@ struct VaultAllDataPage: View {
                     case .day(let day):
                         Text(VaultWords.day(day))
                             .somaFont(theme.typography.eyebrow)
-                            .textCase(.uppercase)
                             .foregroundStyle(theme.colors.inkSecondary.color)
                             .accessibilityAddTraits(.isHeader)
                             .padding(.top, line.index == 0 ? 0 : metrics.leadSpacing)

@@ -82,8 +82,8 @@ struct BodyMeasurementsPage: View {
         func position(_ v: Double) -> Double { (v - lo) / (hi - lo) }
         return LabBandItem(
             id: kind.id, title: kind.title,
-            detail: "\(LabMath.format(first, decimals: 1) ?? "-") on \(span.first.0.labDay)",
-            value: "\(LabMath.format(latest, decimals: 1) ?? "-") cm",
+            detail: "\(SomaFormat.number(first, decimals: 1)) on \(span.first.0.labDay)",
+            value: "\(SomaFormat.number(latest, decimals: 1)) cm",
             band: min(position(first), position(latest))...max(position(first), position(latest)),
             position: position(latest))
     }
@@ -167,7 +167,7 @@ struct MeasurementFigure: View {
                 if guide == nil {
                     ForEach(BodyMeasurementKind.allCases) { kind in
                         let (_, end) = leaderLine(kind, cx: cx, s: s)
-                        let text = "\(kind.title) \(values[kind].flatMap { $0 }.flatMap { LabMath.format($0, decimals: 1) }.map { "\($0) cm" } ?? "-")"
+                        let text = values[kind].flatMap { $0 }.flatMap { LabMath.format($0, decimals: 1) }.map { "\(kind.title) \($0) cm" } ?? kind.title
                         Text(verbatim: text)
                             .somaFont(theme.typography.caption)
                             .foregroundStyle(colors.inkSecondary.color)
@@ -237,8 +237,7 @@ struct MeasurementCaptureFlow: View {
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
                 HStack(alignment: .firstTextBaseline, spacing: theme.metrics.spaceS) {
-                    Text(LabMath.format(current, decimals: 1) ?? "-")
-                        .somaFont(theme.typography.metric)
+                    SomaNumber(LabMath.format(current, decimals: 1), theme.typography.metric)
                         .foregroundStyle(theme.colors.inkPrimary.color)
                     Text("cm")
                         .somaFont(theme.typography.callout)
@@ -314,7 +313,7 @@ struct MeasurementReviewView: View {
                 VStack(alignment: .leading, spacing: theme.metrics.cardSpacing) {
                     SomaBrowseGroup(BodyMeasurementKind.allCases, hasGlyphs: false) { kind in
                         SomaBrowseRow(title: kind.title,
-                                      detail: entry.values[kind].flatMap { LabMath.format($0, decimals: 1) }.map { "\($0) cm" } ?? "-",
+                                      detail: entry.values[kind].flatMap { LabMath.format($0, decimals: 1) }.map { "\($0) cm" },
                                       opensSomething: false)
                     }
                     LabDateRow(title: "Date", date: $entry.date)

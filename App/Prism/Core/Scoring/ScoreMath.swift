@@ -5,6 +5,7 @@
 
 import Foundation
 import HealthScoring
+import SomaUI
 
 /// The small arithmetic and wording every score page shares: means over a
 /// window, a value against a person's usual band, the trend table, and the
@@ -130,18 +131,15 @@ nonisolated enum ScoreMath {
         value.formatted(.number.precision(.fractionLength(decimals)))
     }
 
-    /// Hours as a clock duration: 7.2 reads "7:12".
+    /// Hours as a duration, never a clock face: 7.2 reads "7h 12m"
+    /// (``SomaFormat``), so it cannot be taken for a time of day.
     static func hoursMinutes(_ hours: Double) -> String {
-        let minutes = Int((hours * 60).rounded())
-        return String(format: "%d:%02d", minutes / 60, minutes % 60)
+        SomaFormat.duration(hours * 3600)
     }
 
-    /// Hours as words: "1 h 10", "40 min".
+    /// Hours as a duration, its size only: "1h 10m", "40m" (``SomaFormat``).
     static func duration(hours: Double) -> String {
-        let minutes = Int((abs(hours) * 60).rounded())
-        if minutes < 60 { return "\(minutes) min" }
-        let rest = minutes % 60
-        return rest == 0 ? "\(minutes / 60) h" : String(format: "%d h %02d", minutes / 60, rest)
+        SomaFormat.duration(abs(hours) * 3600)
     }
 
     /// A clock hour on a 24 hour face: 23.17 reads "23:10".

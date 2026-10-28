@@ -105,7 +105,7 @@ struct HomeWalkLiveView: View {
         switch session.phase {
         case .ready, .starting, .unavailable: "Easy walk · \(targetMinutes) min"
         case .running, .paused, .saved:
-            "Easy walk · since \(session.startDate.map { HomeFormat.clock($0) } ?? "-")"
+            session.startDate.map { "Easy walk · since \(HomeFormat.clock($0))" } ?? "Easy walk"
         }
     }
 

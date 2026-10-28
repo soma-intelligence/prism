@@ -97,7 +97,7 @@ struct TrackJournalTests {
             id: "alcohol", title: "Alcohol", reading: .nextMorningVariability,
             effect: EffectMath.Effect(delta: nil, held: 0, tries: 2)
         )
-        #expect(gathering.valueText == "-")
+        #expect(gathering.valueText == nil)
         #expect(gathering.detailText == "HRV next morning, 2 of 3 so far")
     }
 

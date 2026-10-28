@@ -36,7 +36,7 @@ struct ContentView: View {
                     .transition(.opacity)
             }
         }
-        .animation(reduceMotion ? nil : theme.motion.tabEntrance, value: hasOnboarded)
+        .animation(reduceMotion ? nil : theme.motion.navigation, value: hasOnboarded)
         // A save says it landed here, over whichever page or sheet made it.
         .confirmationHost()
         // Signing in finishes in the background after the screen moves on,
@@ -92,10 +92,10 @@ struct ContentView: View {
         @Bindable var router = router
 
         return TabView(selection: $router.selection) {
-            Tab("Pulse", image: "soma.pulse", value: "pulse") { PulsePage().somaTabEntrance(isActive: router.selection == "pulse") }
-            Tab("Longevity", image: "soma.longevity", value: "longevity") { LongevityPage().somaTabEntrance(isActive: router.selection == "longevity") }
-            Tab("Track", image: "soma.track", value: "track") { TrackPage().somaTabEntrance(isActive: router.selection == "track") }
-            Tab("Ask Soma", image: "soma.mark", value: "ask", role: .prominent) { AskPage().somaTabEntrance(isActive: router.selection == "ask") }
+            Tab("Pulse", image: "soma.pulse", value: "pulse") { PulsePage() }
+            Tab("Longevity", image: "soma.longevity", value: "longevity") { LongevityPage() }
+            Tab("Track", image: "soma.track", value: "track") { TrackPage() }
+            Tab("Ask Soma", image: "soma.mark", value: "ask", role: .prominent) { AskPage() }
         }
     }
 }

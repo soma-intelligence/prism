@@ -122,16 +122,16 @@ struct PulseTodayTests {
         // The row under the orb holds scores now, and none were passed; the
         // hours read on the sleep card.
         #expect(today.sleep.value == nil)
-        #expect(today.sleepCard.value == "5:30")
+        #expect(today.sleepCard.value == "5h 30m")
         #expect(today.carrying == .sleep)
         #expect(today.headline == "A short night to make up.")
-        #expect(today.reason.contains("You slept 5:30, 2 h under your usual."))
+        #expect(today.reason.contains("You slept 5h 30m, 2h under your usual."))
         #expect(today.moves.first?.aspect == .sleep)
         // The helper gets into bed ten minutes before sleep: 22:50, rounded
         // down to the quarter hour.
         #expect(today.moves.first?.title == "In bed by 22:45")
         #expect(today.events.first?.title == "Woke up")
-        #expect(today.events.first?.detail == "Slept 5:30, 60 min of deep sleep.")
+        #expect(today.events.first?.detail == "Slept 5h 30m, 1h of deep sleep.")
     }
 
     @Test("Bedtime comes from the month's longest nights")
@@ -158,7 +158,7 @@ struct PulseTodayTests {
         samples += night(hours: 8, day: 0, deepMinutes: 68)
         let today = page(PulseInputs(now: at(9), sleep: samples))
 
-        #expect(today.sleepCard.summary == "Your longest night this week, 68 min deep.")
+        #expect(today.sleepCard.summary == "Your longest night this week, 1h 8m deep.")
         #expect(today.nights.last == 8)
         #expect(today.nights.count == 7)
     }
@@ -263,15 +263,15 @@ struct PulseTodayTests {
         ))
 
         let details = Dictionary(uniqueKeysWithValues: today.events.map { ($0.title, $0.detail ?? "") })
-        #expect(details["Walk"] == "35 min, 3,900 steps.")
-        #expect(details["Gym"] == "55 min, 31 of them in zone 3 and above.")
+        #expect(details["Walk"] == "35m, 3,900 steps.")
+        #expect(details["Gym"] == "55m, 31m in zone 3 and above.")
         #expect(today.events.map(\.title) == ["Walk", "Gym", "Now"])
     }
 
-    @Test("The body card reads the pod's absence plainly, and the age when Health has it")
+    @Test("The body card asks for the VO2 max reading the fitness age needs, and says nothing without an age")
     func bodyCard() {
-        #expect(page(PulseInputs(now: at(9), age: 46)).bodyCard.summary == "Measured at the pod. No visit yet. You are 46.")
-        #expect(page(PulseInputs(now: at(9))).bodyCard.summary == "Measured at the pod. No visit yet.")
+        #expect(page(PulseInputs(now: at(9), age: 46)).bodyCard.summary == "Needs a VO2 max reading.")
+        #expect(page(PulseInputs(now: at(9))).bodyCard.summary == nil)
     }
 
     // MARK: - Done moves

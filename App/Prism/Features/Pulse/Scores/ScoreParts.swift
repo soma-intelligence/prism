@@ -143,8 +143,7 @@ struct ScoreGauge: View {
                     .padding(rangeInset + stroke + metrics.spaceS)
 
                 VStack(spacing: metrics.spaceXS) {
-                    Text(lead.value.map { "\($0)" } ?? "-")
-                        .somaFont(type.scoreGaugeFigure)
+                    SomaNumber(lead.value.map { "\($0)" }, type.scoreGaugeFigure)
                         .foregroundStyle(colors.inkPrimary.color)
                     if let word = lead.word {
                         Text(word)
@@ -184,17 +183,6 @@ struct ScoreGauge: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(lead.word ?? "No score yet"))
         .accessibilityValue(accessibilityValue)
-    }
-
-    /// The display role at the gauge's size: one large light number, set at
-    /// its own size rather than scaled up, so it stays sharp.
-    private var numberFont: SomaFontSpec {
-        var spec = theme.typography.display
-        spec.size *= theme.metrics.scoreGaugeNumberScale
-        spec.tracking = -1.5
-        spec.weight = .light
-        spec.digits = .tabular
-        return spec
     }
 
     private var accessibilityValue: Text {
@@ -289,6 +277,7 @@ struct ScoreHead: View {
 }
 
 /// The value at the head of a sheet: the number large, its unit beside it.
+/// Nothing measured draws the mark alone: a unit beside it reads as a typo.
 struct ScoreFigure: View {
     let value: String?
     let unit: String
@@ -296,15 +285,9 @@ struct ScoreFigure: View {
     @Environment(\.somaTheme) private var theme
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: theme.metrics.spaceS) {
-            Text(value ?? "-")
-                .somaFont(theme.typography.display)
-                .foregroundStyle(theme.colors.inkPrimary.color)
-            Text(unit)
-                .somaFont(theme.typography.callout)
-                .foregroundStyle(theme.colors.inkSecondary.color)
-        }
-        .accessibilityElement(children: .combine)
+        SomaNumber(value, theme.typography.display, unit: unit, unitSpec: theme.typography.callout)
+            .foregroundStyle(theme.colors.inkPrimary.color)
+            .accessibilityElement(children: .combine)
     }
 }
 
@@ -382,8 +365,7 @@ struct ScoreUsualRow: View {
             .frame(maxWidth: .infinity, alignment: .leading)
 
             VStack(alignment: .trailing, spacing: 8) {
-                Text(line.value ?? "-")
-                    .somaFont(type.rowValue)
+                SomaNumber(line.value, type.rowValue)
                     .foregroundStyle(line.isOff ? colors.danger.color : colors.inkPrimary.color)
                 if line.band != nil || line.position != nil {
                     ScoreTrack(position: line.position, band: line.band, aspect: aspect, isOff: line.isOff)

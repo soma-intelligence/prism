@@ -47,9 +47,14 @@ public struct SomaMotion: Sendable, Equatable {
     public var pressDuration: Double
     /// Scale a control drops to while pressed.
     public var pressScale: CGFloat
-    /// Opacity a control dims to while pressed. Full: a press is a scale, and a
-    /// grey veil on a pressed button reads as disabled.
+    /// Opacity a control dims to while pressed, beside the scale: a light dim,
+    /// enough to read as the finger's shadow, never the grey veil of a
+    /// disabled control.
     public var pressOpacity: Double
+    /// Opacity a control dims to while pressed when it does not scale (a
+    /// segment, a full width row): the dim is the whole answer there, so it
+    /// is deeper than the one beside a scale.
+    public var pressDimOpacity: Double
     /// Opacity of something set aside rather than pressed: a move already
     /// done, a shutter that cannot fire yet.
     public var dimOpacity: Double
@@ -75,20 +80,18 @@ public struct SomaMotion: Sendable, Equatable {
     /// One part of a tab giving way to the next, from the segmented control:
     /// the new part slides in from the side of the segment chosen while the
     /// old one leaves by the other. A spring without bounce, as long as the
-    /// pill's `selection`, so the page and the pill land together; a page
-    /// that overshot would show a sliver of its neighbour.
+    /// pill's `selection` and a swipe's `partSettle`, so the page and the pill
+    /// land together; a page that overshot would show a sliver of its
+    /// neighbour.
     public var partSwitch: Animation
     /// The same handover under Reduce Motion: a quick cross fade in place.
     public var partFadeDuration: Double
     /// How far a part slides as it comes in, in points. Short: the page is
     /// replaced in place, not carried across the screen.
     public var partSlide: CGFloat
-    /// A tab settling in after the bar selects it.
-    public var tabEntrance: Animation
-    /// The blur a page arrives out of, and leaves into.
-    public var arrivalBlur: CGFloat
-    /// The scale a page arrives from.
-    public var arrivalScale: CGFloat
+    /// How long a confirmation stays up before it leaves on its own: long
+    /// enough to read a short line twice.
+    public var confirmationHold: Double
     /// How long a page that has just appeared holds its ambient motion (an
     /// aspect's drifting weather), in seconds, so a push or a zoom runs over
     /// a still page and every frame of it goes to the transition.
@@ -114,7 +117,8 @@ public struct SomaMotion: Sendable, Equatable {
         // 0.97, from the design brief: enough to feel the press, not so much
         // that the control seems to collapse under the finger.
         pressScale: CGFloat = 0.97,
-        pressOpacity: Double = 1,
+        pressOpacity: Double = 0.85,
+        pressDimOpacity: Double = 0.7,
         dimOpacity: Double = 0.6,
         feedback: Animation = .spring(response: 0.25, dampingFraction: 0.9),
         navigation: Animation = .spring(response: 0.42, dampingFraction: 0.86),
@@ -124,12 +128,10 @@ public struct SomaMotion: Sendable, Equatable {
         breathDuration: Double = 2.6,
         orbBlendDuration: Double = 3.2,
         orbTurnDuration: Double = 600,
-        partSwitch: Animation = .smooth(duration: 0.35),
+        partSwitch: Animation = .smooth(duration: 0.3),
         partFadeDuration: Double = 0.18,
         partSlide: CGFloat = 36,
-        tabEntrance: Animation = .smooth(duration: 0.45),
-        arrivalBlur: CGFloat = 8,
-        arrivalScale: CGFloat = 0.985,
+        confirmationHold: Double = 2.6,
         // The system's push and zoom take a little under half a second.
         settleDelay: Double = 0.5
     ) {
@@ -143,6 +145,7 @@ public struct SomaMotion: Sendable, Equatable {
         self.pressDuration = pressDuration
         self.pressScale = pressScale
         self.pressOpacity = pressOpacity
+        self.pressDimOpacity = pressDimOpacity
         self.dimOpacity = dimOpacity
         self.feedback = feedback
         self.navigation = navigation
@@ -155,9 +158,7 @@ public struct SomaMotion: Sendable, Equatable {
         self.partSwitch = partSwitch
         self.partFadeDuration = partFadeDuration
         self.partSlide = partSlide
-        self.tabEntrance = tabEntrance
-        self.arrivalBlur = arrivalBlur
-        self.arrivalScale = arrivalScale
+        self.confirmationHold = confirmationHold
         self.settleDelay = settleDelay
     }
 

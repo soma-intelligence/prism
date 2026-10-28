@@ -367,8 +367,11 @@ enum ThemeScan {
     /// Counted 2026-10-26 on the reconciled line; only ever lower these.
     /// Sizes 916 to 910 on 2026-10-27, when Today's dials became Zones and
     /// the five rejected score styles and the old dial card were removed.
-    static let baselines: [Kind: Int] = [.colour: 189, .font: 105, .size: 910, .motion: 24]
-    static let duplicateBaseline = 33
+    /// Colours 189 to 186 and sizes 910 to 909 on 2026-10-27 (design pass A:
+    /// flat card surface, one press style), duplicates 33 to 32 when the
+    /// app's `TilePressStyle` gave way to `somaGlassPress`.
+    static let baselines: [Kind: Int] = [.colour: 172, .font: 100, .size: 894, .motion: 22]
+    static let duplicateBaseline = 32
 
     static let duplicatePattern =
         #"struct (\w*(?:PrimaryButton|SecondaryButton|QuietButton|OutlineButton|WideButton|Eyebrow|Hairline|RowsCard|RowGroup|PressStyle|Chip))\b"#

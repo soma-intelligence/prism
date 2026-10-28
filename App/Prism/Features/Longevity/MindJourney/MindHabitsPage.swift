@@ -144,7 +144,7 @@ struct MindHabitRow: View {
     }
 
     private var value: String {
-        guard let delta = habit.delta else { return "-" }
+        guard let delta = habit.delta else { return String(localized: "Too early") }
         let whole = Int(delta.rounded())
         if abs(delta) < MindHabitEffects.noEffectPoints, clearDays == nil { return "No effect" }
         return (whole > 0 ? "+\(whole)" : "\(whole)") + " pts"

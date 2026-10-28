@@ -32,7 +32,8 @@ struct PulseToday: Equatable {
     /// The words of one aspect card.
     struct Card: Equatable, Codable {
         var value: String?
-        var summary: String
+        /// The line under the value; nil when there is nothing true to say.
+        var summary: String?
     }
 
     /// The aspect the day turns on, which the orb opens on. Nil when nothing
@@ -187,7 +188,7 @@ private struct PulseTodayBuilder {
             energyNote: words.energyNote(scores),
             events: events(lastNight: lastNight, workouts: workouts, peaks: peaks),
             sleepCard: PulseToday.Card(
-                value: lastNight.map { words.clock($0.asleep) },
+                value: lastNight.map { words.duration($0.asleep) },
                 summary: words.sleepSummary(lastNight, week: week.compactMap { $0 })
             ),
             nights: week.map { $0.map { $0.asleep / 3600 } },
@@ -304,7 +305,7 @@ private struct PulseTodayBuilder {
         if let bedtime = bedtime(month) {
             var reason = "Your longest nights this month started before \(words.time(bedtime.before))."
             if let shortBy, let lastNight {
-                reason = "You slept \(words.clock(lastNight.asleep)), \(words.span(shortBy)) under your usual."
+                reason = "You slept \(words.duration(lastNight.asleep)), \(words.span(shortBy)) under your usual."
             }
             found.append((shortBy == nil ? 30 : 90,
                           PulseToday.Move(aspect: .sleep, title: "In bed by \(words.time(bedtime.target))", reason: reason)))
@@ -326,7 +327,7 @@ private struct PulseTodayBuilder {
             found.append((50, PulseToday.Move(
                 aspect: .activity,
                 title: "Walk for 15 minutes",
-                reason: "\(words.whole(exercise)) min of exercise so far. By now you usually have \(words.whole(usual))."
+                reason: "\(words.duration(exercise * 60)) of exercise so far. By now you usually have \(words.duration(usual * 60))."
             )))
         }
 
@@ -388,7 +389,7 @@ private struct PulseTodayBuilder {
         case .sleep:
             guard let lastNight, let shortBy else { break }
             return (words.part(of: now) == .evening ? "Tonight decides tomorrow." : "A short night to make up.",
-                    "You slept \(words.clock(lastNight.asleep)), \(words.span(shortBy)) under your usual. An earlier night gives most of it back.")
+                    "You slept \(words.duration(lastNight.asleep)), \(words.span(shortBy)) under your usual. An earlier night gives most of it back.")
         case .heart:
             guard let latest = resting.latest, let usual = resting.usual else { break }
             return ("Keep today light.",
@@ -396,7 +397,7 @@ private struct PulseTodayBuilder {
         case .activity:
             guard let exercise = inputs.exerciseToday, let usualExercise else { break }
             return ("A walk would help.",
-                    "\(words.whole(exercise)) min of exercise so far. By this time you usually have \(words.whole(usualExercise)).")
+                    "\(words.duration(exercise * 60)) of exercise so far. By this time you usually have \(words.duration(usualExercise * 60)).")
         default:
             break
         }
@@ -447,8 +448,8 @@ private struct PulseTodayBuilder {
         return PulseToday.Night(
             bed: words.time(night.bedtime),
             woke: words.time(night.woke),
-            asleep: words.clock(night.asleep),
-            usual: usual.map { "Usual \(words.clock($0))" },
+            asleep: words.duration(night.asleep),
+            usual: usual.map { "Usual \(words.duration($0))" },
             span: asleepFrom...max(asleepFrom, at(night.woke)),
             usualSpan: usual.map { asleepFrom...(asleepFrom + $0 / length) },
             midnight: at(morning)
@@ -462,8 +463,8 @@ private struct PulseTodayBuilder {
         var dated: [(Date, SomaTimelineEvent)] = []
 
         if let lastNight {
-            var stats = [SomaTimelineStat(symbol: "bed.double.fill", text: words.clock(lastNight.asleep))]
-            if let deep = lastNight.deep { stats.append(SomaTimelineStat(symbol: "moon.zzz.fill", text: words.minutes(deep))) }
+            var stats = [SomaTimelineStat(symbol: "bed.double.fill", text: words.duration(lastNight.asleep))]
+            if let deep = lastNight.deep { stats.append(SomaTimelineStat(symbol: "moon.zzz.fill", text: words.duration(deep))) }
             dated.append((lastNight.woke, SomaTimelineEvent(
                 id: "wake", time: words.time(lastNight.woke), title: "Woke up",
                 detail: words.wokeUp(lastNight), aspect: .sleep,
@@ -472,9 +473,9 @@ private struct PulseTodayBuilder {
             )))
         }
         for workout in workouts {
-            var stats = [SomaTimelineStat(symbol: "timer", text: "\(words.whole(workout.minutes)) min")]
+            var stats = [SomaTimelineStat(symbol: "timer", text: words.duration(workout.minutes * 60))]
             if let steps = workout.steps { stats.append(SomaTimelineStat(symbol: "figure.walk", text: words.whole(steps))) }
-            if let zone = workout.zoneThreeMinutes { stats.append(SomaTimelineStat(symbol: "flame.fill", text: "\(Int(zone.rounded())) min z3+")) }
+            if let zone = workout.zoneThreeMinutes { stats.append(SomaTimelineStat(symbol: "flame.fill", text: "\(words.duration(zone * 60)) z3+")) }
             if let average = workout.averageHeartRate { stats.append(SomaTimelineStat(symbol: "heart.fill", text: "\(words.whole(average)) bpm")) }
             dated.append((workout.start, SomaTimelineEvent(
                 id: "workout-\(workout.start.timeIntervalSinceReferenceDate)", time: words.time(workout.start),
@@ -487,9 +488,9 @@ private struct PulseTodayBuilder {
             let length = session.end.timeIntervalSince(session.start)
             dated.append((session.start, SomaTimelineEvent(
                 id: "mindful-\(session.start.timeIntervalSinceReferenceDate)", time: words.time(session.start),
-                title: "Mindful session", detail: "\(words.minutes(length)).", aspect: .mind,
+                title: "Mindful session", detail: "\(words.duration(length)).", aspect: .mind,
                 hue: .mind, symbol: "brain.head.profile",
-                stats: [SomaTimelineStat(symbol: "timer", text: words.minutes(length))],
+                stats: [SomaTimelineStat(symbol: "timer", text: words.duration(length))],
                 start: session.start, end: session.end
             )))
         }
@@ -508,7 +509,7 @@ private struct PulseTodayBuilder {
 
         var nowStats: [SomaTimelineStat] = []
         if let steps = inputs.stepsToday { nowStats.append(SomaTimelineStat(symbol: "figure.walk", text: words.whole(steps))) }
-        if let exercise = inputs.exerciseToday { nowStats.append(SomaTimelineStat(symbol: "flame.fill", text: "\(words.whole(exercise)) min")) }
+        if let exercise = inputs.exerciseToday { nowStats.append(SomaTimelineStat(symbol: "flame.fill", text: words.duration(exercise * 60))) }
         let now = SomaTimelineEvent(
             id: "now", time: words.time(self.now), title: "Now",
             detail: words.now(steps: inputs.stepsToday, exercise: inputs.exerciseToday), isNow: true,

@@ -77,7 +77,7 @@ struct MindSignalsTests {
         return before + lastNight
     }
 
-    /// Five nights of 7 to 9 hours asleep from 23:00, usual 7:30 to 8:30,
+    /// Five nights of 7 to 9 hours asleep from 23:00, usual 7h 30m to 8h 30m,
     /// then six hours last night.
     var sleep: [HealthReading] {
         let hours: [Double] = [7, 7.5, 8, 8.5, 9]
@@ -139,9 +139,9 @@ struct MindSignalsTests {
     func sleepRow() {
         let row = make(sleep: sleep).sleep
         #expect(row.number == 6)
-        #expect(row.value == "6:00")
+        #expect(row.value == "6h")
         #expect(row.usual == 7.5...8.5)
-        #expect(row.detail == "usual 7:30 to 8:30")
+        #expect(row.detail == "usual 7h 30m to 8h 30m")
         #expect(row.isCost)
     }
 

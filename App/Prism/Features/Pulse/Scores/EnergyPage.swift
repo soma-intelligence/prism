@@ -150,8 +150,7 @@ private struct EnergyFact: View {
             Text(lead)
                 .somaFont(type.caption)
                 .foregroundStyle(colors.inkSecondary.color)
-            Text(verbatim: level.map(String.init) ?? "-")
-                .somaFont(type.captionValue)
+            SomaNumber(level.map(String.init), type.captionValue)
                 .foregroundStyle(colors.inkPrimary.color)
             if level != nil, let at {
                 Text("at")
@@ -232,8 +231,7 @@ private struct EnergyReadingTile: View {
                         .font(.system(size: metrics.browseChevronSize, weight: .semibold))
                         .foregroundStyle(colors.inkSecondary.color)
                 }
-                Text(value ?? "-")
-                    .somaFont(theme.typography.cardTitle)
+                SomaNumber(value, theme.typography.cardTitle)
                     .foregroundStyle(colors.inkPrimary.color)
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
@@ -394,8 +392,7 @@ private struct EnergyAverage: View {
         let colors = theme.colors
         let metrics = theme.metrics
         VStack(spacing: 4) {
-            Text(verbatim: value.map { "\(Int($0.rounded()))" } ?? "-")
-                .somaFont(theme.typography.bankDelta)
+            SomaNumber(value.map { "\(Int($0.rounded()))" }, theme.typography.bankDelta)
                 .foregroundStyle(value.map { SomaEnergyRamp.calm.value(at: $0 / 100).color } ?? colors.inkSecondary.color)
             Text(title)
                 .somaFont(theme.typography.caption)

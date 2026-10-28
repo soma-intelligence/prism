@@ -37,10 +37,10 @@ struct SomaTopChromeTests {
         #expect(SomaPartMath.resisted(-40, width: 400) == -near)
     }
 
-    @Test("The parts slide on a short smooth spring, and cross fade quickly under Reduce Motion")
+    @Test("The parts slide on a short smooth spring timed with the pill, and cross fade quickly under Reduce Motion")
     func partMotion() {
         let motion = SomaMotion.standard
-        #expect(motion.partSwitch == .smooth(duration: 0.35))
+        #expect(motion.partSwitch == .smooth(duration: 0.3))
         #expect(motion.partFadeDuration > 0 && motion.partFadeDuration < 0.3)
     }
 

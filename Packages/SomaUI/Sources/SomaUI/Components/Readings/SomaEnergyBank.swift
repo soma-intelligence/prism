@@ -31,11 +31,11 @@ public enum SomaBankMark: Sendable, Hashable {
     }
 }
 
-/// A level as a number with its sign: plus, the true minus, or a dash when
-/// there is none.
+/// A level as a number with its sign: plus, the true minus, or nil when there
+/// is none, so the view draws the missing mark.
 enum SomaBankSigned {
-    static func text(_ value: Int?) -> String {
-        guard let value else { return "-" }
+    static func text(_ value: Int?) -> String? {
+        guard let value else { return nil }
         if value > 0 { return "+\(value)" }
         if value < 0 { return "\u{2212}\(-value)" }
         return "0"
@@ -77,8 +77,7 @@ public struct SomaBankBattery: View {
 
         VStack(spacing: metrics.cardSpacing) {
             HStack(alignment: .firstTextBaseline, spacing: 2) {
-                Text(verbatim: level.map(String.init) ?? "-")
-                    .somaFont(type.bankFigure)
+                SomaNumber(level.map(String.init), type.bankFigure)
                     .contentTransition(.numericText())
                 if level != nil {
                     Text(verbatim: "%")
@@ -139,8 +138,7 @@ public struct SomaBankDelta: View {
         }
 
         VStack(spacing: 4) {
-            Text(verbatim: value == nil ? "-" : SomaBankSigned.text(value) + "%")
-                .somaFont(theme.typography.bankDelta)
+            SomaNumber(SomaBankSigned.text(value).map { $0 + "%" }, theme.typography.bankDelta)
                 .foregroundStyle(tone)
             Text(title)
                 .somaFont(theme.typography.caption)
@@ -460,14 +458,13 @@ public struct SomaBankEntryRow: View {
                 }
             }
             .frame(width: metrics.bankEntryBarWidth, height: metrics.bankEntryBarHeight)
-            Text(verbatim: SomaBankSigned.text(points))
-                .somaFont(type.rowValue)
-                .foregroundStyle(points == nil ? colors.inkSecondary.color : colors.inkPrimary.color)
+            SomaNumber(SomaBankSigned.text(points), type.rowValue)
+                .foregroundStyle(colors.inkPrimary.color)
                 .frame(width: metrics.bankEntryValueColumn, alignment: .trailing)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(verbatim: [title, span].compactMap { $0 }.joined(separator: ", ")))
-        .accessibilityValue(Text(verbatim: SomaBankSigned.text(points)))
+        .accessibilityValue(Text(verbatim: SomaBankSigned.text(points) ?? SomaFormat.notMeasured))
     }
 }
 

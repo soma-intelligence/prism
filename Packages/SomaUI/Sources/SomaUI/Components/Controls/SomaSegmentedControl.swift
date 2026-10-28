@@ -82,12 +82,18 @@ private struct SomaSegmentButton<ID: Hashable>: View {
     let action: () -> Void
 
     @Environment(\.somaTheme) private var theme
+    @Environment(\.colorScheme) private var colorScheme
 
-    /// The pill and its label are the dark appearance's surface and ink in both
-    /// appearances. The concept draws the selected segment as the same dark
-    /// lozenge over a bright photograph and over the night canvas, and a pill
-    /// that turned cream in dark mode would be the loudest thing on the screen.
-    private var pillFill: Color { SomaColorValue(theme.colors.surface.dark).color }
+    /// In light, the pill is the dark appearance's surface under its ink: the
+    /// concept's dark lozenge on bright glass. In dark that surface sank into
+    /// the dark glass (the selection all but vanished), so there the pill is
+    /// a tonal step up from the track instead: the ink laid thin over it. Never
+    /// cream: a light pill would be the loudest thing on a dark screen.
+    private var pillFill: Color {
+        colorScheme == .dark
+            ? theme.colors.inkPrimary.color.opacity(theme.metrics.segmentPillDarkLift)
+            : SomaColorValue(theme.colors.surface.dark).color
+    }
     private var pillInk: Color { SomaColorValue(theme.colors.inkPrimary.dark).color }
 
     var body: some View {

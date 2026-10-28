@@ -101,11 +101,9 @@ struct CardioLoadPage: View {
                                 .somaFont(theme.typography.body)
                                 .foregroundStyle(theme.colors.inkPrimary.color)
                                 .frame(maxWidth: .infinity, alignment: .leading)
-                            Text(model == nil ? "-" : "\(days ?? 0) days")
-                                .somaFont(theme.typography.rowValue)
+                            SomaNumber(model == nil ? nil : "\(days ?? 0) days", theme.typography.rowValue)
                                 .foregroundStyle(theme.colors.inkPrimary.color)
-                            Text(model == nil ? "-" : "\(Int((Double(days ?? 0) / Double(total) * 100).rounded()))%")
-                                .somaFont(theme.typography.rowValue)
+                            SomaNumber(model == nil ? nil : "\(Int((Double(days ?? 0) / Double(total) * 100).rounded()))%", theme.typography.rowValue)
                                 .foregroundStyle(theme.colors.inkSecondary.color)
                                 .frame(width: theme.metrics.metricColumnWidth * 0.7, alignment: .trailing)
                         }
@@ -205,7 +203,7 @@ struct CardioLoadExplainer: View {
 
         SomaExplainer(title: "Cardio load", summary: "Your last 7 days of effort against the 42 before.",
                       aspect: .heart, onClose: { dismiss() }) {
-            SomaExplainerRing(fraction: (ratio ?? 0) / 2, value: ratio.map { "\(ScoreMath.number($0, decimals: 1))×" } ?? "-",
+            SomaExplainerRing(fraction: (ratio ?? 0) / 2, value: ratio.map { "\(ScoreMath.number($0, decimals: 1))×" },
                               caption: model?.todayStatus.title ?? "Calibrating", aspect: .heart)
         } content: {
             SomaExplainerSection("How it’s counted") {

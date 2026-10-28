@@ -70,7 +70,10 @@ struct OnboardingFooter: View {
     }
 }
 
-/// The accent capsule: the one primary action on a step.
+/// The accent capsule: the one primary action on a step. Not yet enabled,
+/// it sits on the recessed surface with its label in the secondary ink at
+/// full strength, as ``SomaActionButton`` does: a faded accent was grey on
+/// grey, nearly gone on the dark ground.
 struct OnboardingPrimaryButton: View {
     let button: OnboardingButton
 
@@ -78,18 +81,18 @@ struct OnboardingPrimaryButton: View {
 
     var body: some View {
         let colors = theme.colors
+        let isEnabled = button.isEnabled
 
         Button(action: button.action) {
             Text(button.title)
                 .somaFont(theme.typography.body)
-                .foregroundStyle(colors.onAccent.color)
+                .foregroundStyle(isEnabled ? colors.onAccent.color : colors.inkSecondary.color)
                 .frame(maxWidth: .infinity, minHeight: theme.metrics.minimumTapTarget + 4)
-                .background(Capsule().fill(colors.accent.color))
+                .background(Capsule().fill(isEnabled ? colors.accent.color : colors.surfaceRecessed.color))
                 .contentShape(.capsule)
         }
         .buttonStyle(.somaGlassPress)
-        .disabled(!button.isEnabled)
-        .opacity(button.isEnabled ? 1 : 0.4)
+        .disabled(!isEnabled)
     }
 }
 

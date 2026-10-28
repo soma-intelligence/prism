@@ -220,17 +220,6 @@ enum HomeFormat {
         let parts = calendar.dateComponents([.hour, .minute], from: date)
         return String(format: "%02d:%02d", parts.hour ?? 0, parts.minute ?? 0)
     }
-
-    /// A duration as "7:12".
-    static func hoursMinutes(_ seconds: TimeInterval) -> String {
-        let minutes = Int((seconds / 60).rounded())
-        return String(format: "%d:%02d", minutes / 60, minutes % 60)
-    }
-
-    /// A duration as "1 h 10" or "24 min".
-    static func span(_ seconds: TimeInterval) -> String {
-        NextMoveContext.span(minutes: Int((seconds / 60).rounded()))
-    }
 }
 
 private extension Double {

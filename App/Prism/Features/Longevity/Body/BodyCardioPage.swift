@@ -7,11 +7,8 @@ import SwiftUI
 import SomaUI
 
 /// Cardio, pushed from the Longevity tab's Body page: VO2 max, resting heart rate and heart rate
-/// recovery, then the fitness age waterfall, seven days of heart rate zones
-/// and the latest run or walk.
-///
-/// Everything but the waterfall comes from Health. The waterfall breaks a pod
-/// fitness age into what moved it, so it waits for the first visit.
+/// recovery, then seven days of heart rate zones and the latest run or walk,
+/// all from Health.
 struct BodyCardioPage: View {
     @Environment(HealthDashboard.self) private var health
 
@@ -25,9 +22,9 @@ struct BodyCardioPage: View {
             title: page.headline,
             reason: page.reason,
             stats: [
-                SomaStat("VO2 max", value: page.vo2Max, trend: page.vo2Trend),
-                SomaStat("Resting HR", value: page.restingHeartRate, unit: "bpm", trend: page.restingTrend),
-                SomaStat("HR recovery", value: page.recovery, unit: "bpm", trend: page.recoveryTrend),
+                SomaStat("VO2 max", value: page.vo2Max, trend: page.vo2Trend, better: .higher),
+                SomaStat("Resting HR", value: page.restingHeartRate, unit: "bpm", trend: page.restingTrend, better: .lower),
+                SomaStat("HR recovery", value: page.recovery, unit: "bpm", trend: page.recoveryTrend, better: .higher),
             ]
         ) {
             BodyZonesCard(zones: page.zones)
@@ -66,24 +63,34 @@ private struct BodyZonesCard: View {
 
     var body: some View {
         TileLink(value: PulseRoute.category("Heart")) {
-            SomaChartCard(
-                eyebrow: "Heart rate zones, 7 days",
-                value: zones.zoneTwo,
-                unit: "min in zone 2",
-                note: zones.note
-            ) {
-                VStack(spacing: theme.metrics.bodyRowSpacing) {
-                    ForEach(BodyMath.Zone.allCases) { zone in
-                        BodyBarRow(
-                            title: zone.title,
-                            subtitle: zone.name,
-                            fraction: zones.fraction(zone),
-                            value: zones.value(zone),
-                            aspect: .heart,
-                            isHighlighted: zone == .two,
-                            usual: zone == .two ? zones.usualFraction : nil
-                        )
-                    }
+            if zones.minutes == nil {
+                // No week to draw: the card says what fills it, at its own
+                // height, rather than five empty bars.
+                BodyWaitingCard(title: "Heart rate zones, 7 days", line: zones.note)
+            } else {
+                zonesCard
+            }
+        }
+    }
+
+    private var zonesCard: some View {
+        SomaChartCard(
+            eyebrow: "Heart rate zones, 7 days",
+            value: zones.zoneTwo,
+            unit: "min in zone 2",
+            note: zones.note
+        ) {
+            VStack(spacing: theme.metrics.bodyRowSpacing) {
+                ForEach(BodyMath.Zone.allCases) { zone in
+                    BodyBarRow(
+                        title: zone.title,
+                        subtitle: zone.name,
+                        fraction: zones.fraction(zone),
+                        value: zones.value(zone),
+                        aspect: .heart,
+                        isHighlighted: zone == .two,
+                        usual: zone == .two ? zones.usualFraction : nil
+                    )
                 }
             }
         }
@@ -97,34 +104,68 @@ private struct BodyRunCard: View {
     @Environment(\.somaTheme) private var theme
 
     var body: some View {
+        TileLink(value: PulseRoute.category("Activity")) {
+            if let run {
+                card(run)
+            } else {
+                BodyWaitingCard(title: "Run or walk", line: "Your next run or walk with Apple Watch fills this in.")
+            }
+        }
+    }
+
+    private func card(_ run: BodyCardio.Run) -> some View {
         let type = theme.typography
         let colors = theme.colors
 
-        TileLink(value: PulseRoute.category("Activity")) {
-            SomaChartCard(
-                eyebrow: run?.title ?? "Run",
-                value: run.map { $0.distance ?? $0.duration },
-                unit: run.flatMap { run in run.distance.map { _ in "km in \(run.duration)" } },
-                note: run?.note ?? "Your next run or walk with Apple Watch draws this."
-            ) {
-                if let run, run.heartRate.count >= 2 {
-                    VStack(alignment: .leading, spacing: theme.metrics.spaceS) {
-                        Text("Heart rate")
-                            .somaFont(type.caption)
-                            .foregroundStyle(colors.inkSecondary.color)
-                        BodyLine(values: run.heartRate, aspect: .heart)
-                            .frame(height: theme.metrics.bodyRunPlotHeight)
-                        HStack {
-                            Text(verbatim: "0:00")
-                            Spacer()
-                            Text(verbatim: run.duration)
-                        }
+        return SomaChartCard(
+            eyebrow: run.title,
+            value: run.distance ?? run.duration,
+            unit: run.distance.map { _ in "km in \(run.duration)" },
+            note: run.note
+        ) {
+            if run.heartRate.count >= 2 {
+                VStack(alignment: .leading, spacing: theme.metrics.spaceS) {
+                    Text("Heart rate")
                         .somaFont(type.caption)
                         .foregroundStyle(colors.inkSecondary.color)
+                    BodyLine(values: run.heartRate, aspect: .heart)
+                        .frame(height: theme.metrics.bodyRunPlotHeight)
+                    HStack {
+                        Text(verbatim: "0:00")
+                        Spacer()
+                        Text(verbatim: run.duration)
                     }
+                    .somaFont(type.caption)
+                    .foregroundStyle(colors.inkSecondary.color)
                 }
             }
         }
+    }
+}
+
+/// A Body card with nothing to draw yet: its title and one line on what fills
+/// it, at its natural height. Empty bars or a lone dash under a title read as
+/// broken; a sentence says why the card is quiet.
+struct BodyWaitingCard: View {
+    let title: String
+    let line: String
+
+    @Environment(\.somaTheme) private var theme
+
+    var body: some View {
+        SomaCard {
+            VStack(alignment: .leading, spacing: theme.metrics.spaceS) {
+                Text(title)
+                    .somaFont(theme.typography.cardTitle)
+                    .foregroundStyle(theme.colors.inkPrimary.color)
+                Text(line)
+                    .somaFont(theme.typography.callout)
+                    .foregroundStyle(theme.colors.inkSecondary.color)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .accessibilityElement(children: .combine)
     }
 }
 

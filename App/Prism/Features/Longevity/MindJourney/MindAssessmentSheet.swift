@@ -194,8 +194,7 @@ struct MindAssessmentResultCard: View {
                         .foregroundStyle(colors.inkSecondary.color)
                 }
                 HStack(alignment: .firstTextBaseline, spacing: theme.metrics.spaceS) {
-                    Text(reading?.value ?? "-")
-                        .somaFont(type.metric)
+                    SomaNumber(reading?.value, type.metric)
                         .foregroundStyle(colors.inkPrimary.color)
                     if let reading {
                         Text(reading.unit)

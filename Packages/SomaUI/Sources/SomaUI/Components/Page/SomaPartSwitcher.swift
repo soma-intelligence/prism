@@ -390,38 +390,6 @@ struct SomaPartPan: UIGestureRecognizerRepresentable {
 }
 #endif
 
-public extension View {
-    /// A no-op kept so call sites stay put; see ``SomaTabEntrance``.
-    func somaTabEntrance(isActive: Bool) -> some View {
-        modifier(SomaTabEntrance(isActive: isActive))
-    }
-}
-
-/// Kept as a seam, drawing nothing: the rise out of a blur on every tab switch
-/// read as the page loading twice. The system's own tab switch is the motion.
-struct SomaTabEntrance: ViewModifier {
-    let isActive: Bool
-
-    func body(content: Content) -> some View {
-        content
-    }
-}
-
-public extension View {
-    /// A no-op kept so call sites stay put; see ``SomaScrollReveal``.
-    func somaScrollReveal() -> some View {
-        modifier(SomaScrollReveal())
-    }
-}
-
-/// Draws nothing now: cards shrinking and fading at the foot of the screen
-/// made every page look half loaded. Cards scroll as they are.
-struct SomaScrollReveal: ViewModifier {
-    func body(content: Content) -> some View {
-        content
-    }
-}
-
 #Preview("Part switcher") {
     struct Demo: View {
         enum Part: CaseIterable { case a, b, c }

@@ -13,6 +13,12 @@ import CoreGraphics
 public extension SomaMetrics {
     /// The gap between the hero's caption, its number and its meaning.
     var metricHeroSpacing: CGFloat { 4 }
+    /// A large duration ("7h 54m"): the gap between a part's figures and
+    /// its unit, and between one part and the next.
+    var durationUnitGap: CGFloat { 1 }
+    var durationPartGap: CGFloat { 6 }
+    /// The gap between a number and its unit set beside it.
+    var numberUnitGap: CGFloat { 4 }
     /// The dot that leads the meaning line, in its tone.
     var metricMeaningDot: CGFloat { 7 }
 
@@ -27,11 +33,13 @@ public extension SomaMetrics {
     var scoreHeroTopPadding: CGFloat { 8 }
 
     /// A reading's row: the gap between its name and when it was read, the
-    /// week's small line, and the column its value sits in.
+    /// week's small line, and the column its value sits in. The column is
+    /// wide enough for a value and a short unit ("92.2 bpm") so every row's
+    /// line starts at one x; a longer unit pushes only its own row.
     var readingRowLineGap: CGFloat { 2 }
     var readingRowSparkWidth: CGFloat { 56 }
     var readingRowSparkHeight: CGFloat { 22 }
-    var readingRowValueWidth: CGFloat { 52 }
+    var readingRowValueWidth: CGFloat { 72 }
 
     /// The plot of a fortnight of sleep windows, labels left out.
     var sleepWindowsHeight: CGFloat { 150 }
@@ -55,6 +63,10 @@ public extension SomaMetrics {
     /// chart's hue softened most of the way to the secondary ink, so it reads
     /// as a calm ground of the same family rather than a grey slab.
     var metricChartBandOpacity: Double { 0.13 }
+    /// The share of the plot past which the usual band keeps only its two
+    /// edges: lower than a sparkline's, since the plot pads round the band
+    /// and a population range ("Typical 50 to 70") fills most of it.
+    var metricChartBandMaxShare: Double { 0.6 }
     /// How far the band's hue is softened toward the secondary ink.
     var metricChartBandMix: Double { 0.55 }
     /// The band's two edges, drawn as hairlines in the same tint.

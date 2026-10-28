@@ -96,9 +96,9 @@ public struct SomaSwitch: View {
         .accessibilityHidden(true)
     }
 
-    /// The knob: the accent when on, else a raised surface (an ink wash over
-    /// the track in dark, where the surface is the card's own). One shape
-    /// whose colour moves with it.
+    /// The knob: the accent when on, else a surface with a hairline rim (an
+    /// ink wash over the track in dark, where the surface is the card's own).
+    /// One shape whose colour moves with it.
     private func knobFill(_ knob: RoundedRectangle) -> some View {
         let metrics = theme.metrics
         let colors = theme.colors
@@ -107,8 +107,10 @@ public struct SomaSwitch: View {
 
         return knob.fill(base)
             .overlay(knob.fill(colors.inkPrimary.color.opacity(isDark && !isOn ? metrics.trackAnswerNoOpacity : 0)))
-            .shadow(color: colors.inkPrimary.color.opacity(isDark ? 0 : metrics.journalChoiceShadowOpacity),
-                    radius: metrics.journalChoiceShadowRadius, y: 0.5)
+            // The card's rim instead of a shadow, as the journal's choices
+            // draw it: flat, the edge a hairline. The accent needs none.
+            .overlay(knob.strokeBorder(colors.inkPrimary.color.opacity(isOn ? 0 : metrics.hairlineOpacity),
+                                       lineWidth: metrics.surfaceRimWidth))
             .allowsHitTesting(false)
     }
 }

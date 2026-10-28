@@ -226,22 +226,26 @@ private struct ConfirmationHost: ViewModifier {
         content
             .overlay(alignment: .top) {
                 if let current {
-                    ConfirmationPill(item: current)
+                    ConfirmationPill(item: current, dismiss: { dismiss(current) })
                         .padding(.top, theme.metrics.cardSpacing)
                         .padding(.horizontal, theme.metrics.pagePadding)
-                        .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
+                        // In from the top on the bar's own spring, out as a
+                        // plain fade, quicker than it came: a confirmation
+                        // read and done should leave without a second show.
+                        .transition(.asymmetric(
+                            insertion: reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity),
+                            removal: .opacity
+                        ))
                         .id(current.id)
                         .task(id: current.id) {
-                            // Held for one breath, then let go.
-                            try? await Task.sleep(for: .seconds(theme.motion.breathDuration))
-                            withAnimation(reduceMotion ? nil : theme.motion.fold) { confirmations.clear(current) }
-                        }
-                        .onTapGesture {
-                            withAnimation(reduceMotion ? nil : theme.motion.fold) { confirmations.clear(current) }
+                            try? await Task.sleep(for: .seconds(theme.motion.confirmationHold))
+                            dismiss(current)
                         }
                 }
             }
-            .animation(reduceMotion ? nil : theme.motion.fold, value: current)
+            // The curve is read after the change: a pill arriving takes the
+            // fold, one leaving (nothing current) takes the fade.
+            .animation(reduceMotion || current == nil ? theme.motion.fade : theme.motion.fold, value: current?.id)
             .sensoryFeedback(trigger: current) { _, new in
                 switch new?.kind {
                 case .done: .success
@@ -250,12 +254,20 @@ private struct ConfirmationHost: ViewModifier {
                 }
             }
     }
+
+    private func dismiss(_ item: Confirmations.Item) {
+        confirmations.clear(item)
+    }
 }
 
 private struct ConfirmationPill: View {
     let item: Confirmations.Item
+    let dismiss: () -> Void
 
     @Environment(\.somaTheme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// How far the pill is being pushed up, following the finger.
+    @State private var lift: CGFloat = 0
 
     var body: some View {
         let metrics = theme.metrics
@@ -274,7 +286,29 @@ private struct ConfirmationPill: View {
         .padding(.horizontal, metrics.cardPadding)
         .frame(minHeight: metrics.chromeCapsuleHeight)
         .somaGlass(in: Capsule())
+        .offset(y: lift)
+        .contentShape(Capsule())
+        .onTapGesture(perform: dismiss)
+        // Pushed up and let go, it leaves; pulled down, it gives a little
+        // and springs back, the way a notification banner does.
+        .gesture(
+            DragGesture(minimumDistance: metrics.spaceS)
+                .onChanged { drag in
+                    let y = drag.translation.height
+                    lift = y < 0 ? y : y / metrics.confirmationPullResistance
+                }
+                .onEnded { drag in
+                    let flung = drag.predictedEndTranslation.height < -metrics.chromeCapsuleHeight
+                    if drag.translation.height < -metrics.chromeCapsuleHeight / 2 || flung {
+                        dismiss()
+                    } else {
+                        withAnimation(reduceMotion ? nil : theme.motion.gesture) { lift = 0 }
+                    }
+                }
+        )
         .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityHint(Text("Dismisses the message"))
     }
 }
 

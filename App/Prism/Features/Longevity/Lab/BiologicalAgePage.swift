@@ -41,7 +41,7 @@ struct BiologicalAgePage: View {
                     LabContributors(items: result.components
                         .sorted { abs($0.yearsDelta) > abs($1.yearsDelta) }
                         .map { .init(id: $0.id, label: $0.label, amount: $0.yearsDelta,
-                                     text: LabMath.signed($0.yearsDelta, decimals: 1) ?? "-") })
+                                     text: LabMath.signed($0.yearsDelta, decimals: 1) ?? SomaFormat.number($0.yearsDelta, decimals: 1)) })
                 }
             }
             LabRowGroup(rows: rows)
@@ -74,9 +74,9 @@ struct BiologicalAgePage: View {
     private var rows: [LabRow] {
         var rows: [LabRow] = []
         if person.sex == nil {
-            rows.append(LabRow("Sex", detail: "-", action: { isAskingSex = true }))
+            rows.append(LabRow("Sex", detail: String(localized: "Add"), action: { isAskingSex = true }))
         }
-        rows.append(LabRow("How sure", detail: result.map { "give or take \(Int($0.confidence.spread))" } ?? "-",
+        rows.append(LabRow("How sure", detail: result.map { "give or take \(Int($0.confidence.spread))" },
                            action: { isShowingConfidence = true }))
         let count = panels.latest?.markers.count
         rows.append(LabRow("Every marker", detail: count.map { "\($0) in the panel" } ?? "No panel yet", route: .bloodPanel))
@@ -138,7 +138,7 @@ struct BiologicalAgeWords {
         guard let result else {
             return "Two weeks of your watch or a blood panel is enough for a first estimate. A panel moves it most."
         }
-        let estimate = LabMath.format(result.estimatedAge, decimals: 0) ?? "-"
+        let estimate = SomaFormat.number(result.estimatedAge)
         let strongest = result.components.max { abs($0.yearsDelta) < abs($1.yearsDelta) }
         var text = "\(result.components.count) inputs put you at \(estimate)."
         if let strongest {
@@ -171,7 +171,7 @@ struct ConfidenceSheet: View {
     var body: some View {
         let spread = result?.confidence.spread
         LabSheet(
-            eyebrow: "Biological age · \(result.flatMap { LabMath.format($0.estimatedAge, decimals: 0) } ?? "-")",
+            eyebrow: result.map { "Biological age · \(SomaFormat.number($0.estimatedAge))" } ?? "Biological age",
             title: "How sure it is",
             reason: reason
         ) {

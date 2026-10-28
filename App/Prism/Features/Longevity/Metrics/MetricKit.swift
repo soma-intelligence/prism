@@ -173,8 +173,7 @@ private struct MetricRow: View {
             .frame(maxWidth: .infinity, alignment: .leading)
 
             if row.value != nil || !opens {
-                Text(row.value ?? "-")
-                    .somaFont(type.rowValue)
+                SomaNumber(row.value, type.rowValue)
                     .foregroundStyle(colors.inkSecondary.color)
             }
             if opens {
@@ -399,11 +398,9 @@ struct MetricSplitCard: View {
                                 }
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            Text(part.value ?? "-")
-                                .somaFont(type.rowValue)
+                            SomaNumber(part.value, type.rowValue)
                                 .foregroundStyle(colors.inkPrimary.color)
-                            Text(total > 0 ? "\(Int((part.share / total * 100).rounded()))%" : "-")
-                                .somaFont(type.rowValue)
+                            SomaNumber(total > 0 ? "\(Int((part.share / total * 100).rounded()))%" : nil, type.rowValue)
                                 .foregroundStyle(colors.inkSecondary.color)
                                 .frame(width: metrics.metricColumnWidth * 0.7, alignment: .trailing)
                         }
@@ -467,8 +464,7 @@ struct MetricRing: View {
                     .rotationEffect(.degrees(-90))
             }
             VStack(spacing: 2) {
-                Text(fraction.map { "\(Int(($0 * 100).rounded()))%" } ?? "-")
-                    .somaFont(theme.typography.metric)
+                SomaNumber(fraction.map { "\(Int(($0 * 100).rounded()))%" }, theme.typography.metric)
                     .foregroundStyle(theme.colors.inkPrimary.color)
                 Text("of goal")
                     .somaFont(theme.typography.caption)

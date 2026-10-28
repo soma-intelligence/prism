@@ -403,7 +403,7 @@ struct ExploreArticleLink: View {
                             asset: article.photo?.asset, style: style,
                             coverStyle: ExploreZoomCover(id: open.id, cornerRadius: cornerRadius))
         }
-        .buttonStyle(TilePressStyle())
+        .buttonStyle(.somaGlassPress)
     }
 
     private var cornerRadius: CGFloat {

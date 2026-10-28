@@ -5,13 +5,13 @@
 
 import SwiftUI
 
-/// A card's ground lit from above (owner, 2026-10-25):
-/// light falls from above, so the top of the card sits a breath lighter than
-/// its foot and its top edge catches a thin rim that fades down the sides.
-/// No shadow and no glow: the card still sits flat on the page.
+/// A card's ground: the flat surface and a single rim, in both appearances.
 ///
-/// In light mode the light is already there, so the card keeps its flat white
-/// and the single hairline.
+/// It was lit from above in dark (owner, 2026-10-25): a gradient fill a breath
+/// lighter at the top and a rim fading down the sides. The design pass of
+/// 2026-10-27 took the gradients out (flat, one stroke, no gloss), so dark
+/// cards keep a slightly brighter rim than light ones, at `surfaceRimOpacity`,
+/// and nothing else. The name stays so call sites stay put.
 public struct SomaLitSurface: ViewModifier {
     private let cornerRadius: CGFloat?
 
@@ -26,28 +26,13 @@ public struct SomaLitSurface: ViewModifier {
 
     public func body(content: Content) -> some View {
         let metrics = theme.metrics
-        let surface = theme.colors.surface.color
         let shape = RoundedRectangle(cornerRadius: cornerRadius ?? metrics.cardCornerRadius, style: .continuous)
-        let dark = colorScheme == .dark
+        let rim = colorScheme == .dark ? metrics.surfaceRimOpacity : metrics.hairlineOpacity
 
         content
-            .background(
-                shape.fill(dark
-                    ? AnyShapeStyle(LinearGradient(
-                        colors: [surface.mix(with: .white, by: metrics.surfaceLightLift), surface],
-                        startPoint: .top, endPoint: .bottom))
-                    : AnyShapeStyle(surface))
-            )
+            .background(shape.fill(theme.colors.surface.color))
             .overlay(
-                shape.strokeBorder(
-                    dark
-                        ? AnyShapeStyle(LinearGradient(
-                            stops: [.init(color: .white.opacity(metrics.surfaceRimOpacity), location: 0),
-                                    .init(color: .white.opacity(metrics.hairlineOpacity), location: 0.45)],
-                            startPoint: .top, endPoint: .bottom))
-                        : AnyShapeStyle(theme.colors.inkPrimary.color.opacity(metrics.hairlineOpacity)),
-                    lineWidth: metrics.surfaceRimWidth
-                )
+                shape.strokeBorder(theme.colors.inkPrimary.color.opacity(rim), lineWidth: metrics.surfaceRimWidth)
             )
     }
 }
@@ -60,10 +45,9 @@ public extension View {
 }
 
 public extension SomaMetrics {
-    /// How much white the top of a dark card takes.
-    var surfaceLightLift: Double { 0.045 }
-    /// The rim's opacity at the card's top edge.
-    var surfaceRimOpacity: Double { 0.16 }
+    /// The rim's opacity on a dark card, against the ink: a touch above the
+    /// hairline, so a card holds its edge on the dark page.
+    var surfaceRimOpacity: Double { 0.12 }
     /// The rim's width.
     var surfaceRimWidth: CGFloat { 0.75 }
 }

@@ -67,7 +67,18 @@ struct MindRitual: Equatable, Sendable, Identifiable {
         effect.delta.map { $0 / (reading == .variability ? 10 : 30) }
     }
 
-    var isCost: Bool { effect.isCost(.higher) }
+    /// The move as the row prints it, signed and whole, or nil when there
+    /// is no clear effect yet.
+    var signedDelta: String? { effect.delta.map(MindMath.signed) }
+
+    /// Whether the move survives rounding: a delta that prints as 0 is no
+    /// effect, neither the best one nor a cost.
+    var isClear: Bool { effect.delta.map { Int($0.rounded()) != 0 } ?? false }
+
+    /// A clear move for the better.
+    var isGain: Bool { isClear && !effect.isCost(.higher) }
+
+    var isCost: Bool { isClear && effect.isCost(.higher) }
 
     /// The title of the card that offers it tonight.
     var offer: String {
@@ -177,7 +188,9 @@ struct MindRituals: Equatable, Sendable {
         let thisWeek = rituals.isEmpty ? nil : rituals.reduce(0) { $0 + $1.days.filter { $0 >= weekStart }.count }
         let streak = rituals.isEmpty ? nil : MindMath.streak(allDays, today: today, calendar: calendar)
 
-        let good = rituals.filter { ($0.effect.delta ?? 0) > 0 }
+        // Only a move that prints as more than zero counts as good: "Best
+        // effect 0" would present no effect as the best one.
+        let good = rituals.filter(\.isGain)
         let bestHRV = good.filter { $0.reading == .variability }.compactMap(\.effect.delta).max()
 
         let reason: String

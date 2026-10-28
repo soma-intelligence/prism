@@ -101,7 +101,6 @@ private struct EnvironmentTemperatureHeading: View {
     var body: some View {
         Text(title)
             .somaFont(theme.typography.eyebrow)
-            .textCase(.uppercase)
             .foregroundStyle(theme.colors.inkSecondary.color)
             .accessibilityAddTraits(.isHeader)
     }

@@ -89,6 +89,6 @@ struct SomaScorePagePartsTests {
         }
         #expect(SomaLinkPairLayout.number(56.4) == "56")
         #expect(SomaLinkPairLayout.number(3.14) == "3.1")
-        #expect(SomaLinkPairLayout.number(nil) == "-")
+        #expect(SomaLinkPairLayout.number(nil) == nil)
     }
 }

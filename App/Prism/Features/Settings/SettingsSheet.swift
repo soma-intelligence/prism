@@ -245,9 +245,11 @@ struct SettingsSheet: View {
         health.status == .ready ? String(localized: "Connected") : String(localized: "Off")
     }
 
+    /// "6 measures": short enough to sit after "Health," on a half width
+    /// tile without being cut.
     private var healthCaption: String? {
         guard health.status == .ready, !health.readings.isEmpty else { return nil }
-        return VaultWords.withData(health.readings.count)
+        return VaultWords.measures(health.readings.count)
     }
 
     private var notificationsValue: String {
@@ -347,18 +349,15 @@ struct SettingsSheet: View {
         .buttonStyle(.somaGlassPress)
     }
 
-    /// The day's state and what to do with it: the activity status, which
-    /// changes how the scores read, the calendar, and a card to share. They sat
+    /// What to do with the day: the calendar and a card to share. They sat
     /// in a strip under the orb on Today; here they sit with the person's own
-    /// settings (owner, 2026-10-03).
+    /// settings (owner, 2026-10-03). The activity status, which changes how
+    /// the scores read, is the Status tile in the summary above, and only
+    /// there: a row here repeated it a few points lower.
     private var dayGroup: some View {
         section("Today") {
             SomaBrowseGroup(DayRow.allCases) { row in
-                SettingsTileRow(
-                    row.title,
-                    symbol: row == .status ? ActivityStatusStore.shared.current.symbol : row.symbol,
-                    detail: row == .status ? ActivityStatusStore.shared.current.title : nil
-                ) {
+                SettingsTileRow(row.title, symbol: row.symbol) {
                     show(row.route)
                 }
             }
@@ -366,25 +365,22 @@ struct SettingsSheet: View {
     }
 
     private enum DayRow: String, CaseIterable, Identifiable {
-        case status, calendar, share
+        case calendar, share
         var id: String { rawValue }
         var title: String {
             switch self {
-            case .status: String(localized: "Status")
             case .calendar: String(localized: "Calendar")
             case .share: String(localized: "Share a card")
             }
         }
         var symbol: String {
             switch self {
-            case .status: "figure.run"
             case .calendar: "calendar"
             case .share: "square.and.arrow.up"
             }
         }
         var route: GlobalRoute {
             switch self {
-            case .status: .activityStatus
             case .calendar: .calendar
             case .share: .shareStudio
             }
@@ -601,14 +597,7 @@ struct SettingsSummaryTile: View {
             }
             .padding(metrics.cardPadding)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                RoundedRectangle(cornerRadius: metrics.cardCornerRadius, style: .continuous)
-                    .fill(theme.colors.surface.color)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: metrics.cardCornerRadius, style: .continuous)
-                    .strokeBorder(theme.colors.inkPrimary.color.opacity(metrics.hairlineOpacity), lineWidth: 0.5)
-            )
+            .somaLitSurface()
             .contentShape(.rect)
         }
         .buttonStyle(.somaGlassPress)

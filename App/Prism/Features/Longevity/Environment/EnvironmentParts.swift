@@ -44,8 +44,7 @@ struct EnvironmentMeasureRow: View {
             .frame(maxWidth: .infinity, alignment: .leading)
 
             VStack(alignment: .trailing, spacing: 8) {
-                Text(value ?? "-")
-                    .somaFont(type.body)
+                SomaNumber(value, type.body)
                     .foregroundStyle(value == nil ? colors.inkSecondary.color : valueColour)
                 if let rail {
                     EnvironmentRail(rail: rail, isWorse: isWorse)

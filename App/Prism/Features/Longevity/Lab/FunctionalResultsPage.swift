@@ -110,7 +110,9 @@ struct FunctionalKindPage: View {
         TabPartScaffold(
             aspect: nil,
             eyebrow: latest.map { "\($0.date.labDay) · \(kind.title)" } ?? kind.title,
-            title: latest == nil ? "No result yet." : "\(field?.name ?? kind.title): \(field?.text(latest?.values[kind.headlineField], measures: measures) ?? "-")",
+            title: latest == nil ? "No result yet." : field.flatMap { field in
+                field.text(latest?.values[kind.headlineField], measures: measures).map { "\(field.name): \($0)" }
+            } ?? kind.title,
             reason: note?.text ?? kind.summary,
             stats: []
         ) {
@@ -130,7 +132,7 @@ struct FunctionalKindPage: View {
             if history.count > 1 {
                 LabRowGroup(heading: "Every result", rows: history.reversed().map { result in
                     LabRow("\(result.date.labDay) \(result.date.formatted(.dateTime.year()))",
-                           detail: field?.text(result.values[kind.headlineField], measures: measures) ?? "-")
+                           detail: field?.text(result.values[kind.headlineField], measures: measures))
                 })
             }
             if kind == .fieldVO2 {
@@ -177,8 +179,9 @@ enum FunctionalItems {
             guard let value = result.values[field.id] else { return nil }
             let note = FunctionalAssessment.note(field: field.id, value: value, sex: sex)
             var detail = note?.text ?? "Against your own tests"
-            if let before = previous?.values[field.id], let date = previous?.date {
-                detail += " · \(field.text(before, measures: measures)) in \(date.formatted(.dateTime.month(.wide).year()))"
+            if let before = previous?.values[field.id], let date = previous?.date,
+               let shown = field.text(before, measures: measures) {
+                detail += " · \(shown) in \(date.formatted(.dateTime.month(.wide).year()))"
             }
             let (band, position) = rail(field: field.id, value: value, sex: sex)
             return LabBandItem(id: field.id, title: field.name, detail: detail, value: field.text(value, measures: measures),

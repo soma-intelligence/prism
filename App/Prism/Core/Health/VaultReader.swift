@@ -5,6 +5,7 @@
 
 import Foundation
 import HealthExportCore
+import SomaUI
 
 /// What the Vault's pages read: one metric's chart over a period, its headline
 /// value, and its raw records a page at a time.
@@ -109,7 +110,12 @@ enum VaultFormat {
         return (number(scaled(reading.value, unit: reading.unit)), reading.unit.shortLabel)
     }
 
-    static func duration(_ seconds: TimeInterval) -> String {
-        Duration.seconds(seconds.rounded()).formatted(.units(allowed: [.hours, .minutes, .seconds], width: .abbreviated, maximumUnitCount: 2))
+    /// How long a record ran, the way every duration in the app is written
+    /// ("7h 54m", "45m"), with seconds only for one under a minute ("40s").
+    static func duration(_ seconds: TimeInterval, locale: Locale = .autoupdatingCurrent) -> String {
+        guard seconds < 60 else { return SomaFormat.duration(seconds, locale: locale) }
+        var style = Duration.UnitsFormatStyle(allowedUnits: [.seconds], width: .narrow)
+        style.locale = locale
+        return Duration.seconds(Int(seconds.rounded())).formatted(style)
     }
 }

@@ -52,12 +52,13 @@ struct TrackLogTests {
 
     @Test("The part of a fast inside the sleep window counts across midnight")
     func overlapWithSleepWindow() {
-        // 20:00 for 14 h against 23:15 to 07:00: 7 h 45.
+        // 20:00 for 14 hours against 23:15 to 07:00: 7h 45m.
         let seconds = TrackFasting.overlap(start: date(9, 16, 20), hours: 14, window: (23.25, 7), calendar: calendar)
         #expect(seconds == (7 * 60 + 45) * 60)
-        #expect(TrackFasting.length(seconds) == "7 h 45")
-        #expect(TrackFasting.length(14 * 3600) == "14 h")
-        #expect(TrackFasting.length(40 * 60) == "40 min")
+        let english = Locale(identifier: "en_US")
+        #expect(TrackFasting.length(seconds, locale: english) == "7h 45m")
+        #expect(TrackFasting.length(14 * 3600, locale: english) == "14h")
+        #expect(TrackFasting.length(40 * 60, locale: english) == "40m")
     }
 
     @Test("The usual window is the median of nights, evening hours read past midnight")

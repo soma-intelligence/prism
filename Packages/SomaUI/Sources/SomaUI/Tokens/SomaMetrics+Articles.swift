@@ -63,14 +63,3 @@ public extension SomaMetrics {
     /// A filled disc (a sun on the horizon, a body in orbit).
     var articleCoverDiscOpacity: Double { 0.22 }
 }
-
-/// Sizes other components still read, kept from the parallel design lines.
-public extension SomaMetrics {
-    /// A card in the sideways rail of news.
-    var articleRailCardWidth: CGFloat { 236 }
-    /// The topic glyph drawn on a generated cover.
-    var articleFeatureGlyphSize: CGFloat { 64 }
-    var articleTileGlyphSize: CGFloat { 34 }
-    /// The glyph's strength on a generated cover, and the rings' behind it.
-    var articleCoverGlyphOpacity: Double { 0.92 }
-}

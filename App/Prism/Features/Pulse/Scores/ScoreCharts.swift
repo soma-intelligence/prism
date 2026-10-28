@@ -364,8 +364,7 @@ struct ScoreSparkRow: View {
                 .frame(width: 76, alignment: .leading)
             SomaSparkline(values, tint: tint, band: usual.map { $0.low...max($0.low, $0.high) })
                 .frame(height: metrics.chartSparkHeight)
-            Text(latest ?? "-")
-                .somaFont(theme.typography.rowValue)
+            SomaNumber(latest, theme.typography.rowValue)
                 .foregroundStyle(isOff ? colors.statusOut.color : colors.inkPrimary.color)
                 .frame(width: 48, alignment: .trailing)
         }

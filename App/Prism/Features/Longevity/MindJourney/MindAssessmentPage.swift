@@ -137,8 +137,7 @@ struct MindAssessmentRow: View {
                     .foregroundStyle(colors.inkSecondary.color)
             }
             Spacer(minLength: theme.metrics.spaceS)
-            Text(assessment.reading.map { "\($0.value) \($0.unit), \($0.word.localizedLowercase)" } ?? "-")
-                .somaFont(type.rowValue)
+            SomaNumber(assessment.reading.map { "\($0.value) \($0.unit), \($0.word.localizedLowercase)" }, type.rowValue)
                 .foregroundStyle(colors.inkPrimary.color)
         }
         .padding(.vertical, theme.metrics.browseRowVerticalPadding)

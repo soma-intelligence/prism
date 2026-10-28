@@ -59,7 +59,7 @@ public struct SomaEnergyCell: View {
                 .strokeBorder(colors.inkPrimary.color.opacity(metrics.hairlineOpacity), lineWidth: 0.5)
             if share != nil {
                 SomaChargeShape(level: shown, tilt: tilt, slosh: metrics.energyCellSlosh)
-                    .fill(LinearGradient(colors: [tint.opacity(0.78), tint], startPoint: .top, endPoint: .bottom))
+                    .fill(tint)
                     .clipShape(RoundedRectangle(cornerRadius: radius - inset, style: .continuous))
                     .padding(inset)
             }
@@ -150,13 +150,14 @@ public struct SomaEnergyGauge: View {
             SomaEnergyCell(level: level, size: size)
             VStack(alignment: .leading, spacing: size == .hero ? metrics.cardHeaderSpacing : 2) {
                 HStack(alignment: .firstTextBaseline, spacing: metrics.identityDotSpacing) {
-                    Text(verbatim: level.map(String.init) ?? "-")
-                        .somaFont(size == .hero ? type.bankFigure : type.metric)
+                    SomaNumber(level.map(String.init), size == .hero ? type.bankFigure : type.metric)
                         .foregroundStyle(colors.inkPrimary.color)
                         .contentTransition(.numericText())
-                    Text("of 100")
-                        .somaFont(type.callout)
-                        .foregroundStyle(colors.inkSecondary.color)
+                    if level != nil {
+                        Text("of 100")
+                            .somaFont(type.callout)
+                            .foregroundStyle(colors.inkSecondary.color)
+                    }
                 }
                 if let line {
                     Text(verbatim: line)
@@ -350,8 +351,7 @@ public struct SomaEnergyTimeline: View {
             Text(title)
                 .somaFont(theme.typography.caption)
                 .foregroundStyle(theme.colors.inkSecondary.color)
-            Text(verbatim: value ?? "-")
-                .somaFont(theme.typography.captionValue)
+            SomaNumber(value, theme.typography.captionValue)
                 .foregroundStyle(theme.colors.inkPrimary.color)
         }
     }

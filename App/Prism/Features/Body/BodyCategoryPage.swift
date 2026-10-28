@@ -54,7 +54,7 @@ struct BodyCategoryPage: View {
                                     aspect: aspect
                                 )
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(.somaBrowseRow)
                         }
                     }
                 }
@@ -66,7 +66,7 @@ struct BodyCategoryPage: View {
                                 SomaBrowseRow(title: MetricPageWords.title(identifier: type.metric.identifier, fallback: type.title))
                                     .contentShape(.rect)
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(.somaBrowseRow)
                         }
                     }
                 } else if !hasRead {
@@ -92,7 +92,6 @@ struct BodyCategoryPage: View {
         VStack(alignment: .leading, spacing: theme.metrics.cardSpacing) {
             Text(title)
                 .somaFont(theme.typography.eyebrow)
-                .textCase(.uppercase)
                 .foregroundStyle(theme.colors.inkSecondary.color)
                 .accessibilityAddTraits(.isHeader)
             content()
@@ -111,8 +110,8 @@ struct BodyCategoryPage: View {
 
 /// The head of a category: the aspect's glyph on its tinted square (or the
 /// category's symbol on a recessed one, for the few that belong to no
-/// aspect), the category's name, and how many of its measures read this
-/// week.
+/// aspect) and how many of its measures read this week. The name is the
+/// navigation title's alone: said twice, it was a heading over itself.
 private struct BodyCategoryHead: View {
     let category: BodyCategory
     let withData: Int?
@@ -133,14 +132,9 @@ private struct BodyCategoryHead: View {
                     .background(RoundedRectangle(cornerRadius: metrics.aspectBadgeCornerRadius, style: .continuous)
                         .fill(colors.surfaceRecessed.color))
             }
-            VStack(alignment: .leading, spacing: metrics.readingRowLineGap) {
-                Text(category.title)
-                    .somaFont(theme.typography.headline)
-                    .foregroundStyle(colors.inkPrimary.color)
-                Text(BodyCategoryPage.countLine(withData: withData, of: category.types.count))
-                    .somaFont(theme.typography.caption)
-                    .foregroundStyle(colors.inkSecondary.color)
-            }
+            Text(BodyCategoryPage.countLine(withData: withData, of: category.types.count))
+                .somaFont(theme.typography.body)
+                .foregroundStyle(colors.inkSecondary.color)
         }
         .padding(.top, metrics.scoreHeroTopPadding)
         .accessibilityElement(children: .combine)

@@ -149,9 +149,10 @@ nonisolated struct FunctionalField: Identifiable, Sendable, Hashable {
         quantity == .mass ? (measures == .imperial ? "lb" : "kg") : unit
     }
 
-    /// "45.4 kg", "100.0 lb", "-1.8", "Present"; a dash when nothing was measured.
-    func text(_ storage: Double?, measures: MeasureSystem) -> String {
-        guard let storage else { return "-" }
+    /// "45.4 kg", "100.0 lb", "-1.8", "Present"; nil when nothing was
+    /// measured, so the view draws the missing mark rather than a hyphen.
+    func text(_ storage: Double?, measures: MeasureSystem) -> String? {
+        guard let storage else { return nil }
         switch quantity {
         case .yesNo:
             return storage >= 0.5 ? "Present" : "None seen"
@@ -160,7 +161,7 @@ nonisolated struct FunctionalField: Identifiable, Sendable, Hashable {
             let number = String(format: "%.1f", shown)
             return "\(number) \(displayUnit(measures))"
         case .plain:
-            let number = LabMath.format(storage, decimals: decimals, locale: Locale(identifier: "en_US_POSIX")) ?? "-"
+            guard let number = LabMath.format(storage, decimals: decimals, locale: Locale(identifier: "en_US_POSIX")) else { return nil }
             if unit.isEmpty { return number }
             return unit == "%" ? "\(number)%" : "\(number) \(unit)"
         }

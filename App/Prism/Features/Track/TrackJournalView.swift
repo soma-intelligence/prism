@@ -292,10 +292,10 @@ struct TrackJournalView: View {
             AutoRow(title: "8,000 steps", glyph: .steps, tone: .moss,
                     detail: totals.steps.map(TrackFormat.whole), mark: mark(totals.steps, goal: Goal.steps)),
             AutoRow(title: "30 min outdoors", glyph: .daylight, tone: .sand,
-                    detail: totals.daylightMinutes.map { "\(TrackFormat.whole($0)) min" },
+                    detail: totals.daylightMinutes.map(TrackJournalFormat.minutes),
                     mark: mark(totals.daylightMinutes, goal: Goal.daylightMinutes)),
             AutoRow(title: "30 min exercise", glyph: .exercise, tone: .sage,
-                    detail: totals.exerciseMinutes.map { "\(TrackFormat.whole($0)) min" },
+                    detail: totals.exerciseMinutes.map(TrackJournalFormat.minutes),
                     mark: mark(totals.exerciseMinutes, goal: Goal.exerciseMinutes)),
             AutoRow(title: "HRV at usual", glyph: .hrv, tone: .tide,
                     detail: variability.map { "\(TrackFormat.whole($0)) ms" },
@@ -395,7 +395,7 @@ enum TrackJournalQuantity: String, CaseIterable {
     }
 
     /// The day's amount and its unit. Nothing logged is a nil value, which
-    /// the row draws as a dash before the unit.
+    /// the row draws as the missing mark, with no unit beside it.
     @MainActor
     func amount(on day: Date, log: TrackLogStore) -> (value: String?, unit: String) {
         switch self {
@@ -409,11 +409,14 @@ enum TrackJournalQuantity: String, CaseIterable {
 
 /// Numbers the Journal's rows set.
 enum TrackJournalFormat {
-    /// Hours and minutes: "7 h 24".
+    /// Hours and minutes the way every duration is written: "7h 24m".
     static func hours(_ hours: Double) -> String {
-        let minutes = Int((hours * 60).rounded())
-        let rest = minutes % 60
-        return rest == 0 ? "\(minutes / 60) h" : "\(minutes / 60) h \(String(format: "%02d", rest))"
+        SomaFormat.duration(hours * 3600)
+    }
+
+    /// Minutes as a duration: "45m", "1h 10m".
+    static func minutes(_ minutes: Double) -> String {
+        SomaFormat.duration(minutes * 60)
     }
 
     /// Millilitres under a litre, litres from there: "750" ml, "1.5" L. Nil
@@ -436,6 +439,7 @@ private struct TrackWeekStrip: View {
     let calendar: Calendar
     let hasEntries: (Date) -> Bool
 
+    @Namespace private var tile
     @Environment(\.somaTheme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -448,6 +452,7 @@ private struct TrackWeekStrip: View {
             }
         }
         .contentShape(.rect)
+        .sensoryFeedback(.selection, trigger: selected)
         .somaClaimsSwipe()
         .gesture(
             DragGesture(minimumDistance: 24)
@@ -467,12 +472,17 @@ private struct TrackWeekStrip: View {
     }
 
     private func move(weeks: Int) {
-        let target = TrackWeek.shift(selected, weeks: weeks, today: today, calendar: calendar)
-        guard target != selected else { return }
+        select(TrackWeek.shift(selected, weeks: weeks, today: today, calendar: calendar))
+    }
+
+    /// One change, one motion: a tapped day and a swiped week land on the
+    /// same selection spring, and simply land under Reduce Motion.
+    private func select(_ day: Date) {
+        guard day != selected else { return }
         if reduceMotion {
-            selected = target
+            selected = day
         } else {
-            withAnimation(theme.motion.selection) { selected = target }
+            withAnimation(theme.motion.selection) { selected = day }
         }
     }
 
@@ -484,11 +494,12 @@ private struct TrackWeekStrip: View {
         let isFuture = TrackWeek.isFuture(day, today: today, calendar: calendar)
         // The accent rides the chosen day's letter and number; the tile is
         // the tonal step.
-        let ink = isFuture ? colors.inkSecondary.color.opacity(0.5) : (isSelected ? colors.accent.color : colors.inkSecondary.color)
-        let number = isFuture ? colors.inkSecondary.color.opacity(0.5) : (isSelected ? colors.accent.color : colors.inkPrimary.color)
+        let future = colors.inkSecondary.color.opacity(theme.motion.dimOpacity)
+        let ink = isFuture ? future : (isSelected ? colors.accent.color : colors.inkSecondary.color)
+        let number = isFuture ? future : (isSelected ? colors.accent.color : colors.inkPrimary.color)
 
         return Button {
-            selected = day
+            select(day)
         } label: {
             VStack(spacing: metrics.spaceXS) {
                 Text(TrackWeek.letter(day, calendar: calendar))
@@ -506,9 +517,12 @@ private struct TrackWeekStrip: View {
             .padding(.vertical, metrics.spaceS)
             .frame(maxWidth: .infinity)
             .background {
+                // One tile that moves to the chosen day, rather than one
+                // fading out while another fades in.
                 if isSelected {
                     RoundedRectangle(cornerRadius: metrics.controlCornerRadius, style: .continuous)
                         .fill(colors.surface.color)
+                        .matchedGeometryEffect(id: "chosen", in: tile)
                 }
             }
             .contentShape(.rect)
@@ -540,8 +554,7 @@ private struct TrackFeelingRow: View {
                 HStack(alignment: .firstTextBaseline) {
                     TrackEyebrow("How you felt")
                     Spacer(minLength: metrics.cardSpacing)
-                    Text(feeling.map { TrackJournal.feelingLabels[$0] } ?? "-")
-                        .somaFont(theme.typography.caption)
+                    SomaNumber(feeling.map { TrackJournal.feelingLabels[$0] }, theme.typography.caption)
                         .foregroundStyle(feeling.map { SomaFeelingScale.color($0, theme: theme) } ?? colors.inkSecondary.color)
                 }
                 SomaFeelingScale(
@@ -579,8 +592,7 @@ private struct TrackFeelMeasureCard: View {
                 HStack(alignment: .firstTextBaseline, spacing: metrics.spaceXS) {
                     TrackEyebrow("Feel and measure")
                     Spacer(minLength: metrics.cardSpacing)
-                    Text(enough ? "\(agreed)/\(points.count)" : "-")
-                        .somaFont(type.metricCompact)
+                    SomaNumber(enough ? "\(agreed)/\(points.count)" : nil, type.metricCompact)
                         .monospacedDigit()
                         .foregroundStyle(enough ? SomaTrackTone.sage.color : colors.inkSecondary.color)
                     Text(enough ? "agree" : "\(points.count) of \(TrackJournal.feelMinimum) days")
@@ -688,9 +700,7 @@ private struct TrackEffectsCard: View {
                 }
 
                 if effects.isEmpty {
-                    Text("-")
-                        .somaFont(type.metricCompact)
-                        .foregroundStyle(colors.inkSecondary.color)
+                    SomaMissingValue(type.metricCompact)
                 } else {
                     ForEach(Array(effects.enumerated()), id: \.element.id) { index, effect in
                         if index > 0 { TrackHairline() }
@@ -707,7 +717,7 @@ private struct TrackEffectsCard: View {
         let colors = theme.colors
         let style = TrackTagStyle.of(effect.id)
         // No move, or one that rounds to nothing, stays in the ink.
-        let tone = effect.fraction == nil || effect.valueText.hasPrefix("0")
+        let tone = effect.fraction == nil || (effect.valueText?.hasPrefix("0") ?? true)
             ? colors.inkSecondary.color
             : (effect.isCost ? SomaTrackTone.clay.color : SomaTrackTone.sage.color)
 
@@ -726,8 +736,7 @@ private struct TrackEffectsCard: View {
             .layoutPriority(1)
             Spacer(minLength: metrics.scoreLabelSpacing)
             VStack(alignment: .trailing, spacing: metrics.spaceXS) {
-                Text(effect.valueText)
-                    .somaFont(type.rowValue)
+                SomaNumber(effect.valueText, type.rowValue)
                     .foregroundStyle(tone)
                     .lineLimit(1)
                     .fixedSize()
@@ -736,7 +745,7 @@ private struct TrackEffectsCard: View {
             }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(Text("\(effect.title), \(effect.reading.name), \(effect.valueText). \(effect.detailText)"))
+        .accessibilityLabel(Text("\(effect.title), \(effect.reading.name), \(effect.valueText ?? SomaFormat.notMeasured). \(effect.detailText)"))
     }
 }
 

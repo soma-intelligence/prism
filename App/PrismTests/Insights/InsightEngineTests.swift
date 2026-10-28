@@ -233,7 +233,7 @@ struct InsightEngineTests {
         #expect(insights.items.count == InsightMetric.allCases.count)
         #expect(insights.moved.first?.metric == .restingHeartRate)
         #expect(insights.moved.count == 3)
-        #expect(insights[.sleepDuration]?.value == "7:30")
+        #expect(insights[.sleepDuration]?.value == "7h 30m")
     }
 
     @Test("A move with a time reads the time as its hero")

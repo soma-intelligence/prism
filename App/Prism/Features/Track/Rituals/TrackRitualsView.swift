@@ -170,8 +170,7 @@ fileprivate struct TrackRitualRow: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             VStack(alignment: .trailing, spacing: theme.metrics.spaceS) {
-                Text(ritual.value ?? "-")
-                    .somaFont(type.rowValue)
+                SomaNumber(ritual.signedDelta, type.rowValue, unit: ritual.unit)
                     .foregroundStyle(ritual.isCost ? colors.danger.color : colors.inkPrimary.color)
                 SomaEffectBar(fraction: ritual.fraction, aspect: aspect, isCost: ritual.isCost)
                     .frame(width: metrics.miniOrbDiameter * 1.75)

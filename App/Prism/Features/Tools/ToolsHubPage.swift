@@ -107,6 +107,6 @@ private struct ToolHubRow: View {
             .contentShape(.rect)
             .zoomSource(opened ? kind.route : ToolRoute.intro(kind))
         }
-        .buttonStyle(TilePressStyle())
+        .buttonStyle(.somaGlassPress)
     }
 }

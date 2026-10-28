@@ -49,8 +49,7 @@ struct LabAgeGauge: View {
                             .position(point(fraction(age), radius: radius + lineWidth * 1.6, centre: centre))
                     }
                     VStack(spacing: 2) {
-                        Text(estimate.flatMap { LabMath.format($0, decimals: 0) } ?? "-")
-                            .somaFont(theme.typography.display)
+                        SomaNumber(estimate.flatMap { LabMath.format($0, decimals: 0) }, theme.typography.display)
                             .foregroundStyle(theme.colors.inkPrimary.color)
                         if let caption {
                             Text(caption)
@@ -79,7 +78,7 @@ struct LabAgeGauge: View {
 
     private func settle() {
         let target = estimate.map(fraction) ?? 0
-        if reduceMotion { shown = target } else { withAnimation(theme.motion.tabEntrance) { shown = target } }
+        if reduceMotion { shown = target } else { withAnimation(theme.motion.reveal) { shown = target } }
     }
 
     private func fraction(_ value: Double) -> Double {

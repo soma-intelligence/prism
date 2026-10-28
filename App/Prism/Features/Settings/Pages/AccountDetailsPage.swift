@@ -183,8 +183,7 @@ struct AccountDetailsPage: View {
             }
         default:
             SettingsLine("Age") {
-                Text(draft.age().map { "\($0)" } ?? "-")
-                    .somaFont(theme.typography.rowValue)
+                SomaNumber(draft.age().map { "\($0)" }, theme.typography.rowValue)
                     .foregroundStyle(theme.colors.inkSecondary.color)
             }
         }

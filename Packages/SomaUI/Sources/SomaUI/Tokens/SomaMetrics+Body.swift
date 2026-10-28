@@ -10,8 +10,6 @@ import CoreGraphics
 /// Read from the design at one size for touch and pointer alike, and computed
 /// so they add no stored field to the theme.
 public extension SomaMetrics {
-    /// The fitness age plot and the fitness age waterfall.
-    var bodyPlotHeight: CGFloat { 150 }
     /// The body map's silhouette, head to feet.
     var bodyMapHeight: CGFloat { 212 }
     /// The leading column of a zone row or a region row: its name.
@@ -28,11 +26,6 @@ public extension SomaMetrics {
     var bodySessionPlotHeight: CGFloat { 88 }
     /// The largest dot a session column draws.
     var bodySessionDotDiameter: CGFloat { 12 }
-    /// The thumbnail that leads an action card on the Body tab.
-    var bodyActionThumbnail: CGFloat { 44 }
-    /// The narrowest a reading card gets before the grid gives it a row of
-    /// its own: one to a row on a phone, two side by side on a wide page.
-    var bodyReadingCardMinWidth: CGFloat { 320 }
 
     /// Muscle freshness: the legend's dot and the gap between its items,
     /// the group pills (height, inset, corner, gap, and how strongly the
@@ -42,7 +35,6 @@ public extension SomaMetrics {
     var muscleLegendSpacing: CGFloat { 16 }
     var musclePillHeight: CGFloat { 36 }
     var musclePillPadding: CGFloat { 10 }
-    var musclePillCornerRadius: CGFloat { 12 }
     var musclePillSpacing: CGFloat { 8 }
     var musclePillSelectedTint: Double { 0.16 }
     var muscleMapBackTone: Double { 0.22 }

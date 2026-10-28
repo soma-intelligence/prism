@@ -6,11 +6,47 @@
 import SwiftUI
 import Charts
 
-/// Where a reading sits against the person's usual range, as a status word.
-public enum SomaReadingStatus: Sendable {
-    case normal
+/// Which side of a reading's usual is the good one: higher for HRV or heart
+/// rate recovery, lower for resting heart rate, neither for a reading that is
+/// only different (body weight, a respiratory rate).
+public enum SomaBetterSide: Sendable, Equatable {
+    case higher
+    case lower
+    case neither
+
+    /// How a reading on `side` of its usual reads: good news on the better
+    /// side, worth a watch on the other, neutral when neither is better.
+    public func tone(_ side: SomaUsualSide) -> SomaCueTone {
+        switch (self, side) {
+        case (.higher, .above), (.lower, .below): .good
+        case (.higher, .below), (.lower, .above): .watch
+        case (.neither, _): .neutral
+        }
+    }
+}
+
+/// Which side of the usual a reading fell on.
+public enum SomaUsualSide: Sendable, Equatable {
     case above
     case below
+}
+
+/// Where a reading sits against the person's usual range, as a status word.
+///
+/// Prefer ``outside(_:better:)`` to `above` and `below`: it colours the word
+/// by whether that side is the good one, so heart rate recovery above its
+/// usual reads green and resting heart rate above its usual reads amber.
+/// `above` and `below` carry no direction and read amber whichever way.
+public enum SomaReadingStatus: Sendable {
+    case normal
+    /// Above the usual, with no word on whether that is good.
+    case above
+    /// Below the usual, with no word on whether that is good.
+    case below
+    /// Outside the usual on `side`, toned by which side is `better`: the word
+    /// stays "Above your usual" or "Below your usual", its colour tells the
+    /// truth about it.
+    case outside(SomaUsualSide, better: SomaBetterSide)
     case alert(LocalizedStringResource)
     /// A direction rather than a judgement: "Increasing", "Stabilizing".
     case trend(LocalizedStringResource)
@@ -25,8 +61,8 @@ public enum SomaReadingStatus: Sendable {
     public var word: LocalizedStringResource? {
         switch self {
         case .normal: "Within your usual"
-        case .above: "Above your usual"
-        case .below: "Below your usual"
+        case .above, .outside(.above, _): "Above your usual"
+        case .below, .outside(.below, _): "Below your usual"
         case .alert(let word), .trend(let word), .worded(let word, _): word
         case .none: nil
         }
@@ -41,6 +77,7 @@ public enum SomaReadingStatus: Sendable {
         switch self {
         case .normal: colors.statusNormal.color
         case .above, .below: colors.statusOut.color
+        case .outside(let side, let better): better.tone(side).color(colors)
         case .alert: colors.statusAlert.color
         case .trend, .none: colors.inkSecondary.color
         case .worded(_, let tone): tone.color(colors)
@@ -68,13 +105,15 @@ public enum SomaCueTone: Sendable, Equatable {
 
 /// A small line of recent values, as Apple Health draws a trend at
 /// the end of a row: a smooth line in the metric's hue and a solid dot on the
-/// last value, under it a soft fade. The usual band only sets the scale, so
-/// the line sits where it would against it; nothing is drawn behind the line
-/// (owner, 2026-10-24: no background on the small charts). The usual band, when there is
-/// one, sits behind it as a faint neutral strip: the status word already
-/// says where the reading sits, so the band never needs a colour of its own
-/// (a green block read as a widget, owner 2026-10-23). Gaps are skipped, not
-/// drawn as zero.
+/// last value. The usual band, when there is one, sits behind it as a faint
+/// neutral strip: the status word already says where the reading sits, so the
+/// band never needs a colour of its own (a green block read as a widget,
+/// owner 2026-10-23). Gaps are skipped, not drawn as zero.
+///
+/// One layer under the line at most (2026-10-27): the band when there is one,
+/// else the fade when asked for, never both, so a row never reads as a
+/// coloured box. A band that covers most of the plot says nothing about where
+/// the line sits and is left out.
 public struct SomaSparkline: View {
     private let values: [Double?]
     private let tint: Color?
@@ -113,6 +152,7 @@ public struct SomaSparkline: View {
         let band = band
         let eased = eased
         let halo = metrics.chartRingDiameter + 4
+        let bandInk = theme.colors.inkPrimary.color.opacity(metrics.sparkBandOpacity)
 
         Canvas { context, size in
             let known = values + (band.map { [$0.lowerBound, $0.upperBound] } ?? [])
@@ -137,16 +177,21 @@ public struct SomaSparkline: View {
                 CGPoint(x: plot.minX + plot.width * CGFloat(index) / CGFloat(values.count - 1), y: y(value))
             }
 
-            // The usual band behind the line, the reference design's way: a soft slab of the
-            // line's own colour, so a value outside it shows at a glance.
+            // The usual band behind the line as a neutral strip, so a value
+            // outside it shows at a glance; left out when it fills most of
+            // the plot, where it would only tint the whole chart.
+            var drewBand = false
             if let band {
                 let top = y(band.upperBound), bottom = y(band.lowerBound)
-                let slab = CGRect(x: plot.minX, y: top, width: plot.width, height: max(1, bottom - top))
-                context.fill(Path(roundedRect: slab, cornerRadius: 2), with: .color(color.opacity(metrics.chartBandOpacity)))
+                if (bottom - top) / max(1, plot.height) <= metrics.sparkBandMaxShare {
+                    let slab = CGRect(x: plot.minX, y: top, width: plot.width, height: max(1, bottom - top))
+                    context.fill(Path(roundedRect: slab, cornerRadius: metrics.sparkBandRadius), with: .color(bandInk))
+                    drewBand = true
+                }
             }
 
             let line = Self.smooth(points)
-            if filled, let first = points.first, let last = points.last {
+            if filled, !drewBand, let first = points.first, let last = points.last {
                 var area = line
                 area.addLine(to: CGPoint(x: last.x, y: size.height))
                 area.addLine(to: CGPoint(x: first.x, y: size.height))
@@ -301,7 +346,7 @@ private struct SomaSparkPlot: View {
                     SomaSparkPath(shape: shape, part: .band, inset: inset)
                         .fill(ground)
                 }
-                if filled {
+                if filled, !shape.hasBand {
                     SomaSparkPath(shape: shape, part: .area, inset: inset)
                         .fill(LinearGradient(colors: [hue.opacity(metrics.metricChartFillOpacity), hue.opacity(0)],
                                              startPoint: .top, endPoint: .bottom))
@@ -529,9 +574,8 @@ public struct SomaTrendRow: View {
             }
             .somaFont(theme.typography.callout)
             .foregroundStyle(colors.inkSecondary.color)
-            Text(value ?? "-")
-                .somaFont(theme.typography.metric)
-                .foregroundStyle(value == nil ? colors.inkSecondary.color : colors.inkPrimary.color)
+            SomaNumber(value, theme.typography.metric)
+                .foregroundStyle(colors.inkPrimary.color)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
             if let word = status.word {
@@ -548,8 +592,8 @@ public struct SomaTrendRow: View {
 
     private var statusMark: String {
         switch status {
-        case .above: "arrow.up.circle.fill"
-        case .below: "arrow.down.circle.fill"
+        case .above, .outside(.above, _): "arrow.up.circle.fill"
+        case .below, .outside(.below, _): "arrow.down.circle.fill"
         case .alert: "exclamationmark.circle.fill"
         default: "checkmark.circle.fill"
         }
@@ -571,14 +615,14 @@ public struct SomaTrendRow: View {
                             Text(word).foregroundStyle(status.color(colors))
                             Text(verbatim: "·").foregroundStyle(colors.inkSecondary.color)
                         }
-                        Text(value ?? "-")
+                        SomaNumber(value, theme.typography.caption)
                             .foregroundStyle(colors.inkPrimary.color)
                     }
                     VStack(alignment: .leading, spacing: metrics.cardHeaderSpacing) {
                         if let word = status.word {
                             Text(word).foregroundStyle(status.color(colors))
                         }
-                        Text(value ?? "-")
+                        SomaNumber(value, theme.typography.caption)
                             .foregroundStyle(colors.inkPrimary.color)
                     }
                 }
@@ -598,7 +642,7 @@ public struct SomaTrendRow: View {
     private var sparkTint: Color {
         if let hue { return hue.color }
         switch status {
-        case .normal, .trend, .none: return theme.colors.inkPrimary.color.opacity(0.85)
+        case .normal, .trend, .none, .outside(_, .neither): return theme.colors.inkPrimary.color.opacity(0.85)
         default: return status.color(theme.colors)
         }
     }
@@ -673,18 +717,9 @@ public struct SomaTrendTile: View {
                 .somaFont(theme.typography.eyebrow)
                 .foregroundStyle(colors.inkSecondary.color)
                 .lineLimit(1)
-            HStack(alignment: .firstTextBaseline, spacing: metrics.spaceXS) {
-                Text(value ?? "-")
-                    .somaFont(theme.typography.metricCompact)
-                    .foregroundStyle(colors.inkPrimary.color)
-                    .layoutPriority(1)
-                if let unit, value != nil {
-                    Text(unit)
-                        .somaFont(theme.typography.caption)
-                        .foregroundStyle(colors.inkSecondary.color)
-                }
-            }
-            .lineLimit(1)
+            SomaNumber(value, theme.typography.metricCompact, unit: unit, unitSpec: theme.typography.caption)
+                .foregroundStyle(colors.inkPrimary.color)
+                .lineLimit(1)
             .minimumScaleFactor(0.6)
             statusLine(dot: tint)
             Spacer(minLength: metrics.spaceS)
@@ -756,6 +791,7 @@ public struct SomaTrendTile: View {
         let neutral = aspect.map { theme.aspects[$0].identity.color } ?? colors.inkPrimary.color
         switch status {
         case .normal, .above, .below, .alert: return status.color(colors)
+        case .outside(let side, let better) where better != .neither: return better.tone(side).color(colors)
         case .worded(_, let tone) where tone != .neutral: return tone.color(colors)
         default: return neutral
         }
@@ -764,7 +800,7 @@ public struct SomaTrendTile: View {
     /// What VoiceOver reads after the title: the value and its unit, the
     /// status and the cue, the cue included even where the line had no room.
     private var spokenValue: String {
-        let reading = value.map { value in unit.map { "\(value) \($0)" } ?? value } ?? String(localized: "No reading")
+        let reading = value.map { value in unit.map { "\(value) \($0)" } ?? value } ?? SomaFormat.notMeasured
         let parts = [reading, status.word.map { String(localized: $0) }, cue.map { String(localized: $0) }]
         return parts.compactMap { $0 }.joined(separator: ", ")
     }

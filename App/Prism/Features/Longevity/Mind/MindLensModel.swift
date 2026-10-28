@@ -203,10 +203,9 @@ struct MindLensModel: Equatable, Sendable, Codable {
 }
 
 enum MindLensFormat {
-    /// Minutes as hours and minutes on a clock face: 5:36.
-    static func duration(_ minutes: Double) -> String {
-        let whole = Int(minutes.rounded())
-        return "\(whole / 60):" + String(format: "%02d", whole % 60)
+    /// Minutes the way the app writes every duration: "5h 36m", "45m".
+    static func duration(_ minutes: Double, locale: Locale = .autoupdatingCurrent) -> String {
+        SomaFormat.duration(minutes * 60, locale: locale)
     }
 
     static func whole(_ value: Double) -> String {

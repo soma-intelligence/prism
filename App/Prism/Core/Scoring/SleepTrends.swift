@@ -5,6 +5,7 @@
 
 import Foundation
 import HealthScoring
+import SomaUI
 
 /// The Sleep page's trend list, as the reference design sets it: one row a reading, its
 /// latest value, where that value sits against the person's own usual band,
@@ -56,10 +57,9 @@ nonisolated enum SleepTrends {
         ScoringUsual.of(Array(values.dropLast()), spreadFloor: floor).map { $0.low...$0.high }
     }
 
-    /// "6h 55m", "45m": the way Apple prints a night.
+    /// "6h 55m", "45m": the way Apple prints a night, through ``SomaFormat``.
     static func hm(_ hours: Double) -> String {
-        let minutes = Int((max(0, hours) * 60).rounded())
-        return minutes < 60 ? "\(minutes)m" : "\(minutes / 60)h \(minutes % 60)m"
+        SomaFormat.duration(max(0, hours) * 3600)
     }
 
     static func rows(scores: SomaScores?, inputs: ScoreDetailInputs?, dip: ScorePages.NightDip?) -> [Row] {

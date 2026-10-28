@@ -38,7 +38,6 @@ public extension SomaMetrics {
     var vesselHeight: CGFloat { 250 }
     var vesselWidth: CGFloat { 170 }
     var vesselGlyphHeight: CGFloat { 36 }
-    var vesselStroke: CGFloat { 1 }
     /// The glass: how far the rim's ellipse opens, the thickness of its foot
     /// and its walls, as shares of its width and height.
     var vesselRimDepth: CGFloat { 0.075 }
@@ -113,19 +112,10 @@ public extension SomaMetrics {
     var macroLabelReach: CGFloat { 30 }
 
     /// The valence track's height, its stop dots, and the thumb a finger
-    /// drags along it, with the dot of the feeling's colour at its centre.
+    /// drags along it.
     var valenceTrackHeight: CGFloat { 4 }
     var valenceStopDiameter: CGFloat { 4 }
     var valenceThumbDiameter: CGFloat { 28 }
-    var valenceThumbDotDiameter: CGFloat { 8 }
-    /// How much of its colour the track keeps: the scale reads calm.
-    var valenceTrackOpacity: Double { 0.7 }
-    /// How far the track sits dimmed before a feeling is chosen.
-    var valenceUnsetOpacity: Double { 0.4 }
-
-    /// A chosen chip's wash and rim in the feeling's colour.
-    var chipTintOpacity: Double { 0.24 }
-    var chipTintRimOpacity: Double { 0.7 }
 
     /// A mood face in the row of five: its side, how much heavier its line
     /// is than a glyph's, the soft fill when chosen, how far the chosen one

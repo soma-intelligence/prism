@@ -359,7 +359,7 @@ struct ToolLinkRow<Value: Hashable>: View {
             ToolLinkLabel(title: title, detail: detail)
         }
         .zoomSource(value)
-        .buttonStyle(TilePressStyle())
+        .buttonStyle(.somaGlassPress)
     }
 }
 
@@ -373,7 +373,7 @@ struct ToolButtonRow: View {
         Button(action: action) {
             ToolLinkLabel(title: title, detail: detail)
         }
-        .buttonStyle(TilePressStyle())
+        .buttonStyle(.somaGlassPress)
     }
 }
 

@@ -50,9 +50,9 @@ public struct SomaScore: Identifiable, Sendable {
 
 /// Three values under a hairline, each taking an equal share of the width.
 ///
-/// A value that rose wears the accent on its mark; one that fell wears the
-/// danger ink. The number itself stays in the primary ink, so the mark is the
-/// only thing that moves.
+/// A value that rose or fell carries a small mark in the secondary ink: a
+/// direction, never an alert. The number itself stays in the primary ink, so
+/// the mark is the only thing that moves.
 public struct SomaScoreRow: View {
     private let scores: [SomaScore]
     private let onSelect: ((SomaAspect) -> Void)?
@@ -117,18 +117,27 @@ private struct SomaScoreView: View {
 }
 
 /// The small triangle beside a value that rose or fell.
+///
+/// A direction, not an alert: the mark is in the secondary ink unless the
+/// caller says which side is the better one, and then it takes the status
+/// tone of that side (green on the better side, amber on the other). It is
+/// never red: red is kept for real alerts.
 public struct SomaTrendMark: View {
     private let trend: SomaTrend
+    private let better: SomaBetterSide
 
     @Environment(\.somaTheme) private var theme
 
-    public init(trend: SomaTrend) {
+    /// - Parameter better: which way is good news for this reading; neither
+    ///   by default, which keeps the mark neutral.
+    public init(trend: SomaTrend, better: SomaBetterSide = .neither) {
         self.trend = trend
+        self.better = better
     }
 
     public var body: some View {
         SomaTriangle(pointsUp: trend == .up)
-            .fill(trend == .up ? theme.colors.accent.color : theme.colors.danger.color)
+            .fill(better.tone(trend == .up ? .above : .below).color(theme.colors))
             .frame(width: theme.metrics.trendMarkWidth, height: theme.metrics.trendMarkHeight)
             .accessibilityHidden(true)
     }

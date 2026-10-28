@@ -90,11 +90,11 @@ struct TrackTagEffect: Equatable, Identifiable, Sendable {
 
     var isCost: Bool { effect.isCost(reading.better) }
 
-    /// The move, signed, in the reading's unit: "−18 min", "+3 bpm". A dash
-    /// until both sides hold enough days.
-    var valueText: String {
-        guard let delta = effect.delta else { return "-" }
-        return TrackFormat.signed(delta, unit: reading.unit)
+    /// The move, signed, in the reading's unit: "−18 min", "+3 bpm".
+    /// Nil until both sides hold enough days, which the row draws as the
+    /// missing mark.
+    var valueText: String? {
+        effect.delta.map { TrackFormat.signed($0, unit: reading.unit) }
     }
 
     /// How often it went the way the delta says, out of the days it happened.

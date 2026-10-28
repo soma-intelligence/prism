@@ -103,16 +103,11 @@ struct MindMindfulCard: View {
                 .stroke(hue.color.opacity(metrics.chartBandOpacity), lineWidth: width)
             Circle()
                 .trim(from: 0, to: progress)
-                .stroke(
-                    AngularGradient(colors: [hue.end.color, hue.start.color], center: .center,
-                                    startAngle: .degrees(0), endAngle: .degrees(360 * max(progress, 0.01))),
-                    style: StrokeStyle(lineWidth: width, lineCap: .round)
-                )
+                .stroke(hue.color, style: StrokeStyle(lineWidth: width, lineCap: .round))
                 .rotationEffect(.degrees(-90))
                 .animation(reduceMotion ? nil : theme.motion.selection, value: progress)
             VStack(spacing: 0) {
-                Text(bar?.minutes.map(MindLensFormat.whole) ?? "-")
-                    .somaFont(theme.typography.metric)
+                SomaNumber(bar?.minutes.map(MindLensFormat.whole), theme.typography.metric)
                     .foregroundStyle(colors.inkPrimary.color)
                     .contentTransition(.numericText())
                 Text(bar?.isToday == false ? bar.map { $0.day.formatted(.dateTime.weekday(.abbreviated)) } ?? "" : "of \(MindLensFormat.whole(goal))")
@@ -124,7 +119,7 @@ struct MindMindfulCard: View {
         .padding(width / 2)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Mindful minutes")
-        .accessibilityValue(bar?.minutes.map { "\(MindLensFormat.whole($0)) of \(MindLensFormat.whole(goal))" } ?? "-")
+        .accessibilityValue(bar?.minutes.map { "\(MindLensFormat.whole($0)) of \(MindLensFormat.whole(goal))" } ?? SomaFormat.notMeasured)
     }
 
     private func bars(selected: Date?) -> some View {
@@ -146,10 +141,7 @@ struct MindMindfulCard: View {
                             Capsule()
                                 .fill(colors.inkPrimary.color.opacity(metrics.chartGridOpacity * 0.6))
                             Capsule()
-                                .fill(
-                                    LinearGradient(colors: [hue.end.color, hue.start.color], startPoint: .top, endPoint: .bottom)
-                                        .opacity(minutes >= goal ? 1 : metrics.chartContextBarOpacity + 0.15)
-                                )
+                                .fill(hue.color.opacity(minutes >= goal ? 1 : metrics.chartContextBarOpacity + 0.15))
                                 .frame(height: bar.minutes == nil ? 0 : max(height * minutes / highest, metrics.chartThinBarWidth))
                         }
                         .frame(width: metrics.chartThinBarWidth * 1.8, height: height)
@@ -167,9 +159,9 @@ struct MindMindfulCard: View {
                     .frame(maxWidth: .infinity, minHeight: metrics.minimumTapTarget)
                     .contentShape(.rect)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.somaGlassPressDim)
                 .accessibilityLabel(Text(bar.day, format: .dateTime.weekday(.wide)))
-                .accessibilityValue(bar.minutes.map { "\(MindLensFormat.whole($0)) min" } ?? "-")
+                .accessibilityValue(bar.minutes.map { "\(MindLensFormat.whole($0)) min" } ?? SomaFormat.notMeasured)
             }
         }
     }
@@ -218,7 +210,7 @@ struct MindBreatheCard: View {
             .background(colors.surface.color, in: .rect(cornerRadius: metrics.cardCornerRadius, style: .continuous))
             .contentShape(.rect)
         }
-        .buttonStyle(TilePressStyle())
+        .buttonStyle(.somaGlassPress)
         .accessibilityLabel("Breathe")
         .accessibilityHint("Starts a guided breath")
     }
@@ -302,9 +294,7 @@ struct MindHeatmapCard: View {
                             .somaFont(theme.typography.captionValue)
                             .foregroundStyle(color(share(shown)))
                     } else {
-                        Text(verbatim: "-")
-                            .somaFont(theme.typography.metric)
-                            .foregroundStyle(colors.inkSecondary.color)
+                        SomaMissingValue(theme.typography.metric)
                         Spacer(minLength: 0)
                     }
                 }
@@ -344,21 +334,23 @@ struct MindHeatmapCard: View {
                         let cell = Cell(row: row, column: column)
                         let share = share(cell)
                         let isChosen = cell == selected
-                        RoundedRectangle(cornerRadius: metrics.chartBarCornerRadius, style: .continuous)
-                            .fill(share > 0 ? AnyShapeStyle(color(share)) : AnyShapeStyle(colors.surfaceRecessed.color))
-                            .overlay {
-                                if isChosen {
-                                    RoundedRectangle(cornerRadius: metrics.chartBarCornerRadius, style: .continuous)
-                                        .strokeBorder(colors.inkPrimary.color, lineWidth: metrics.chartStroke)
+                        // A button, so the cell answers the finger as it lands
+                        // (a dim), and the card's selection tick follows.
+                        Button { selection = cell } label: {
+                            RoundedRectangle(cornerRadius: metrics.chartBarCornerRadius, style: .continuous)
+                                .fill(share > 0 ? AnyShapeStyle(color(share)) : AnyShapeStyle(colors.surfaceRecessed.color))
+                                .overlay {
+                                    if isChosen {
+                                        RoundedRectangle(cornerRadius: metrics.chartBarCornerRadius, style: .continuous)
+                                            .strokeBorder(colors.inkPrimary.color, lineWidth: metrics.chartStroke)
+                                    }
                                 }
-                            }
-                            .frame(height: cellHeight)
-                            .contentShape(.rect)
-                            .onTapGesture { selection = cell }
-                            .accessibilityElement()
-                            .accessibilityLabel(Text(verbatim: "\(Calendar.current.standaloneWeekdaySymbols[(row + 1) % 7]), \(Self.hours(column))"))
-                            .accessibilityValue("\(MindLensFormat.whole(heatmap.minutes[row][column])) min")
-                            .accessibilityAddTraits(.isButton)
+                                .frame(height: cellHeight)
+                                .contentShape(.rect)
+                        }
+                        .buttonStyle(.somaGlassPressDim)
+                        .accessibilityLabel(Text(verbatim: "\(Calendar.current.standaloneWeekdaySymbols[(row + 1) % 7]), \(Self.hours(column))"))
+                        .accessibilityValue("\(MindLensFormat.whole(heatmap.minutes[row][column])) min")
                     }
                 }
             }

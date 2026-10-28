@@ -489,6 +489,22 @@ struct ComponentPlayground: View {
                     }
                 }
 
+                entry("SomaNumber, SomaDurationText, SomaMissingValue") {
+                    SomaCard {
+                        VStack(alignment: .leading, spacing: theme.metrics.cardSpacing) {
+                            HStack(spacing: theme.metrics.cardSpacing) {
+                                SomaNumber("120", theme.typography.rowValue, unit: "mg")
+                                SomaNumber(nil, theme.typography.rowValue, unit: "mg")
+                            }
+                            HStack(spacing: theme.metrics.cardSpacing) {
+                                SomaDurationText(SomaPreviewSamples.nightStages.values.reduce(0, +),
+                                                 figures: theme.typography.metric, units: theme.typography.caption)
+                                SomaDurationText(nil, figures: theme.typography.metric, units: theme.typography.caption)
+                            }
+                        }
+                    }
+                }
+
                 entry("SomaSleepGradeGrid") {
                     SomaCard {
                         SomaSleepGradeGrid(SomaPreviewSamples.nightGrades)

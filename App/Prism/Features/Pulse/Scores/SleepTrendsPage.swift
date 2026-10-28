@@ -37,7 +37,7 @@ struct SleepTrendsPage: View {
 
             ScoreLinks(links: [
                 ScoreLink(title: "Tonight’s sleep needed",
-                          detail: scores.map { SleepTrends.hm($0.sleepNeedHours) } ?? "-") { sheet = .debt },
+                          detail: scores.map { SleepTrends.hm($0.sleepNeedHours) }) { sheet = .debt },
             ])
 
             if let move = page.move {
@@ -66,7 +66,7 @@ struct SleepTrendsPage: View {
             }
 
             ScoreLinks(links: [
-                ScoreLink(title: "Sleep environment", detail: page.sound ?? "-") { sheet = .environment },
+                ScoreLink(title: "Sleep environment", detail: page.sound) { sheet = .environment },
                 ScoreLink(title: "How your score is built") { sheet = .built },
             ])
         }
@@ -130,8 +130,7 @@ private struct SleepDipCard: View {
                                 .foregroundStyle(colors.inkSecondary.color)
                         }
                         Spacer(minLength: 0)
-                        Text(verbatim: today.map { "\(Int($0.percent.rounded()))%" } ?? "-")
-                            .somaFont(theme.typography.metric)
+                        SomaNumber(today.map { "\(Int($0.percent.rounded()))%" }, theme.typography.metric)
                             .foregroundStyle(today.map { $0.band == .healthy ? colors.statusNormal.color : colors.statusOut.color }
                                              ?? colors.inkSecondary.color)
                     }

@@ -50,7 +50,6 @@ public struct SomaInfoSheet<Footer: View>: View {
                     VStack(alignment: .leading, spacing: metrics.cardSpacing / 2) {
                         Text(section.heading)
                             .somaFont(theme.typography.eyebrow)
-                            .textCase(.uppercase)
                             .foregroundStyle(colors.inkSecondary.color)
                             .accessibilityAddTraits(.isHeader)
                         Text(section.body)

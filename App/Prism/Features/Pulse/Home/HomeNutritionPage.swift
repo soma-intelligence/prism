@@ -137,7 +137,7 @@ struct HomeNutritionPage: View {
         }
         let higher = measured.dropLast().filter { $0.rise < last.rise }.count
         var note = "The latest meal rose \(Int(last.rise.rounded())) mg/dL"
-        if let back = last.backToBaseline { note += ", back in \(HomeFormat.span(back))" }
+        if let back = last.backToBaseline { note += ", back in \(SomaFormat.duration(back))" }
         note += "."
         if measured.count > 1 { note += " More than \(higher) of today’s other \(measured.count - 1)." }
         return note

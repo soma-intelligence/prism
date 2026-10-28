@@ -327,9 +327,13 @@ public struct SomaMetricChart: View {
             let metrics = theme.metrics
             let low = SomaChartMath.curve(lower, domain: domain, count: metrics.metricChartSamples)
             let high = SomaChartMath.curve(upper, domain: domain, count: metrics.metricChartSamples)
+            // A band spanning most of the plot only tints the whole chart: it
+            // keeps its two edges and drops its fill.
+            let spans = zip(low.samples, high.samples).map { abs($1 - $0) }
+            let wide = !spans.isEmpty && spans.reduce(0, +) / Double(spans.count) > metrics.metricChartBandMaxShare
             ZStack {
                 SomaBandShape(lower: low, upper: high)
-                    .fill(bandTint.opacity(metrics.metricChartBandOpacity))
+                    .fill(bandTint.opacity(wide ? 0 : metrics.metricChartBandOpacity))
                 SomaCurveShape(curve: high, closed: false, spansWidth: true)
                     .stroke(bandTint.opacity(metrics.metricChartBandEdgeOpacity), lineWidth: 0.5)
                 SomaCurveShape(curve: low, closed: false, spansWidth: true)
@@ -408,7 +412,10 @@ public struct SomaMetricChart: View {
         let color = hue.color
 
         return ZStack(alignment: .topLeading) {
-            if !curve.isEmpty {
+            // The fade under the line only when no band is drawn: band, fade
+            // and the dotted average in one hue read as a coloured block,
+            // and the band already says where the line sits.
+            if !curve.isEmpty, !hasBand {
                 SomaCurveShape(curve: curve, closed: true)
                     .fill(LinearGradient(
                         colors: [color.opacity(metrics.metricChartFillOpacity), color.opacity(0)],
@@ -417,6 +424,8 @@ public struct SomaMetricChart: View {
                     .mask(alignment: .leading) {
                         Rectangle().scaleEffect(x: isDrawn ? 1 : 0, anchor: .leading)
                     }
+            }
+            if !curve.isEmpty {
                 SomaCurveShape(curve: curve, closed: false)
                     .trim(from: 0, to: isDrawn ? 1 : 0)
                     .stroke(color, style: StrokeStyle(lineWidth: metrics.metricChartLine, lineCap: .round, lineJoin: .round))

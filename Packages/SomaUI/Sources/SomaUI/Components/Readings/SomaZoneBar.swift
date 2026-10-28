@@ -125,7 +125,7 @@ public struct SomaZoneBar: View {
         .animation(reduceMotion ? nil : theme.motion.fold, value: value)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(zones.map(\.name).joined(separator: ", ")))
-        .accessibilityValue(Text(active.map { zones[$0].name } ?? "-"))
+        .accessibilityValue(Text(active.map { zones[$0].name } ?? SomaFormat.notMeasured))
     }
 
     private func color(_ tone: Tone) -> Color {

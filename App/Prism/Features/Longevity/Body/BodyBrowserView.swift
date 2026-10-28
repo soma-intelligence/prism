@@ -100,7 +100,6 @@ struct BodyBrowserView: View {
         VStack(alignment: .leading, spacing: theme.metrics.cardSpacing) {
             Text(title)
                 .somaFont(theme.typography.eyebrow)
-                .textCase(.uppercase)
                 .foregroundStyle(theme.colors.inkSecondary.color)
                 .accessibilityAddTraits(.isHeader)
             content()
@@ -120,7 +119,7 @@ struct BodyBrowserView: View {
                         aspect: score.aspect
                     )
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.somaBrowseRow)
             }
         }
     }
@@ -150,7 +149,7 @@ struct BodyBrowserView: View {
                                           detail: VaultWords.measures(category.types.count))
                                 .contentShape(.rect)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.somaBrowseRow)
                     }
                 }
             }
@@ -165,7 +164,7 @@ struct BodyBrowserView: View {
                             )
                             .contentShape(.rect)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.somaBrowseRow)
                     }
                 }
             }
@@ -174,7 +173,7 @@ struct BodyBrowserView: View {
 }
 
 /// The Vault's head, set like a category's: the Vault's glyph on a recessed
-/// square, its name, and how much it holds.
+/// square and how much it holds. The name is the navigation title's alone.
 private struct VaultHead: View {
     let line: String
 
@@ -192,14 +191,9 @@ private struct VaultHead: View {
                 .background(RoundedRectangle(cornerRadius: metrics.aspectBadgeCornerRadius, style: .continuous)
                     .fill(colors.surfaceRecessed.color))
                 .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: metrics.readingRowLineGap) {
-                Text("Vault")
-                    .somaFont(theme.typography.headline)
-                    .foregroundStyle(colors.inkPrimary.color)
-                Text(line)
-                    .somaFont(theme.typography.caption)
-                    .foregroundStyle(colors.inkSecondary.color)
-            }
+            Text(line)
+                .somaFont(theme.typography.body)
+                .foregroundStyle(colors.inkSecondary.color)
         }
         .padding(.top, metrics.scoreHeroTopPadding)
         .accessibilityElement(children: .combine)
@@ -215,7 +209,8 @@ extension EnvironmentValues {
 
 /// A row of the Vault: pushed on the stack on a phone, shown in the pane
 /// beside the list where the host keeps one, with the row it shows marked by
-/// a tonal step.
+/// a tonal step. It sets no button style of its own: a style set here, next
+/// to the button, would beat the caller's (a tile's press, a row's wash).
 private struct VaultLink<Label: View>: View {
     let route: VaultRoute
     @ViewBuilder let label: Label
@@ -229,7 +224,6 @@ private struct VaultLink<Label: View>: View {
             Button { pane.wrappedValue = route } label: {
                 label.contentShape(.rect)
             }
-            .buttonStyle(.plain)
             .background(isShown ? theme.colors.inkPrimary.color.opacity(theme.metrics.selectionFillOpacity) : .clear)
             .accessibilityAddTraits(isShown ? .isSelected : [])
         } else {
@@ -237,7 +231,6 @@ private struct VaultLink<Label: View>: View {
                 label.contentShape(.rect)
             }
             .zoomSource(route)
-            .buttonStyle(.plain)
         }
     }
 }

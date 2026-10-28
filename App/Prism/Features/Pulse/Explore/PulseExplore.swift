@@ -90,7 +90,7 @@ struct PulseExploreWeek: Equatable {
         if let lastNight, let deep = lastNight.deep {
             sleepReason = "Last night held \(words.span(deep)) of deep sleep."
         } else if let lastNight {
-            sleepReason = "You slept \(words.clock(lastNight.asleep)) last night."
+            sleepReason = "You slept \(words.duration(lastNight.asleep)) last night."
         } else {
             sleepReason = "Why the first hours of the night matter most."
         }

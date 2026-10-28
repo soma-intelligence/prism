@@ -52,7 +52,8 @@ struct WeatherPage: View {
                     .foregroundStyle(colors.inkSecondary.color)
             }
             .padding(.top, theme.metrics.heroTopPadding)
-            ScoreFigure(value: nil, unit: "°C now")
+            // No forecast source, so no figure: the headline leads rather
+            // than a dash with a unit beside it.
             ScoreHead(headline: "No forecast source yet.",
                       reason: "Soma reads the weather once a forecast service is connected.",
                       aside: "Until then this page shows only what your own body recorded.")
@@ -69,7 +70,7 @@ struct WeatherPage: View {
             }
             ScoreUsualCard(title: "What it does to you", caption: "From your own history", aspect: .sleep, lines: [
                 ScoreMath.usualLine(title: "Daylight outside", value: today, usual: usual, worse: .lower,
-                                    format: { ScoreMath.number($0) }, unit: " min",
+                                    format: { SomaFormat.duration($0 * 60) },
                                     empty: "Apple Watch counts it on its own"),
             ])
             SomaCard {

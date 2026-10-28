@@ -429,12 +429,10 @@ struct MeetingVerdictRow: View {
                 .somaFont(type.caption)
                 .foregroundStyle(colors.inkSecondary.color)
         case .unknown:
-            Text(verbatim: "-")
-                .somaFont(type.captionValue)
-                .foregroundStyle(colors.inkSecondary.color)
+            SomaMissingValue(type.captionValue)
         case .calm, .stressful:
             MeetingStatusMark(
-                word: assessment.rise.map { "\(MindMath.signed($0)) bpm" } ?? "-",
+                word: assessment.rise.map { "\(MindMath.signed($0)) bpm" } ?? assessment.verdict.title,
                 tone: assessment.verdict == .stressful ? .out : .normal,
                 isValue: true
             )
@@ -482,8 +480,7 @@ struct MeetingEvidence: View {
                 .somaFont(type.caption)
                 .foregroundStyle(colors.inkSecondary.color)
             HStack(alignment: .firstTextBaseline, spacing: theme.metrics.spaceXS) {
-                Text(value ?? "-")
-                    .somaFont(type.rowValue)
+                SomaNumber(value, type.rowValue)
                     .foregroundStyle(colors.inkPrimary.color)
                     .contentTransition(.numericText())
                 if let unit, value != nil {
@@ -630,8 +627,7 @@ struct MindHalvesCard: View {
         let fill = isHigher ? colors.statusOut.color : colors.inkSecondary.color.opacity(metrics.chartContextOpacity)
 
         return VStack(alignment: .leading, spacing: metrics.spaceS) {
-            Text(MindFormat.whole(value) ?? "-")
-                .somaFont(type.metricCompact)
+            SomaNumber(MindFormat.whole(value), type.metricCompact)
                 .foregroundStyle(isHigher ? colors.statusOut.color : colors.inkPrimary.color)
                 .contentTransition(.numericText())
             ZStack(alignment: .bottom) {

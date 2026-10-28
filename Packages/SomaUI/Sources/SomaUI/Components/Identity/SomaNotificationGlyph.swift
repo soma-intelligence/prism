@@ -45,7 +45,8 @@ public struct SomaNotificationGlyph: View {
                     .fill(theme.colors.accent.color)
                     .frame(width: dot.radius * 2 * unit, height: dot.radius * 2 * unit)
                     .position(x: dot.centre.x * unit, y: dot.centre.y * unit)
-                    .transition(.scale.combined(with: .opacity))
+                    // From half its size, never from nothing.
+                    .transition(.scale(scale: 0.5).combined(with: .opacity))
             }
         }
         .frame(width: side, height: side)

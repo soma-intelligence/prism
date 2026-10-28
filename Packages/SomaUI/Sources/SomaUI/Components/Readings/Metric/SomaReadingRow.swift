@@ -90,16 +90,18 @@ public struct SomaReadingRow: View {
                     .frame(width: metrics.readingRowSparkWidth, height: metrics.readingRowSparkHeight)
             }
 
+            // Value and unit in a trailing column of one width, so the week's
+            // lines before it share a left edge down the group.
             HStack(alignment: .firstTextBaseline, spacing: metrics.metricHeroSpacing) {
-                Text(value ?? "-")
-                    .somaFont(type.rowValue)
-                    .foregroundStyle(value == nil ? colors.inkSecondary.color : colors.inkPrimary.color)
+                SomaNumber(value, type.rowValue)
+                    .foregroundStyle(colors.inkPrimary.color)
                 if let unit, value != nil {
                     Text(unit)
                         .somaFont(type.caption)
                         .foregroundStyle(colors.inkSecondary.color)
                 }
             }
+            .fixedSize()
             .frame(minWidth: metrics.readingRowValueWidth, alignment: .trailing)
 
             if opensSomething {

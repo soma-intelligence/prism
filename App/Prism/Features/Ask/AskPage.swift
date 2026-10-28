@@ -24,6 +24,7 @@ struct AskPage: View {
 
     @Environment(\.somaTheme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.layoutDirection) private var layoutDirection
     @Environment(HealthDashboard.self) private var health
     @Environment(AppRouter.self) private var router
 
@@ -35,6 +36,14 @@ struct AskPage: View {
     /// know it. Nil until the first question of a new one, which picks it.
     @State private var conversationID: UUID?
     @State private var isShowingHistory = false
+    /// The history drawer's offset from open: 0 at rest, minus its width
+    /// shut. Moved by a finger, then by the spring it lets go into.
+    @State private var drawerOffset: CGFloat = 0
+    /// Where the drawer was when the finger on it came down.
+    @State private var dragStart: CGFloat?
+    /// A finger is pulling the drawer out from the leading edge.
+    @State private var isPullingOut = false
+    @State private var pageWidth: CGFloat = 0
     @State private var isShowingSettings = false
     @State private var history = AskHistoryStore.shared
     @State private var statuses = ActivityStatusStore.shared
@@ -55,13 +64,30 @@ struct AskPage: View {
     var body: some View {
         ZStack(alignment: .leading) {
             stack
+                // The page holds still under the drawer, and is out of
+                // VoiceOver's reach while the drawer is over it.
+                .accessibilityHidden(isShowingHistory)
+#if os(iOS)
+                // From the leading edge the finger pulls the drawer out. Not
+                // once a page is pushed: the edge is the way back then.
+                .gesture(AskDrawerPan(
+                    kind: .edge, isEnabled: path.isEmpty && (!isShowingHistory || isPullingOut),
+                    isRightToLeft: layoutDirection == .rightToLeft,
+                    changed: pullDrawer,
+                    ended: { travel, velocity in releaseDrawer(travel: travel, velocity: velocity, from: -drawerWidth) }
+                ))
+#endif
 
             if isShowingHistory {
                 theme.colors.canvas.color.opacity(0.7)
+                    .opacity(drawerShown)
                     .ignoresSafeArea()
+                    .contentShape(.rect)
                     .onTapGesture { setHistory(false) }
                     .accessibilityLabel("Close history")
                     .accessibilityAddTraits(.isButton)
+                    .drawerDrag(minimumDistance: theme.metrics.spaceM, isRightToLeft: layoutDirection == .rightToLeft,
+                                changed: dragDrawer, ended: dropDrawer)
                     .transition(.opacity)
 
                 AskHistoryDrawer(
@@ -83,11 +109,18 @@ struct AskPage: View {
                         isShowingSettings = true
                     }
                 )
-                .frame(maxWidth: theme.metrics.sidebarIdealWidth * 1.3)
+                // A definite width, read off the page, which every row inside
+                // wraps to.
+                .frame(width: drawerWidth)
+                .offset(x: drawerOffset)
+                .accessibilityAction(.escape) { setHistory(false) }
+                .drawerDrag(minimumDistance: theme.metrics.spaceM, isRightToLeft: layoutDirection == .rightToLeft,
+                                changed: dragDrawer, ended: dropDrawer)
                 .transition(reduceMotion ? .opacity : .move(edge: .leading))
                 .zIndex(1)
             }
         }
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { pageWidth = $0 }
         .sheet(isPresented: $isShowingSettings) { SettingsSheet() }
         .sheet(isPresented: $isShowingModels) {
             NavigationStack { AskModelPage() }
@@ -170,8 +203,89 @@ struct AskPage: View {
 
     private static let bottom = "ask.bottom"
 
+    /// As wide as a sidebar and a bit, always leaving a strip of the page in
+    /// sight to tap back to.
+    private var drawerWidth: CGFloat {
+        let metrics = theme.metrics
+        let ideal = metrics.sidebarIdealWidth * 1.3
+        guard pageWidth > 0 else { return ideal }
+        return max(1, min(ideal, pageWidth - metrics.iconButtonDiameter))
+    }
+
+    /// How much of the drawer is out, 0 shut to 1 open: the scrim follows it.
+    private var drawerShown: Double {
+        Double(min(max(1 + drawerOffset / drawerWidth, 0), 1))
+    }
+
+    /// Opens or closes the drawer from a tap: a spring in from the leading
+    /// edge, a fade in place under Reduce Motion.
     private func setHistory(_ isShowing: Bool) {
-        withAnimation(reduceMotion ? nil : theme.motion.selection) { isShowingHistory = isShowing }
+        dragStart = nil
+        withAnimation(reduceMotion ? theme.motion.fade : theme.motion.partSettle(velocity: 0)) {
+            isShowingHistory = isShowing
+            drawerOffset = 0
+        }
+    }
+
+    /// The edge pull: the drawer comes out under the finger. Under Reduce
+    /// Motion it waits for the release and fades in.
+    private func pullDrawer(_ travel: CGFloat) {
+        guard !reduceMotion, !isShowingHistory || isPullingOut else { return }
+        let width = drawerWidth
+        still {
+            isPullingOut = true
+            isShowingHistory = true
+            drawerOffset = AskDrawerMotion.offset(travel - width, width: width)
+        }
+    }
+
+    /// The open drawer under a finger: it follows one to one toward shut,
+    /// and gives only a little past open.
+    private func dragDrawer(_ travel: CGFloat) {
+        guard !reduceMotion else { return }
+        let start = dragStart ?? drawerOffset
+        dragStart = start
+        still { drawerOffset = AskDrawerMotion.offset(start + travel, width: drawerWidth) }
+    }
+
+    /// Lets the drawer go: open or shut by where the release projects it,
+    /// or by a flick's direction, on a spring that starts at the finger's
+    /// speed. Under Reduce Motion it fades to the same answer.
+    private func releaseDrawer(travel: CGFloat, velocity: CGFloat, from start: CGFloat) {
+        let width = drawerWidth
+        let flick = theme.metrics.partSwipeFlick
+        let here = reduceMotion ? start + travel : drawerOffset
+        let open = AskDrawerMotion.landsOpen(offset: here, velocity: velocity, width: width, flick: flick)
+        dragStart = nil
+        isPullingOut = false
+        guard !reduceMotion else {
+            if open != isShowingHistory { setHistory(open) }
+            return
+        }
+        let target: CGFloat = open ? 0 : -width
+        let spring = theme.motion.partSettle(velocity: AskDrawerMotion.springVelocity(velocity, from: here, to: target))
+        withAnimation(spring, completionCriteria: .logicallyComplete) {
+            drawerOffset = target
+        } completion: {
+            // Shut and still shut: the drawer leaves without a second move.
+            guard !open, drawerOffset == target, dragStart == nil else { return }
+            still {
+                isShowingHistory = false
+                drawerOffset = 0
+            }
+        }
+    }
+
+    /// The open drawer let go.
+    private func dropDrawer(_ travel: CGFloat, _ velocity: CGFloat) {
+        releaseDrawer(travel: travel, velocity: velocity, from: 0)
+    }
+
+    /// A change that lands at once, with no animation the page might lend it.
+    private func still(_ change: () -> Void) {
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction, change)
     }
 
     private func send(_ question: String) {
@@ -311,14 +425,17 @@ struct AskPage: View {
         let metrics = theme.metrics
         let colors = theme.colors
         let hasDraft = !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let action: ComposerAction = isStreaming ? .stop : (hasDraft ? .send : .speak)
+        // The discs draw at three quarters of an icon button; the finger gets
+        // a full tap target around them.
         let disc = metrics.iconButtonDiameter * 0.75
 
-        return HStack(spacing: metrics.spaceS) {
+        return HStack(spacing: metrics.spaceXS) {
             Button { sheet = .attach } label: {
                 Image(systemName: "plus")
-                    .font(.system(size: metrics.browseGlyphSize, weight: .regular))
+                    .somaGlyph(theme.typography.glyph, size: metrics.browseGlyphSize)
                     .foregroundStyle(colors.inkSecondary.color)
-                    .frame(width: disc, height: disc)
+                    .frame(width: metrics.minimumTapTarget, height: metrics.minimumTapTarget)
                     .contentShape(.circle)
             }
             .buttonStyle(.somaGlassPress)
@@ -332,45 +449,31 @@ struct AskPage: View {
                 .submitLabel(.send)
                 .onSubmit { if !isStreaming { send(draft) } }
 
-            Group {
-                if isStreaming {
-                    Button(action: stop) {
-                        Image(systemName: "stop.fill")
-                            .font(.system(size: metrics.browseGlyphSize * 0.6, weight: .semibold))
-                            .foregroundStyle(colors.onAccent.color)
-                            .frame(width: disc, height: disc)
-                            .background(Circle().fill(colors.accent.color))
-                            .contentShape(.circle)
-                    }
-                    .accessibilityLabel("Stop answering")
-                    .transition(.opacity)
-                } else if hasDraft {
-                    Button { send(draft) } label: {
-                        Image(systemName: "arrow.up")
-                            .font(.system(size: metrics.browseGlyphSize * 0.8, weight: .semibold))
-                            .foregroundStyle(colors.onAccent.color)
-                            .frame(width: disc, height: disc)
-                            .background(Circle().fill(colors.accent.color))
-                            .contentShape(.circle)
-                    }
-                    .accessibilityLabel("Send")
-                    .transition(reduceMotion ? .opacity : .scale.combined(with: .opacity))
-                } else {
-                    Button { sheet = .voice } label: {
-                        Image(systemName: "mic")
-                            .font(.system(size: metrics.browseGlyphSize * 0.9, weight: .regular))
-                            .foregroundStyle(colors.inkSecondary.color)
-                            .frame(width: disc, height: disc)
-                            .contentShape(.circle)
-                    }
-                    .accessibilityLabel("Speak")
-                    .transition(.opacity)
+            // One button that changes what it does: the microphone while the
+            // field is empty, send once there is something to send, stop
+            // while Soma answers. The glyph swaps in place and the accent
+            // disc fades in under it, so nothing grows out of nothing.
+            Button {
+                switch action {
+                case .stop: stop()
+                case .send: send(draft)
+                case .speak: sheet = .voice
                 }
+            } label: {
+                Image(systemName: action.symbol)
+                    .somaGlyph(theme.typography.glyph, size: metrics.browseGlyphSize * action.glyphScale)
+                    .contentTransition(reduceMotion ? .opacity : .symbolEffect(.replace))
+                    .foregroundStyle(action.isFilled ? colors.onAccent.color : colors.inkSecondary.color)
+                    .frame(width: disc, height: disc)
+                    .background(Circle().fill(colors.accent.color).opacity(action.isFilled ? 1 : 0))
+                    .frame(width: metrics.minimumTapTarget, height: metrics.minimumTapTarget)
+                    .contentShape(.circle)
             }
             .buttonStyle(.somaGlassPress)
+            .accessibilityLabel(action.label)
+            // A fade under Reduce Motion: the disc and glyph change in place.
+            .animation(reduceMotion ? theme.motion.fade : theme.motion.selection, value: action)
         }
-        .animation(reduceMotion ? nil : theme.motion.selection, value: hasDraft)
-        .animation(reduceMotion ? nil : theme.motion.selection, value: isStreaming)
         .padding(.horizontal, metrics.spaceXS)
         .frame(minHeight: metrics.iconButtonDiameter + metrics.spaceS)
         .somaGlass(.regular, in: .capsule)
@@ -378,6 +481,40 @@ struct AskPage: View {
         .padding(.bottom, metrics.cardSpacing)
         // As wide as the conversation over it, not the window.
         .somaReadableWidth()
+    }
+}
+
+/// What the composer's trailing button does right now.
+private enum ComposerAction: Equatable {
+    case speak, send, stop
+
+    var symbol: String {
+        switch self {
+        case .speak: "mic"
+        case .send: "arrow.up"
+        case .stop: "stop.fill"
+        }
+    }
+
+    /// Each glyph's size against a browse glyph, so the three read as one
+    /// weight in the disc.
+    var glyphScale: CGFloat {
+        switch self {
+        case .speak: 0.9
+        case .send: 0.8
+        case .stop: 0.6
+        }
+    }
+
+    /// Send and stop sit on the accent disc; the microphone sits bare.
+    var isFilled: Bool { self != .speak }
+
+    var label: LocalizedStringKey {
+        switch self {
+        case .speak: "Speak"
+        case .send: "Send"
+        case .stop: "Stop answering"
+        }
     }
 }
 
@@ -466,6 +603,35 @@ private enum AskSheet: String, Identifiable {
                 message: "The guided session opens here once it is built. Today\u{2019}s move is still on the Pulse tab."
             )
         }
+    }
+}
+
+// MARK: - Drawer drag
+
+private extension View {
+    /// The open drawer, or the page dimmed beside it, dragged sideways: the
+    /// list keeps every upright drag. The Mac and the headset read a plain
+    /// drag, once it is more sideways than upright.
+    func drawerDrag(
+        minimumDistance: CGFloat,
+        isRightToLeft: Bool,
+        changed: @escaping @MainActor (CGFloat) -> Void,
+        ended: @escaping @MainActor (CGFloat, CGFloat) -> Void
+    ) -> some View {
+#if os(iOS)
+        gesture(AskDrawerPan(kind: .drawer, isRightToLeft: isRightToLeft, changed: changed, ended: ended))
+#else
+        gesture(
+            DragGesture(minimumDistance: minimumDistance)
+                .onChanged { value in
+                    guard abs(value.translation.width) > abs(value.translation.height) else { return }
+                    changed(value.translation.width)
+                }
+                .onEnded { value in
+                    ended(value.translation.width, value.velocity.width)
+                }
+        )
+#endif
     }
 }
 
@@ -662,7 +828,7 @@ private struct AskTurnView: View {
                     Button(action: start) {
                         HStack(spacing: metrics.spaceS) {
                             Image(systemName: "play.circle.fill")
-                                .font(.system(size: metrics.browseGlyphSize, weight: .regular))
+                                .somaGlyph(type.glyph, size: metrics.browseGlyphSize)
                                 .foregroundStyle(colors.accent.color)
                             Text(move.title)
                                 .somaFont(type.callout)

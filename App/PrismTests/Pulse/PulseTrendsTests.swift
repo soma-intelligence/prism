@@ -74,7 +74,7 @@ struct PulseTrendsTests {
         let trends = PulseTrends.make(from: inputs, calendar: calendar, locale: locale)
         #expect(trends.headline == "Mind moved most this month.")
         #expect(trends.reason == "Your HRV fell 10 ms against the 30 days before. The other held or rose.")
-        #expect(trends.rows.map(\.change) == ["No nights yet", "down 10 ms", "up 3 min a day"])
+        #expect(trends.rows.map(\.change) == ["No nights yet", "down 10 ms", "up 3m a day"])
         // The rows' numbers are scores, and none were passed.
         #expect(trends.rows[1].value == nil)
         #expect(trends.rows[0].value == nil)

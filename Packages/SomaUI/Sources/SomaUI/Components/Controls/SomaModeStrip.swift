@@ -73,7 +73,6 @@ public struct SomaModeStrip<ID: Hashable>: View {
     private func label(_ title: String, color: Color) -> some View {
         Text(title)
             .somaFont(theme.typography.segment)
-            .textCase(.uppercase)
             .lineLimit(1)
             .foregroundStyle(color)
             .padding(.horizontal, theme.metrics.modeStripSpacing / 2)

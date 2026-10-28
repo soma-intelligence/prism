@@ -10,6 +10,7 @@
 import Foundation
 import Testing
 import HealthScoring
+import SomaUI
 @testable import Prism
 
 @Suite("Score pages")
@@ -24,9 +25,9 @@ struct ScorePagesTests {
 
     @Test("Durations, clocks and signed changes read the way the pages print them")
     func formats() {
-        #expect(ScoreMath.hoursMinutes(7.2) == "7:12")
-        #expect(ScoreMath.duration(hours: 70.0 / 60) == "1 h 10")
-        #expect(ScoreMath.duration(hours: 0.5) == "30 min")
+        #expect(ScoreMath.hoursMinutes(7.2) == SomaFormat.duration(7 * 3600 + 12 * 60))
+        #expect(ScoreMath.duration(hours: 70.0 / 60) == SomaFormat.duration(70 * 60))
+        #expect(ScoreMath.duration(hours: -0.5) == SomaFormat.duration(30 * 60))
         #expect(ScoreMath.clock(23 + 10.0 / 60) == "23:10")
         #expect(ScoreMath.clock(24.5) == "00:30")
         #expect(ScoreMath.signed(2.1, decimals: 1) == "+2.1")

@@ -8,10 +8,13 @@ import SomaUI
 
 /// Stress across the whole day, last night first: the night lies on a faint
 /// ground of the sleep hue with a moon and its word, the day follows it, and
-/// one line on one scale runs through both, taking the colour of the zone it
-/// passes through over the three zones as faint bands. A finger held on the
-/// plot scrubs it, the value and the time riding in the header. A tap reads
-/// one half hour; a second tap lets it go.
+/// one line in one ink on one scale runs through both. The three zones are
+/// hairlines at their borders, not bands of colour: the zone's colour rides
+/// only the latest reading (or the one scrubbed to) and its word in the
+/// header, where it means something (design pass, 2026-10-27).
+///
+/// A finger held on the plot scrubs it, the value and the time riding in the
+/// header. A tap reads one half hour; a second tap lets it go.
 struct MindStressDayChart: View {
     let samples: [MindStressSample]
     let dayStart: Date
@@ -63,8 +66,7 @@ struct MindStressDayChart: View {
         }
 
         return HStack(alignment: .firstTextBaseline, spacing: theme.metrics.trendMarkSpacing * 2) {
-            Text(sample.map { MindLensFormat.whole($0.value) } ?? "-")
-                .somaFont(type.metric)
+            SomaNumber(sample.map { MindLensFormat.whole($0.value) }, type.metric)
                 .foregroundStyle(colors.inkPrimary.color)
                 .somaRollingNumber(sample.map { MindLensFormat.whole($0.value) }, holdsWidth: true)
             if let sample {
@@ -97,34 +99,23 @@ struct MindStressDayChart: View {
         let all = all
         let selected = selected
         let ticks: [Double] = [0, ScorePages.stressBands.moderate, ScorePages.stressBands.high, 100]
-        let zones = MindZone.allCases.map { (range: $0.range, color: $0.color) }
         let pen = SomaPen(theme)
         let inset = theme.metrics.chartPlotInset
         let slots = MindStressSlots(all, dayStart: dayStart, night: night)
-        let line = LinearGradient(gradient: Self.gradient, startPoint: .bottom, endPoint: .top)
-        let wash = LinearGradient(gradient: Self.gradient(opacity: pen.fillOpacity * 1.6, fades: true),
-                                  startPoint: .bottom, endPoint: .top)
+        let ink = theme.colors.inkPrimary.color
         let sleepHue = theme.aspects[.sleep].identity.color
 
         return ZStack(alignment: .topLeading) {
-            // The zones, faint, behind everything; the night's ground over
-            // them, so the night reads as its own stretch of the day.
+            // The night's ground behind everything, so the night reads as its
+            // own stretch of the day; the zone borders as hairlines over it.
             Canvas { context, size in
                 let plot = CGRect(origin: .zero, size: size).insetBy(dx: inset, dy: inset)
                 func y(_ value: Double) -> CGFloat { plot.maxY - plot.height * CGFloat(value / 100) }
-                for zone in zones {
-                    let band = CGRect(x: 0, y: y(zone.range.upperBound), width: size.width,
-                                      height: y(zone.range.lowerBound) - y(zone.range.upperBound))
-                    context.fill(Path(band), with: .color(zone.color.opacity(pen.bandOpacity * 0.45)))
-                }
                 if let span = axis.nightSpan {
                     let left = plot.minX + plot.width * CGFloat(span.lowerBound)
                     let right = plot.minX + plot.width * CGFloat(span.upperBound)
                     let ground = Path(roundedRect: CGRect(x: left, y: 0, width: max(right - left, 1), height: size.height),
                                       cornerRadius: inset)
-                    // The card's own ground first, so the zones stop at the
-                    // night rather than tinting it.
-                    context.fill(ground, with: .color(pen.surface))
                     context.fill(ground, with: .color(sleepHue.opacity(pen.bandOpacity)))
                     pen.vertical(context, x: right, height: size.height, color: sleepHue.opacity(theme.metrics.chartNightEdgeOpacity))
                 }
@@ -133,12 +124,11 @@ struct MindStressDayChart: View {
                 }
             }
 
-            // The line and the light under it morph from one read to the next.
+            // The line morphs from one read to the next.
             Group {
-                MindStressLineShape(slots: slots, axis: axis, part: .area).fill(wash)
                 MindStressLineShape(slots: slots, axis: axis, part: .line)
-                    .stroke(line, style: StrokeStyle(lineWidth: pen.stroke * 1.4, lineCap: .round, lineJoin: .round))
-                MindStressLineShape(slots: slots, axis: axis, part: .dots(pen.point)).fill(line)
+                    .stroke(ink, style: StrokeStyle(lineWidth: pen.stroke * 1.4, lineCap: .round, lineJoin: .round))
+                MindStressLineShape(slots: slots, axis: axis, part: .dots(pen.point)).fill(ink)
             }
             .padding(inset)
             .animation(reduceMotion ? nil : theme.motion.chartMorph, value: slots)
@@ -288,33 +278,6 @@ struct MindStressDayChart: View {
         let part = axis.isNight(shown.start) ? String(localized: "asleep") : ""
         return Text("\(MindLensFormat.whole(shown.value)), \(Text(shown.zone.title)), \(ScoreMath.clock(shown.start)) \(part)")
     }
-
-    // MARK: Arithmetic
-
-    /// The zones up the plot, from the foot (0) to the top (100), with a
-    /// short blend at each border so the line turns colour as it crosses.
-    static var gradient: Gradient { gradient(opacity: 1) }
-
-    /// - Parameter opacity: at the top of the plot; with `fades`, the
-    ///   colour thins toward the foot, so the wash under the line reads as
-    ///   light rather than as a block.
-    static func gradient(opacity: Double, fades: Bool = false) -> Gradient {
-        let blend = 0.04
-        let moderate = ScorePages.stressBands.moderate / 100
-        let high = ScorePages.stressBands.high / 100
-        func stop(_ zone: MindZone, _ location: Double) -> Gradient.Stop {
-            let alpha = fades ? opacity * (0.15 + 0.85 * location) : opacity
-            return .init(color: zone.color.opacity(alpha), location: location)
-        }
-        return Gradient(stops: [
-            stop(.low, 0),
-            stop(.low, moderate - blend),
-            stop(.medium, moderate + blend),
-            stop(.medium, high - blend),
-            stop(.high, high + blend),
-            stop(.high, 1),
-        ])
-    }
 }
 
 /// Where the chart's day begins and ends: at the start of last night when it
@@ -449,11 +412,11 @@ struct MindStressSlots: Equatable, Sendable {
     }
 }
 
-/// One part of the stress line, drawn from its slots: the line, the light
-/// under it, or the lone half hours as dots. The heights interpolate.
+/// One part of the stress line, drawn from its slots: the line, or the lone
+/// half hours as dots. The heights interpolate.
 struct MindStressLineShape: Shape {
     enum Part {
-        case line, area
+        case line
         /// A reading with no neighbour, as a dot this wide.
         case dots(CGFloat)
     }
@@ -477,7 +440,7 @@ struct MindStressLineShape: Shape {
         }
         for run in slots.runs {
             let points = run.map(point)
-            guard let first = points.first, let last = points.last else { continue }
+            guard let first = points.first else { continue }
             switch part {
             case .dots(let side):
                 if points.count == 1 {
@@ -485,20 +448,14 @@ struct MindStressLineShape: Shape {
                 }
             case .line:
                 if points.count > 1 { path.addLines(points) }
-            case .area:
-                guard points.count > 1 else { continue }
-                path.addLines(points)
-                path.addLine(to: CGPoint(x: last.x, y: rect.maxY))
-                path.addLine(to: CGPoint(x: first.x, y: rect.maxY))
-                path.closeSubpath()
             }
         }
         return path
     }
 }
 
-/// Today's minutes in each zone, high first: a bar in
-/// the zone's colour, the share, and the time spent.
+/// Today's minutes in each zone, high first: a bar in the zone's colour on a
+/// neutral track (an empty row stays grey), the share, and the time spent.
 struct MindStressZones: View {
     let minutes: [MindZone: Double]?
 
@@ -521,7 +478,7 @@ struct MindStressZones: View {
                         .frame(width: metrics.miniOrbDiameter, alignment: .leading)
                     GeometryReader { proxy in
                         ZStack(alignment: .leading) {
-                            Capsule().fill(zone.color.opacity(metrics.chartBandOpacity))
+                            Capsule().fill(colors.surfaceRecessed.color)
                             if share > 0 {
                                 Capsule()
                                     .fill(zone.color)
@@ -530,18 +487,18 @@ struct MindStressZones: View {
                         }
                     }
                     .frame(height: metrics.chartThinBarWidth)
-                    Text(minutes == nil ? "-" : "\(Int((share * 100).rounded()))%")
-                        .somaFont(type.captionValue)
+                    SomaNumber(minutes == nil ? nil : "\(Int((share * 100).rounded()))%", type.captionValue)
                         .foregroundStyle(colors.inkPrimary.color)
                         .somaRollingNumber(minutes == nil ? nil : "\(Int((share * 100).rounded()))%")
                         .lineLimit(1)
                         .fixedSize()
                         .frame(minWidth: metrics.miniOrbDiameter * 0.8, alignment: .trailing)
-                    Text(minutes == nil ? "-" : MindLensFormat.duration(spent))
-                        .somaFont(type.captionValue)
+                    SomaNumber(minutes == nil ? nil : MindLensFormat.duration(spent), type.captionValue)
                         .foregroundStyle(colors.inkSecondary.color)
                         .somaRollingNumber(minutes == nil ? nil : MindLensFormat.duration(spent))
-                        .frame(width: metrics.miniOrbDiameter, alignment: .trailing)
+                        .lineLimit(1)
+                        .fixedSize()
+                        .frame(minWidth: metrics.miniOrbDiameter, alignment: .trailing)
                 }
                 .padding(.horizontal, metrics.cardPadding)
                 .padding(.vertical, metrics.spaceM)

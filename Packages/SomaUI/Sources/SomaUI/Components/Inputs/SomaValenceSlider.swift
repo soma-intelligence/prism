@@ -7,12 +7,14 @@ import SwiftUI
 
 /// Seven stops from very unpleasant to very pleasant, with a thumb to drag.
 ///
-/// A thin track carries the whole mood scale as a quiet gradient, cool to
-/// warm, with a fine tick under it at each stop, and the white thumb holds a
-/// small dot of the colour under it. The thumb follows the finger
-/// and settles on the nearest stop when it lifts; the word for the stop it is
-/// on sits under the track and changes as it moves. Before a feeling is
-/// chosen the track is dimmed and the thumb rests at neutral.
+/// A thin track in a faint wash of the ink, a fine tick under it at each
+/// stop, and a white thumb. The feeling's colour is the one piece of colour on the control: a
+/// ring around the thumb in the hue of the stop it is on, so the colour stays
+/// on the data rather than painting the whole scale. The thumb follows the
+/// finger and settles on the nearest stop when it lifts; the word for the
+/// stop it is on sits under the track and changes as it moves. Before a
+/// feeling is chosen the thumb rests at neutral with a plain ink rim.
+/// Flat: a rim holds the thumb off the track, never a shadow.
 public struct SomaValenceSlider: View {
     @Binding private var value: Int?
     private let stops: Int
@@ -22,7 +24,6 @@ public struct SomaValenceSlider: View {
     private let prompt: String?
 
     @Environment(\.somaTheme) private var theme
-    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     /// Where the finger is along the track while it drags, 0 to 1.
@@ -94,8 +95,7 @@ public struct SomaValenceSlider: View {
         let settled = SomaMoodScale.share(value ?? middle, stops: stops)
         let share = dragShare ?? settled
         let aspect = SomaMoodScale.aspect(for: value ?? middle, stops: stops)
-        let dot = SomaMoodScale.glow(aspect, theme: theme)
-        let isDark = colorScheme == .dark
+        let hue = SomaMoodScale.glow(aspect, theme: theme)
 
         return GeometryReader { proxy in
             let width = proxy.size.width
@@ -105,9 +105,8 @@ public struct SomaValenceSlider: View {
 
             ZStack(alignment: .topLeading) {
                 Capsule()
-                    .fill(LinearGradient(gradient: SomaMoodScale.gradient(theme: theme), startPoint: .leading, endPoint: .trailing))
+                    .fill(colors.inkPrimary.color.opacity(metrics.inputTickFaint))
                     .frame(width: run, height: metrics.valenceTrackHeight)
-                    .opacity(value == nil ? metrics.valenceUnsetOpacity : metrics.valenceTrackOpacity)
                     .position(x: width / 2, y: y)
 
                 // A fine tick under the track at each stop, in ink.
@@ -123,15 +122,14 @@ public struct SomaValenceSlider: View {
                     .fill(colors.onOrb.color)
                     .frame(width: thumb, height: thumb)
                     .overlay {
-                        Circle()
-                            .fill(dot)
-                            .frame(width: metrics.valenceThumbDotDiameter, height: metrics.valenceThumbDotDiameter)
-                            .opacity(value == nil ? 0 : 1)
+                        if value == nil {
+                            Circle().strokeBorder(colors.inkPrimary.color.opacity(metrics.inputTickFaint),
+                                                  lineWidth: metrics.inputHairline)
+                        } else {
+                            Circle().strokeBorder(hue, lineWidth: metrics.knobRingWidth)
+                        }
                     }
-                    .overlay {
-                        Circle().strokeBorder(colors.inkPrimary.color.opacity(metrics.hairlineOpacity), lineWidth: metrics.inputHairline * 0.5)
-                    }
-                    .shadow(color: .black.opacity(isDark ? 0.35 : 0.14), radius: metrics.knobRingWidth * 1.5, y: metrics.knobRingWidth * 0.5)
+                    .animation(reduceMotion ? nil : theme.motion.selection, value: value)
                     .scaleEffect(dragShare == nil ? 1 : 1.06)
                     .position(x: inset + run * share, y: y)
                     .animation(reduceMotion || dragShare != nil ? nil : theme.motion.selection, value: share)

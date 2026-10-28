@@ -11,6 +11,13 @@ import CoreGraphics
 /// Computed, like the other part sizes, so they add no stored field to the
 /// theme.
 public extension SomaMetrics {
+    /// The segmented control's pill in dark: the ink laid this thin over the
+    /// glass track, a tonal step up of about 1.7:1 against it.
+    var segmentPillDarkLift: Double { 0.16 }
+    /// How much a confirmation resists being pulled down: it follows the
+    /// finger at a quarter of its travel, then springs back.
+    var confirmationPullResistance: CGFloat { 4 }
+
     /// How far below the bar the page's ground goes on fading to clear, so
     /// content slides out from under the bar rather than meeting an edge.
     var edgeFadeDepth: CGFloat { 36 }

@@ -228,13 +228,13 @@ private struct LedgerMethodSheet: View {
         SomaExplainer(title: "How it counts", summary: "Minutes of life expectancy, from large studies. A day is the sum.",
                       aspect: .activity, onClose: { dismiss() }) {
             SomaExplainerRing(fraction: min(1, max(0, ((net ?? 0) + 10) / 20)),
-                              value: net.map { LabMath.signed($0, decimals: 0) ?? "-" } ?? "-",
+                              value: net.flatMap { LabMath.signed($0, decimals: 0) },
                               caption: "min today", aspect: .activity)
         } content: {
             if let today, !today.isEmpty {
                 SomaExplainerMoves("Today", moves: LongevityLedger.Factor.allCases.compactMap { factor in
                     guard let minutes = today.minutes[factor], let look = Self.looks[factor] else { return nil }
-                    return SomaExplainerMove(title: factor.title, value: LabMath.signed(minutes, decimals: 1) ?? "-",
+                    return SomaExplainerMove(title: factor.title, value: LabMath.signed(minutes, decimals: 1) ?? SomaFormat.number(minutes, decimals: 1),
                                              hue: look.hue, shape: .signed(minutes / 10))
                 })
             }

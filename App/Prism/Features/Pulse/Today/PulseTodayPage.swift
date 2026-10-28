@@ -377,23 +377,22 @@ extension PulseInsightItem {
 
 /// How Today writes durations and clock times.
 enum TodayFormat {
-    /// "7 h 12", held on one line.
+    /// "7h 12m", the app's one spelling of a duration (``SomaFormat``).
     static func duration(seconds: TimeInterval) -> String {
-        let minutes = Int((seconds / 60).rounded())
-        return "\(minutes / 60)\u{00A0}h\u{00A0}" + String(format: "%02d", minutes % 60)
+        SomaFormat.duration(seconds)
     }
 
-    /// A duration already written as "7:12" by ``PulseWording/clock(_:)``.
+    /// A duration already written out: "7h 12m" stays as it is, and the
+    /// "7:12" a cache from an older launch holds is spelled the same way.
     static func duration(text: String) -> String {
         let parts = text.split(separator: ":")
         guard parts.count == 2, let hours = Int(parts[0]), let minutes = Int(parts[1]) else { return text }
         return duration(seconds: TimeInterval(hours * 3600 + minutes * 60))
     }
 
-    /// "28 min", or "1 h 05" past the hour.
+    /// A gap between two durations, spelled like one: "28m", "1h 5m".
     static func span(seconds: TimeInterval) -> String {
-        let minutes = Int((seconds / 60).rounded())
-        return minutes < 60 ? "\(minutes) min" : duration(seconds: seconds)
+        duration(seconds: seconds)
     }
 
     /// An hour of the day (which may run past 24) as a clock time on `date`'s day.

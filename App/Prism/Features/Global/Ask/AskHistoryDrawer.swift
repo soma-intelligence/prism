@@ -44,7 +44,7 @@ struct AskHistoryDrawer: View {
             }
             .padding(.horizontal, metrics.cardPadding)
             .frame(minHeight: metrics.minimumTapTarget)
-            .background(RoundedRectangle(cornerRadius: metrics.cardCornerRadius, style: .continuous).fill(colors.surface.color))
+            .background(RoundedRectangle(cornerRadius: metrics.cardCornerRadius, style: .continuous).fill(colors.surfaceRecessed.color))
 
             drawerButton("New conversation", symbol: "square.and.pencil", isAccent: true, action: startNew)
             drawerButton("Health records", detail: "From your clinic, by kind", symbol: "list.clipboard", action: openRecords)
@@ -53,29 +53,36 @@ struct AskHistoryDrawer: View {
                 .fill(colors.inkPrimary.color.opacity(metrics.hairlineOpacity))
                 .frame(height: 0.5)
 
-            SomaPageScroll {
-                LazyVStack(alignment: .leading, spacing: metrics.scoreLabelSpacing) {
-                    if sections.isEmpty {
-                        Text(query.isEmpty ? "Your conversations with Soma are kept here, and in your account once you sign in." : "No conversation matches.")
-                            .somaFont(theme.typography.caption)
-                            .foregroundStyle(colors.inkSecondary.color)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .padding(.top, metrics.cardSpacing)
-                    }
-                    ForEach(sections) { section in
-                        Text(section.title)
-                            .somaFont(theme.typography.eyebrow)
-                            .foregroundStyle(colors.inkSecondary.color)
-                            .padding(.top, metrics.cardSpacing)
-                            .accessibilityAddTraits(.isHeader)
-                        ForEach(section.ids, id: \.self) { id in
-                            if let conversation = history.conversation(id) {
-                                conversationRow(conversation)
-                            }
+            // A plain list, its rows the drawer's own width.
+            List {
+                if sections.isEmpty {
+                    Text(query.isEmpty ? "Your conversations with Soma are kept here, and in your account once you sign in." : "No conversation matches.")
+                        .somaFont(theme.typography.caption)
+                        .foregroundStyle(colors.inkSecondary.color)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, metrics.cardSpacing)
+                        .drawerListRow()
+                }
+                ForEach(sections) { section in
+                    Text(section.title)
+                        .somaFont(theme.typography.eyebrow)
+                        .foregroundStyle(colors.inkSecondary.color)
+                        .padding(.top, metrics.cardSpacing)
+                        .padding(.bottom, metrics.scoreLabelSpacing)
+                        .accessibilityAddTraits(.isHeader)
+                        .drawerListRow()
+                    ForEach(section.ids, id: \.self) { id in
+                        if let conversation = history.conversation(id) {
+                            conversationRow(conversation)
+                                .padding(.bottom, metrics.scoreLabelSpacing)
+                                .drawerListRow()
                         }
                     }
                 }
             }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .environment(\.defaultMinListRowHeight, 0)
             .softScrollEdges()
             .somaRefreshable { await CloudSync.shared.syncAskHistory() }
 #if !os(visionOS)
@@ -86,8 +93,17 @@ struct AskHistoryDrawer: View {
             profileCard
         }
         .padding(metrics.spaceM)
-        .frame(maxHeight: .infinity, alignment: .top)
-        .background(colors.canvas.color.ignoresSafeArea())
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        // One step above the page it covers, with a hairline down its
+        // trailing edge: the drawer reads as a sheet laid over the page,
+        // with no shadow under it.
+        .background(colors.surface.color.ignoresSafeArea())
+        .overlay(alignment: .trailing) {
+            Rectangle()
+                .fill(colors.inkPrimary.color.opacity(metrics.hairlineOpacity))
+                .frame(width: 0.5)
+                .ignoresSafeArea()
+        }
         .task { await CloudSync.shared.syncAskHistory() }
         .confirmationDialog("Delete this conversation?", isPresented: Binding(
             get: { pendingDelete != nil }, set: { if !$0 { pendingDelete = nil } }
@@ -129,7 +145,7 @@ struct AskHistoryDrawer: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
                 RoundedRectangle(cornerRadius: theme.metrics.cardCornerRadius * 0.6, style: .continuous)
-                    .fill(isCurrent ? theme.colors.surface.color : .clear)
+                    .fill(isCurrent ? theme.colors.surfaceRecessed.color : .clear)
             )
             .contentShape(.rect)
         }
@@ -174,9 +190,14 @@ struct AskHistoryDrawer: View {
         .buttonStyle(.plain)
     }
 
+    /// The account at the drawer's foot, a row under a hairline rather than a
+    /// card: a card is the surface the drawer is already drawn in.
     private var profileCard: some View {
-        Button(action: openSettings) {
-            SomaCard {
+        VStack(spacing: 0) {
+            Rectangle()
+                .fill(theme.colors.inkPrimary.color.opacity(theme.metrics.hairlineOpacity))
+                .frame(height: 0.5)
+            Button(action: openSettings) {
                 HStack(spacing: theme.metrics.browseRowSpacing) {
                     SomaAvatarFace(shape: .circle, diameter: theme.metrics.minimumTapTarget)
                         .accessibilityHidden(true)
@@ -194,9 +215,21 @@ struct AskHistoryDrawer: View {
                         .font(.system(size: theme.metrics.browseChevronSize, weight: .semibold))
                         .foregroundStyle(theme.colors.inkSecondary.color)
                 }
+                .padding(.vertical, theme.metrics.spaceS)
+                .contentShape(.rect)
             }
+            .buttonStyle(.somaBrowseRow)
+            .accessibilityLabel("Settings")
         }
-        .buttonStyle(.somaGlassPress)
-        .accessibilityLabel("Settings")
+    }
+}
+
+private extension View {
+    /// A row of the drawer's list: no inset, no separator, no fill of its
+    /// own, so it sits on the drawer as the rows above the list do.
+    func drawerListRow() -> some View {
+        listRowInsets(EdgeInsets())
+            .listRowSeparator(.hidden)
+            .listRowBackground(Color.clear)
     }
 }

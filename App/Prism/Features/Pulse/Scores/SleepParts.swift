@@ -68,9 +68,8 @@ struct SleepNightFacts: View {
                 .somaFont(theme.typography.body)
                 .foregroundStyle(theme.colors.inkPrimary.color)
             Spacer(minLength: metrics.spaceS)
-            Text(fact.value ?? "-")
-                .somaFont(theme.typography.rowValue)
-                .foregroundStyle(fact.value == nil ? theme.colors.inkSecondary.color : theme.colors.inkPrimary.color)
+            SomaNumber(fact.value, theme.typography.rowValue)
+                .foregroundStyle(theme.colors.inkPrimary.color)
                 .lineLimit(1)
         }
         .padding(.vertical, metrics.spaceM)
@@ -111,7 +110,7 @@ struct SleepNightFacts: View {
             var latency: String?
             if let inBed = inputs?.inBedStart, let first = stages.first(where: { $0.stage != .awake }) {
                 let minutes = first.start.timeIntervalSince(inBed) / 60
-                if minutes >= 0 && minutes < 180 { latency = "\(Int(minutes.rounded())) min" }
+                if minutes >= 0 && minutes < 180 { latency = SomaFormat.duration(minutes * 60) as String }
             }
             let temperature = inputs?.wristTemperature ?? []
             let center = ScoreMath.median(temperature.dropLast())

@@ -711,12 +711,12 @@ enum DoctorReportBuilder {
             guard let result = input.functionalResults.filter({ $0.kind == kind && input.includes($0.date) })
                 .max(by: { $0.date < $1.date }) else { continue }
             for field in kind.fields {
-                guard let value = result.values[field.id] else { continue }
+                guard let value = result.values[field.id],
+                      let text = field.text(value, measures: input.units.measures) else { continue }
                 let note = FunctionalAssessment.note(field: field.id, value: value, sex: sex)
                 let flag: DoctorReportFlag = note?.isFlagged == true ? .attention : .none
                 // "VO2 max, lab test" rather than "VO2 max, lab test, VO2 max".
                 let name = kind.title.lowercased().contains(field.name.lowercased()) ? kind.title : "\(kind.title), \(field.name)"
-                let text = field.text(value, measures: input.units.measures)
                 rows.append(DoctorReportRow(cells: [name, text, note?.text ?? "-", format.day(result.date)], flag: flag))
                 if flag != .none {
                     flagged.append(self.flag(name, result: text, reference: note?.text, date: result.date, .tests, flag, format))

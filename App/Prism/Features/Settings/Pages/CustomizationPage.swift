@@ -32,8 +32,7 @@ struct CustomizationPage: View {
                     } else if item.id == "clock" {
                         SettingsLine("Body clock", detail: profiles.profile.chronotypeCategory == nil
                                      ? String(localized: "From the questionnaire in onboarding") : nil) {
-                            Text(profiles.profile.chronotypeCategory?.title ?? "-")
-                                .somaFont(theme.typography.rowValue)
+                            SomaNumber(profiles.profile.chronotypeCategory?.title, theme.typography.rowValue)
                                 .foregroundStyle(theme.colors.inkSecondary.color)
                         }
                     } else {
@@ -80,8 +79,7 @@ struct CustomizationPage: View {
             }
         case "zones":
             SettingsLine("Heart rate zones", detail: zonesDetail) {
-                Text(maxHeartRate.map { String(localized: "Max \($0)") } ?? "-")
-                    .somaFont(theme.typography.rowValue)
+                SomaNumber(maxHeartRate.map { String(localized: "Max \($0)") }, theme.typography.rowValue)
                     .foregroundStyle(theme.colors.inkSecondary.color)
             }
         case "move":

@@ -46,10 +46,10 @@ struct PeakWindowPage: View {
                 }
             }
             ScoreLinks(links: [
-                ScoreLink(title: "Deep work", detail: day?.deepWork.map { "\(ScoreMath.clock($0.start)) to \(ScoreMath.clock($0.end))" } ?? "-"),
-                ScoreLink(title: "Training", detail: day?.training.map { "\(ScoreMath.clock($0.start)) to \(ScoreMath.clock($0.end))" } ?? "-"),
-                ScoreLink(title: "Caffeine cutoff", detail: day.map { ScoreMath.clock($0.caffeineCutoffHour) } ?? "-"),
-                ScoreLink(title: "Wind down", detail: day.map { ScoreMath.clock($0.windDownHour) } ?? "-"),
+                ScoreLink(title: "Deep work", detail: day?.deepWork.map { "\(ScoreMath.clock($0.start)) to \(ScoreMath.clock($0.end))" }),
+                ScoreLink(title: "Training", detail: day?.training.map { "\(ScoreMath.clock($0.start)) to \(ScoreMath.clock($0.end))" }),
+                ScoreLink(title: "Caffeine cutoff", detail: day.map { ScoreMath.clock($0.caffeineCutoffHour) }),
+                ScoreLink(title: "Wind down", detail: day.map { ScoreMath.clock($0.windDownHour) }),
             ])
             if let day {
                 SomaChartCard(eyebrow: "Rhythm", value: ScoreMath.clock(day.windDownHour), unit: "wind down",

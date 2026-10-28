@@ -41,20 +41,23 @@ public struct SomaMetricHero: View {
             if let caption {
                 Text(caption)
                     .somaFont(theme.typography.eyebrow)
-                    .textCase(.uppercase)
                     .foregroundStyle(colors.inkSecondary.color)
             }
             HStack(alignment: .firstTextBaseline, spacing: metrics.metricHeroSpacing * 1.5) {
-                Text(value ?? "-")
-                    .somaFont(theme.typography.metricHero)
-                    .foregroundStyle(colors.inkPrimary.color)
-                    .contentTransition(reduceMotion ? .identity : .numericText())
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.6)
-                if let unit, value != nil {
-                    Text(unit)
-                        .somaFont(theme.typography.metricHeroUnit)
-                        .foregroundStyle(colors.inkSecondary.color)
+                if let value {
+                    Text(value)
+                        .somaFont(theme.typography.metricHero)
+                        .foregroundStyle(colors.inkPrimary.color)
+                        .contentTransition(reduceMotion ? .identity : .numericText())
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+                    if let unit {
+                        Text(unit)
+                            .somaFont(theme.typography.metricHeroUnit)
+                            .foregroundStyle(colors.inkSecondary.color)
+                    }
+                } else {
+                    SomaMissingValue(theme.typography.metricHero)
                 }
             }
             if let meaning {

@@ -26,6 +26,7 @@ import SomaUI
 struct PulseTodayView: View {
     @Environment(HealthDashboard.self) private var health
     @Environment(\.somaTheme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// The last read, so a return from a pushed page draws at once.
     @State private var insights = PulseInsightsCache.shared.value
     /// Whether the page is wide enough to set the orb beside the cards: read
@@ -53,10 +54,10 @@ struct PulseTodayView: View {
                     .overlay(alignment: .top) {
                         if health.isShowingCache {
                             SomaUpdatingPill(since: health.cachedAt)
-                                .transition(.opacity.combined(with: .scale(scale: 0.9)))
+                                .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.96)))
                         }
                     }
-                    .animation(theme.motion.standard, value: health.isShowingCache)
+                    .animation(reduceMotion ? theme.motion.fade : theme.motion.quick, value: health.isShowingCache)
                 PulseCards(today: health.today, status: health.status, scores: health.scores, insights: insights)
             }
             .padding(.horizontal, metrics.pagePadding)
@@ -143,20 +144,21 @@ private struct PulseLead: View {
 
         VStack(alignment: .leading, spacing: 0) {
             // One orb, one action: the move that matters now, never a carousel
-            // to swipe through (owner, 2026-10-03). Tapping it opens that
-            // move's page.
+            // to swipe through (owner, 2026-10-03). It presses on touch down
+            // and opens that move's page as the finger lifts, zooming out of
+            // the orb; a long press lifts the quick add over Today instead.
             let now = PulseNowAction.make(moves: today?.moves ?? [], at: Date())
             SomaOrb(aspect: now.aspect, label: now.label)
                 .frame(maxWidth: .infinity)
                 .padding(.top, metrics.heroTopPadding)
-                .somaOrbTap(aspect: now.aspect) { open(ScoreRoute.aspect(now.aspect)) }
+                .somaOrbTap(aspect: now.aspect, longPress: { quickAdd = .quickAdd }) {
+                    open(ScoreRoute.aspect(now.aspect))
+                }
                 .zoomSource(ScoreRoute.aspect(now.aspect))
-                .accessibilityElement()
+                .accessibilityElement(children: .ignore)
                 .accessibilityLabel(Text(now.label))
                 .accessibilityAddTraits(.isButton)
-                .accessibilityAction(named: "Open") { open(ScoreRoute.aspect(now.aspect)) }
-                // A long press lifts the quick add over Today.
-                .onLongPressGesture { quickAdd = .quickAdd }
+                .accessibilityAction { open(ScoreRoute.aspect(now.aspect)) }
                 .accessibilityAction(named: "Add to today") { quickAdd = .quickAdd }
                 .homeSheets($quickAdd)
 
@@ -353,7 +355,7 @@ private struct PulseMovesCard: View {
             .contentShape(.rect)
         }
         .zoomSource(HomeRoute.nextMove)
-        .buttonStyle(TilePressStyle())
+        .buttonStyle(.somaGlassPress)
         .accessibilityHint(Text("Opens the next move and why."))
     }
 
@@ -365,7 +367,7 @@ private struct PulseMovesCard: View {
 }
 
 /// The energy bank, set like the other cards: the number with "of 100", one
-/// slim track filled to the level in the energy colours, and today's line.
+/// slim track filled to the level in one colour, and today's line.
 private struct PulseEnergyCard: View {
     let today: PulseToday?
     let scores: SomaScores?
@@ -378,12 +380,8 @@ private struct PulseEnergyCard: View {
         let metrics = theme.metrics
         let level = today?.energyLevel
         let curve = (scores?.energyCurve ?? []).sorted { $0.date < $1.date }.map { Optional($0.level) }
-        let ramp = Gradient(stops: [
-            .init(color: colors.statusAlert.color, location: 0),
-            .init(color: colors.statusOut.color, location: 0.4),
-            .init(color: colors.statusNormal.color, location: 0.8),
-        ])
-        // The line wears the colour of where the level sits on that ramp.
+        // One colour for where the level sits, worn by the line and the
+        // track alike.
         let tint: Color = switch level ?? 1 {
         case ..<0.34: colors.statusAlert.color
         case ..<0.67: colors.statusOut.color
@@ -398,15 +396,10 @@ private struct PulseEnergyCard: View {
                     .accessibilityAddTraits(.isHeader)
 
                 HStack(alignment: .bottom, spacing: metrics.cardSpacing) {
-                    HStack(alignment: .firstTextBaseline, spacing: theme.metrics.spaceS) {
-                        Text(level.map { "\(Int(($0 * 100).rounded()))" } ?? "-")
-                            .somaFont(type.metric)
-                            .foregroundStyle(colors.inkPrimary.color)
-                        Text("of 100")
-                            .somaFont(type.callout)
-                            .foregroundStyle(colors.inkSecondary.color)
-                    }
-                    .accessibilityElement(children: .combine)
+                    SomaNumber(level.map { "\(Int(($0 * 100).rounded()))" }, type.metric,
+                               unit: String(localized: "of 100"), unitSpec: type.callout)
+                        .foregroundStyle(colors.inkPrimary.color)
+                        .accessibilityElement(children: .combine)
                     Spacer(minLength: 0)
                     if curve.count > 1 {
                         SomaSparkline(curve, tint: tint, filled: false)
@@ -414,17 +407,15 @@ private struct PulseEnergyCard: View {
                     }
                 }
 
-                // The track: a slim capsule filled to the level, red to amber
-                // to green along its length.
+                // The track: a slim capsule filled to the level in one flat
+                // colour, the level's own.
                 GeometryReader { proxy in
                     ZStack(alignment: .leading) {
                         Capsule().fill(colors.surfaceRecessed.color)
                         if let level {
                             Capsule()
-                                .fill(LinearGradient(gradient: ramp, startPoint: .leading, endPoint: .trailing))
-                                .mask(alignment: .leading) {
-                                    Capsule().frame(width: max(metrics.sleepGradeBarHeight * 1.5, proxy.size.width * min(1, max(0, level))))
-                                }
+                                .fill(tint)
+                                .frame(width: max(metrics.sleepGradeBarHeight * 1.5, proxy.size.width * min(1, max(0, level))))
                         }
                     }
                 }
@@ -477,7 +468,7 @@ private struct PulseTodayCardView: View {
                 }
                 .contentShape(.rect)
             }
-            .buttonStyle(TilePressStyle())
+            .buttonStyle(.somaGlassPress)
         case .heart:
             Button { open(.marker(.restingHeartRate)) } label: {
                 SomaAspectCard(aspect: .heart, value: today?.heartCard.value, unit: "bpm resting",
@@ -486,7 +477,7 @@ private struct PulseTodayCardView: View {
                 }
                 .contentShape(.rect)
             }
-            .buttonStyle(TilePressStyle())
+            .buttonStyle(.somaGlassPress)
         case .body:
             TileLink(value: PulseRoute.aspect(.body)) {
                 SomaAspectCard(aspect: .body, value: today?.bodyCard.value, unit: "fitness age",

@@ -60,10 +60,10 @@ struct MindSignals: Equatable, Sendable {
         let lastNight = nights.first { calendar.isDate($0.day, inSameDayAs: today) }
         let sleepUsual = MindUsual.range(nights.filter { $0.day < today }.map { $0.asleep / 3600 })
 
-        func range(_ usual: ClosedRange<Double>?, decimals: Int = 0, clock: Bool = false) -> String? {
+        func range(_ usual: ClosedRange<Double>?, decimals: Int = 0, hours: Bool = false) -> String? {
             guard let usual else { return nil }
-            if clock {
-                return "usual \(words.clock(usual.lowerBound * 3600)) to \(words.clock(usual.upperBound * 3600))"
+            if hours {
+                return "usual \(words.duration(usual.lowerBound * 3600)) to \(words.duration(usual.upperBound * 3600))"
             }
             let format: (Double) -> String = { $0.formatted(.number.precision(.fractionLength(decimals))) }
             return "usual \(format(usual.lowerBound)) to \(format(usual.upperBound))"
@@ -99,8 +99,8 @@ struct MindSignals: Equatable, Sendable {
                 number: nil, usual: nil, marks: peakHours
             ),
             sleep: MindSignalRow(
-                kind: .sleep, title: "Sleep", detail: range(sleepUsual, clock: true),
-                value: lastNight.map { words.clock($0.asleep) },
+                kind: .sleep, title: "Sleep", detail: range(sleepUsual, hours: true),
+                value: lastNight.map { words.duration($0.asleep) },
                 isCost: MindUsual.place(lastNight.map { $0.asleep / 3600 }, in: sleepUsual) == .under,
                 number: lastNight.map { $0.asleep / 3600 }, usual: sleepUsual
             ),

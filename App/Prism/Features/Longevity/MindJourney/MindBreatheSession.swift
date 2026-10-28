@@ -117,7 +117,7 @@ struct MindBreatheSession: View {
                 MindHairline()
 
                 SomaStatRow([
-                    SomaStat("HRV now", value: hrvNow.map { MindFormat.whole($0) ?? "-" }, unit: "ms"),
+                    SomaStat("HRV now", value: hrvNow.flatMap { MindFormat.whole($0) }, unit: "ms"),
                     SomaStat("Time left", value: MindBreatheSheet.clock(max(0, length - seconds))),
                 ])
 
@@ -279,10 +279,10 @@ struct MindBeforeAfterRow: View {
     var body: some View {
         let type = theme.typography
         let colors = theme.colors
-        let text: String = switch (row.before, row.after) {
+        let text: String? = switch (row.before, row.after) {
         case let (a?, b?): "\(Int(a.rounded())) to \(Int(b.rounded())) \(row.unit)"
-        case let (a?, nil): "\(Int(a.rounded())) to - \(row.unit)"
-        default: "-"
+        case let (a?, nil): "From \(Int(a.rounded())) \(row.unit)"
+        default: nil
         }
         HStack {
             Text(row.title)
@@ -290,8 +290,7 @@ struct MindBeforeAfterRow: View {
                 .foregroundStyle(colors.inkPrimary.color)
             Spacer(minLength: 8)
             VStack(alignment: .trailing, spacing: theme.metrics.spaceS) {
-                Text(text)
-                    .somaFont(type.rowValue)
+                SomaNumber(text, type.rowValue)
                     .foregroundStyle(colors.inkPrimary.color)
                 if let a = row.before, let b = row.after {
                     MindTwoDots(before: a, after: b)

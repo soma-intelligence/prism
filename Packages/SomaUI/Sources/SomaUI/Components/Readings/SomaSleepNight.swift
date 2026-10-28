@@ -79,17 +79,11 @@ public struct SomaSleepFactorGrade: Sendable, Hashable, Identifiable {
 // MARK: - Durations as the section prints them
 
 enum SomaSleepClock {
-    /// "7h 5m", "45m".
+    /// "7h 5m", "45m", through ``SomaFormat``.
     static func short(_ seconds: TimeInterval) -> String {
-        let minutes = Int((max(0, seconds) / 60).rounded())
-        return minutes < 60 ? "\(minutes)m" : "\(minutes / 60)h \(minutes % 60)m"
+        SomaFormat.duration(seconds)
     }
 
-    /// "4:19:38".
-    static func long(_ seconds: TimeInterval) -> String {
-        let total = Int(max(0, seconds).rounded())
-        return String(format: "%d:%02d:%02d", total / 3600, (total % 3600) / 60, total % 60)
-    }
 }
 
 // MARK: - Sleep period
@@ -110,19 +104,21 @@ public struct SomaSleepPeriodRow: View {
 
     public var body: some View {
         let metrics = theme.metrics
-        let span: String = if let bed, let wake { "\(bed) to \(wake)" } else { "-" }
+        let span: String? = if let bed, let wake { "\(bed) to \(wake)" } else { nil }
 
         HStack(spacing: metrics.chartLabelGap * 1.5) {
+            // Set in the body role at the glyph's own size: a bare symbol
+            // follows Dynamic Type while every word beside it is fixed, and
+            // grew out of its frame over "Sleep period".
             Image(systemName: "bed.double.fill")
-                .imageScale(.small)
+                .somaGlyph(theme.typography.body, size: metrics.sleepGlyphSize)
                 .foregroundStyle(theme.colors.inkSecondary.color)
                 .frame(width: metrics.sleepGlyphSize * 1.5)
             Text("Sleep period")
                 .somaFont(theme.typography.body)
                 .foregroundStyle(theme.colors.inkPrimary.color)
             Spacer(minLength: metrics.chartLabelGap)
-            Text(verbatim: span)
-                .somaFont(theme.typography.rowValue)
+            SomaNumber(span, theme.typography.rowValue)
                 .foregroundStyle(theme.colors.inkPrimary.color)
         }
         .accessibilityElement(children: .combine)
@@ -132,24 +128,33 @@ public struct SomaSleepPeriodRow: View {
 // MARK: - Totals
 
 /// Time in bed and time asleep, side by side, set the way Apple Health sets
-/// them: a quiet label over large digits with their units small ("7 hr 13
-/// min"), both left aligned. The owner asked for Apple's sleep page
+/// them: a quiet label over large digits with their units small ("7h 13m",
+/// through ``SomaDurationText``), both left aligned. The owner asked for Apple's sleep page
 /// (2026-10-25).
+///
+/// A page whose hero already gives the time asleep passes `showsAsleep:
+/// false`, so the screen says it once; time in bed then keeps its half.
 public struct SomaSleepTotals: View {
     private let inBed: TimeInterval?
     private let asleep: TimeInterval?
+    private let showsAsleep: Bool
 
     @Environment(\.somaTheme) private var theme
 
-    public init(inBed: TimeInterval?, asleep: TimeInterval?) {
+    public init(inBed: TimeInterval?, asleep: TimeInterval?, showsAsleep: Bool = true) {
         self.inBed = inBed
         self.asleep = asleep
+        self.showsAsleep = showsAsleep
     }
 
     public var body: some View {
         HStack(alignment: .top, spacing: theme.metrics.cardSpacing) {
             total("Time in bed", inBed)
-            total("Time asleep", asleep)
+            if showsAsleep {
+                total("Time asleep", asleep)
+            } else {
+                Color.clear.frame(maxWidth: .infinity)
+            }
         }
     }
 
@@ -161,21 +166,7 @@ public struct SomaSleepTotals: View {
             Text(title)
                 .somaFont(type.caption)
                 .foregroundStyle(colors.inkSecondary.color)
-            Group {
-                if let seconds {
-                    let minutes = Int((max(0, seconds) / 60).rounded())
-                    HStack(alignment: .firstTextBaseline, spacing: theme.metrics.trendMarkSpacing) {
-                        if minutes >= 60 {
-                            Text(verbatim: "\(minutes / 60)").somaFont(type.metric)
-                            Text("hr").somaFont(type.caption).foregroundStyle(colors.inkSecondary.color)
-                        }
-                        Text(verbatim: "\(minutes % 60)").somaFont(type.metric)
-                        Text("min").somaFont(type.caption).foregroundStyle(colors.inkSecondary.color)
-                    }
-                } else {
-                    Text(verbatim: "-").somaFont(type.metric)
-                }
-            }
+            SomaDurationText(seconds, figures: type.metric, units: type.caption)
             .foregroundStyle(colors.inkPrimary.color)
             .lineLimit(1)
             .minimumScaleFactor(0.7)
@@ -229,14 +220,17 @@ public struct SomaSleepGradeGrid: View {
 
         return VStack(spacing: metrics.chartLabelGap / 2) {
             Image(systemName: item.factor.symbol)
-                .imageScale(.small)
+                .somaGlyph(theme.typography.body, size: metrics.sleepGlyphSize)
                 .foregroundStyle(colors.inkSecondary.color)
                 .frame(height: metrics.sleepGlyphSize)
                 .padding(.bottom, metrics.chartLabelGap / 2)
             Group {
-                if let grade = item.grade { Text(grade.title) } else { Text(verbatim: "-") }
+                if let grade = item.grade {
+                    Text(grade.title).somaFont(theme.typography.headerTitle)
+                } else {
+                    SomaMissingValue(theme.typography.headerTitle)
+                }
             }
-            .somaFont(theme.typography.headerTitle)
             .foregroundStyle(colors.inkPrimary.color)
             Text(item.factor.title)
                 .somaFont(theme.typography.caption)
@@ -259,7 +253,7 @@ public struct SomaSleepGradeGrid: View {
         .padding(.vertical, metrics.sleepGradeCellPadding)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(item.factor.title))
-        .accessibilityValue(item.grade.map { Text($0.title) } ?? Text(verbatim: "-"))
+        .accessibilityValue(item.grade.map { Text($0.title) } ?? Text(verbatim: SomaFormat.notMeasured))
     }
 }
 
@@ -314,21 +308,19 @@ public struct SomaStageTile: View {
         let metrics = theme.metrics
         let colors = theme.colors
         let hue = stage.color(theme)
-        let percent = share.map { "\(Int(($0 * 100).rounded()))%" } ?? "-"
+        let percent = share.map { "\(Int(($0 * 100).rounded()))%" }
 
         HStack(spacing: metrics.chartLabelGap) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(stage.title)
                     .somaFont(theme.typography.caption)
                     .foregroundStyle(colors.inkSecondary.color)
-                Text(verbatim: seconds.map(SomaSleepClock.long) ?? "-")
-                    .somaFont(theme.typography.metricCompact)
+                SomaNumber(SomaFormat.duration(seconds), theme.typography.metricCompact)
                     .foregroundStyle(colors.inkPrimary.color)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
-                Text(verbatim: percent)
-                    .somaFont(theme.typography.captionValue)
-                    .foregroundStyle(share == nil ? colors.inkSecondary.color : hue)
+                SomaNumber(percent, theme.typography.captionValue)
+                    .foregroundStyle(hue)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -369,6 +361,7 @@ public struct SomaStageTile: View {
                 SomaSleepPeriodRow(bed: "23:34", wake: "06:39")
                 SomaSleepTotals(inBed: 25_522, asleep: 24_619)
                 SomaSleepTotals(inBed: nil, asleep: nil)
+                SomaSleepTotals(inBed: 25_522, asleep: 24_619, showsAsleep: false)
             }
         }
         .padding()

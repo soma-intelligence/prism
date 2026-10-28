@@ -21,8 +21,9 @@ struct EnvironmentHere: Equatable {
 
 /// The place on a small map with its name, then today's conditions there as
 /// six tiles: now with the low and high, humidity, UV, air quality, sunrise
-/// and sunset. Without a place, one button asks for Location, the first time
-/// only.
+/// and sunset. Without a place, the prompt stands alone: one button asks for
+/// Location, the first time only, and the tiles join with the first reading
+/// rather than as six blanks under it.
 struct EnvironmentWhereCard: View {
     let here: EnvironmentHere
     let report: EnvironmentReport
@@ -37,14 +38,15 @@ struct EnvironmentWhereCard: View {
         let outside = report.outside
         let words = PulseWording(calendar: .current, locale: .current)
         let temperature = outside?.temperature
-        let tint = temperature.map { SomaDataScale.temperature.value(at: $0).color } ?? SomaHealthHue.respiratory.color
+        let tint = temperature.map { SomaDataScale.temperature.value(at: $0).color }
+        let uv = EnvironmentMeasure.uv.current(report)
 
         SomaCard {
             VStack(alignment: .leading, spacing: metrics.cardSpacing) {
                 Group {
                     if let place = here.place {
                         Button { open(.temperature) } label: {
-                            EnvironmentPlaceMap(place: place, isHere: here.isHere, tint: tint)
+                            EnvironmentPlaceMap(place: place, isHere: here.isHere, tint: tint ?? theme.colors.inkSecondary.color)
                         }
                         .buttonStyle(.somaGlassPress)
                     } else {
@@ -52,73 +54,81 @@ struct EnvironmentWhereCard: View {
                     }
                 }
 
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: metrics.cardSpacing), count: 3),
-                          spacing: metrics.cardSpacing) {
-                    EnvironmentConditionTile(
-                        symbol: outside?.symbol ?? "thermometer.medium",
-                        value: temperature.map { "\(Int($0.rounded()))°" },
-                        label: outside?.low.flatMap { low in outside?.high.map { "\(Int(low.rounded()))° to \(Int($0.rounded()))°" } } ?? "Low, high",
-                        tint: tint
-                    ) { open(.temperature) }
-                    EnvironmentConditionTile(
-                        symbol: "humidity.fill",
-                        value: outside?.humidity.map { "\(Int($0.rounded()))%" },
-                        label: "Humidity",
-                        tint: SomaHealthHue.hearing.color
-                    ) { open(.temperature) }
-                    EnvironmentConditionTile(
-                        symbol: "sun.max.fill",
-                        value: EnvironmentMeasure.uv.current(report).map(EnvironmentMeasure.uv.format),
-                        label: "UV",
-                        tint: EnvironmentMeasure.uv.current(report).map { SomaDataScale.uvIndex.value(at: $0).color }
-                            ?? SomaDataScale.uvIndex.value(at: 0).color
-                    ) { open(.uv) }
-                    EnvironmentConditionTile(
-                        symbol: "aqi.medium",
-                        value: outside?.aqi.map { "\(Int($0.rounded()))" },
-                        label: "AQI",
-                        tint: outside?.aqi.map { SomaDataScale.airQuality.value(at: $0).color }
-                            ?? SomaDataScale.airQuality.value(at: 0).color
-                    ) { open(.air) }
-                    EnvironmentConditionTile(
-                        symbol: "sunrise.fill",
-                        value: sky.rise(words),
-                        label: "Sunrise",
-                        tint: SomaDataScale.daylight.value(at: 60).color
-                    ) { open(.daylight) }
-                    EnvironmentConditionTile(
-                        symbol: "sunset.fill",
-                        value: sky.set(words),
-                        label: "Sunset",
-                        tint: SomaDataScale.daylight.value(at: 20).color
-                    ) { open(.daylight) }
+                if here.place != nil {
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: metrics.cardSpacing), count: 3),
+                              spacing: metrics.cardSpacing) {
+                        EnvironmentConditionTile(
+                            symbol: outside?.symbol ?? "thermometer.medium",
+                            value: temperature.map { "\(Int($0.rounded()))°" },
+                            label: outside?.low.flatMap { low in outside?.high.map { "\(Int(low.rounded()))° to \(Int($0.rounded()))°" } } ?? "Low, high",
+                            tint: tint
+                        ) { open(.temperature) }
+                        EnvironmentConditionTile(
+                            symbol: "humidity.fill",
+                            value: outside?.humidity.map { "\(Int($0.rounded()))%" },
+                            label: "Humidity",
+                            // No scale says what a humidity means for you: the
+                            // tile stays neutral with a reading too.
+                            tint: nil
+                        ) { open(.temperature) }
+                        EnvironmentConditionTile(
+                            symbol: "sun.max.fill",
+                            value: uv.map(EnvironmentMeasure.uv.format),
+                            label: "UV",
+                            tint: uv.map { SomaDataScale.uvIndex.value(at: $0).color }
+                        ) { open(.uv) }
+                        EnvironmentConditionTile(
+                            symbol: "aqi.medium",
+                            value: outside?.aqi.map { "\(Int($0.rounded()))" },
+                            label: "AQI",
+                            tint: outside?.aqi.map { SomaDataScale.airQuality.value(at: $0).color }
+                        ) { open(.air) }
+                        EnvironmentConditionTile(
+                            symbol: "sunrise.fill",
+                            value: sky.rise(words),
+                            label: "Sunrise",
+                            tint: nil
+                        ) { open(.daylight) }
+                        EnvironmentConditionTile(
+                            symbol: "sunset.fill",
+                            value: sky.set(words),
+                            label: "Sunset",
+                            tint: nil
+                        ) { open(.daylight) }
+                    }
                 }
             }
         }
     }
 }
 
-/// One condition: its glyph in its colour, the value, a short label.
+/// One condition: its glyph, the value, a short label. A reading with a scale
+/// behind it (temperature, UV, air quality) tints the tile in that reading's
+/// colour; anything else, and every tile without a reading, sits on the
+/// recessed surface with its glyph in the secondary ink.
 private struct EnvironmentConditionTile: View {
     let symbol: String
     let value: String?
     let label: String
-    let tint: Color
+    /// The reading's colour on its scale, nil when there is no reading or no
+    /// scale that gives it meaning.
+    let tint: Color?
     let action: () -> Void
 
     @Environment(\.somaTheme) private var theme
 
     var body: some View {
         let colors = theme.colors
+        let metrics = theme.metrics
+        let tint = value == nil ? nil : tint
         Button(action: action) {
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: metrics.spaceXS) {
                 Image(systemName: symbol)
-                    .symbolRenderingMode(.multicolor)
+                    .symbolRenderingMode(.monochrome)
                     .somaFont(theme.typography.body)
-                    .foregroundStyle(tint)
-                Text(verbatim: value ?? "-")
-                    .somaFont(theme.typography.rowValue)
-                    .foregroundStyle(value == nil ? colors.inkSecondary.color : colors.inkPrimary.color)
+                    .foregroundStyle(tint ?? colors.inkSecondary.color)
+                SomaNumber(value, theme.typography.rowValue)
+                    .foregroundStyle(colors.inkPrimary.color)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
                 Text(verbatim: label)
@@ -127,9 +137,10 @@ private struct EnvironmentConditionTile: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
             }
-            .padding(theme.metrics.spaceM)
+            .padding(metrics.spaceM)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(tint.opacity(0.1), in: .rect(cornerRadius: theme.metrics.chartBarCornerRadius + 6, style: .continuous))
+            .background(tint.map { $0.opacity(metrics.environmentTileWashOpacity) } ?? colors.surfaceRecessed.color,
+                        in: .rect(cornerRadius: metrics.environmentTileCornerRadius, style: .continuous))
             .contentShape(.rect)
         }
         .buttonStyle(.somaGlassPress)
@@ -137,8 +148,9 @@ private struct EnvironmentConditionTile: View {
     }
 }
 
-/// No place yet: one button that asks for Location the first time, or a
-/// crossed out pin once it was refused.
+/// No place yet: one button that asks for Location the first time, a line
+/// while the first fix is on its way, or a crossed out pin and how to turn
+/// Location back on once it was refused.
 private struct EnvironmentNoPlace: View {
     let access: EnvironmentLocation.Access
     let request: () -> Void
@@ -148,9 +160,9 @@ private struct EnvironmentNoPlace: View {
     var body: some View {
         let colors = theme.colors
         VStack(spacing: theme.metrics.spaceM) {
-            Image(systemName: access == .notAsked ? "location.circle.fill" : "location.slash.fill")
+            Image(systemName: access == .denied ? "location.slash.fill" : "location.circle.fill")
                 .somaFont(theme.typography.metricCompact)
-                .foregroundStyle(access == .notAsked ? SomaHealthHue.hearing.color : colors.inkSecondary.color)
+                .foregroundStyle(colors.inkSecondary.color)
             if access == .notAsked {
                 Button(action: request) {
                     Text("Use location")
@@ -162,13 +174,18 @@ private struct EnvironmentNoPlace: View {
                 }
                 .buttonStyle(.somaGlassPress)
             } else {
-                Text(verbatim: "-")
-                    .somaFont(theme.typography.rowValue)
+                Text(access == .denied
+                     ? "Location is off for Soma. Turn it on in Settings to read the air around you."
+                     : "Finding where you are.")
+                    .somaFont(theme.typography.callout)
                     .foregroundStyle(colors.inkSecondary.color)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, theme.metrics.spaceL)
             }
         }
         .frame(maxWidth: .infinity, minHeight: theme.metrics.environmentMapHeight)
-        .background(colors.surfaceRecessed.color, in: .rect(cornerRadius: theme.metrics.chartBarCornerRadius + 6, style: .continuous))
+        .background(colors.surfaceRecessed.color, in: .rect(cornerRadius: theme.metrics.environmentTileCornerRadius, style: .continuous))
     }
 }
 
@@ -183,7 +200,7 @@ private struct EnvironmentPlaceMap: View {
 
     var body: some View {
         let metrics = theme.metrics
-        let shape = RoundedRectangle(cornerRadius: metrics.chartBarCornerRadius + 6, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: metrics.environmentTileCornerRadius, style: .continuous)
 #if os(visionOS)
         EnvironmentPlacePill(name: place.name, isHere: isHere, tint: tint)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -211,7 +228,7 @@ private struct EnvironmentPlaceMap: View {
                 .padding(theme.metrics.spaceS)
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(verbatim: place.name ?? "-"))
+        .accessibilityLabel(Text(verbatim: EnvironmentPlacePill.title(place.name, isHere: isHere)))
 #endif
     }
 }
@@ -229,7 +246,7 @@ private struct EnvironmentPlacePill: View {
         HStack(spacing: theme.metrics.spaceS) {
             Image(systemName: isHere ? "location.fill" : "mappin")
                 .foregroundStyle(tint)
-            Text(verbatim: name ?? "-")
+            Text(verbatim: Self.title(name, isHere: isHere))
                 .foregroundStyle(colors.inkPrimary.color)
                 .lineLimit(1)
         }
@@ -238,6 +255,11 @@ private struct EnvironmentPlacePill: View {
         .padding(.vertical, theme.metrics.spaceS)
         .background(Capsule().fill(colors.surface.color))
         .overlay(Capsule().strokeBorder(tint.opacity(0.5), lineWidth: 1))
+    }
+
+    /// The place's name, or what it is when Location gave no name.
+    static func title(_ name: String?, isHere: Bool) -> String {
+        name ?? (isHere ? String(localized: "Here") : String(localized: "Your place"))
     }
 }
 
@@ -279,14 +301,15 @@ struct EnvironmentSleepPlacesCard: View {
                         VStack(spacing: theme.metrics.spaceS) {
                             Image(systemName: "mappin.and.ellipse")
                                 .somaFont(theme.typography.metricCompact)
-                                .foregroundStyle(SomaHealthHue.sleep.color)
-                            Text(verbatim: "-")
-                                .somaFont(theme.typography.rowValue)
                                 .foregroundStyle(colors.inkSecondary.color)
+                            Text("Where you sleep shows here after a few nights.")
+                                .somaFont(theme.typography.callout)
+                                .foregroundStyle(colors.inkSecondary.color)
+                                .multilineTextAlignment(.center)
                         }
                         .frame(maxWidth: .infinity, minHeight: metrics.environmentMapHeight)
                         .background(colors.surfaceRecessed.color,
-                                    in: .rect(cornerRadius: metrics.chartBarCornerRadius + 6, style: .continuous))
+                                    in: .rect(cornerRadius: metrics.environmentTileCornerRadius, style: .continuous))
                     } else {
 #if !os(visionOS)
                         EnvironmentSleepMap(places: places)
@@ -331,9 +354,8 @@ private struct EnvironmentSleepPlaceRow: View {
             Text(verbatim: "\(place.nights) nights")
                 .somaFont(theme.typography.caption)
                 .foregroundStyle(colors.inkSecondary.color)
-            Text(verbatim: place.score.map { "\(Int($0.rounded()))" } ?? "-")
-                .somaFont(theme.typography.rowValue)
-                .foregroundStyle(place.score == nil ? colors.inkSecondary.color : tint)
+            SomaNumber(place.score.map { "\(Int($0.rounded()))" }, theme.typography.rowValue)
+                .foregroundStyle(tint)
                 .frame(minWidth: 28, alignment: .trailing)
         }
         .accessibilityElement(children: .combine)
@@ -368,7 +390,7 @@ private struct EnvironmentSleepMap: View {
         .allowsHitTesting(false)
         .frame(height: metrics.environmentMapHeight)
         .background(theme.colors.surfaceRecessed.color)
-        .clipShape(.rect(cornerRadius: metrics.chartBarCornerRadius + 6, style: .continuous))
+        .clipShape(.rect(cornerRadius: metrics.environmentTileCornerRadius, style: .continuous))
         .accessibilityHidden(true)
     }
 }

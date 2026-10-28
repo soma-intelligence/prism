@@ -56,7 +56,9 @@ struct DataDiagnosticsPage: View {
                     SomaBrowseGroup([SettingsItem].items("device", "account"), hasGlyphs: false) { item in
                         if item.id == "device" {
                             SettingsLine(String(localized: "Stored")) {
-                                valueText(onDevice.map { ByteCountFormatter.string(fromByteCount: $0, countStyle: .file) } ?? "-")
+                                SomaNumber(onDevice.map { ByteCountFormatter.string(fromByteCount: $0, countStyle: .file) },
+                                           theme.typography.rowValue)
+                                    .foregroundStyle(theme.colors.inkSecondary.color)
                             }
                         } else {
                             SettingsLine(String(localized: "Copy elsewhere")) {
@@ -246,11 +248,11 @@ enum SourcesSyncWords {
         }
     }
 
-    /// The last read as a time today, "Yesterday", or a date; a dash before
-    /// the first. A twelve hour clock's "PM" is set apart as the unit, so the
+    /// The last read as a time today, "Yesterday", or a date; nil before the
+    /// first, which the hero draws as the missing mark. A twelve hour clock's "PM" is set apart as the unit, so the
     /// large digits stand alone the way a metric's number does.
-    static func lastRead(_ date: Date?, now: Date = .now, calendar: Calendar = .current) -> (value: String, unit: String?) {
-        guard let date else { return ("-", nil) }
+    static func lastRead(_ date: Date?, now: Date = .now, calendar: Calendar = .current) -> (value: String?, unit: String?) {
+        guard let date else { return (nil, nil) }
         guard calendar.isDate(date, inSameDayAs: now) else {
             return (VaultWords.day(date, now: now, calendar: calendar), nil)
         }

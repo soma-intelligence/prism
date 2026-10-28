@@ -67,7 +67,7 @@ struct BloodMarkerPage: View {
         var rows: [LabRow] = BloodMarkerNotes.related(markerID).compactMap { id in
             guard let marker = BloodMarkerCatalog.marker(id: id) else { return nil }
             let value = store.latest?.value(id).map { LabMath.reading($0).text }
-            return LabRow(marker.name, detail: value ?? "-", route: .marker(id))
+            return LabRow(marker.name, detail: value, route: .marker(id))
         }
         if BloodMarkerCatalog.marker(id: markerID)?.category == .lipids || markerID == "hba1c" || markerID == "crp" {
             rows.append(LabRow("Cardiometabolic risk", route: .risk))
@@ -99,7 +99,7 @@ struct BloodMarkerPage: View {
         guard let latest else { return "Add a panel that carries \(definition.name) and it lands here with its range." }
         var text = "\(definition.name) reads \(latest.text)"
         if points.count >= 2, let first = points.first {
-            let from = LabMath.format(first.value, decimals: LabMath.decimals(for: first.value)) ?? "-"
+            let from = SomaFormat.number(first.value, decimals: LabMath.decimals(for: first.value))
             text += ", from \(from) on \(first.date.labDay)"
         }
         text += "."

@@ -42,7 +42,7 @@ struct GenomePage: View {
                 }
                 apoeCard(result)
                 LabRowGroup(heading: "This file", rows: [
-                    LabRow("Build", detail: result.build ?? "-"),
+                    LabRow("Build", detail: result.build),
                     LabRow("Import a newer file", action: { isImporting = true }),
                     LabRow("Delete the DNA data", detail: "from this phone", action: { asksDelete = true }),
                 ])
@@ -93,7 +93,7 @@ struct GenomePage: View {
                                 .foregroundStyle(theme.colors.inkSecondary.color)
                         }
                         GenomeEvidenceLine(evidence: .strong, sources: GenomeCatalog.apoeSources)
-                        Text("From rs429358 \(GenomeCatalog.byID["rs429358"].flatMap(result.genotype) ?? "-") and rs7412 \(GenomeCatalog.byID["rs7412"].flatMap(result.genotype) ?? "-"), plus strand.")
+                        Text("From rs429358 \(GenomeCatalog.byID["rs429358"].flatMap(result.genotype) ?? String(localized: "not read")) and rs7412 \(GenomeCatalog.byID["rs7412"].flatMap(result.genotype) ?? String(localized: "not read")), plus strand.")
                             .somaFont(theme.typography.caption)
                             .foregroundStyle(theme.colors.inkSecondary.color)
                     } else {
@@ -127,8 +127,7 @@ struct GenomeVariantCard: View {
             VStack(alignment: .leading, spacing: theme.metrics.cardSpacing) {
                 LabEyebrow("\(variant.trait) · \(variant.gene) \(variant.id)")
                 HStack(alignment: .firstTextBaseline, spacing: theme.metrics.spaceS) {
-                    Text(genotype.map { Self.slashed($0) } ?? "-")
-                        .somaFont(theme.typography.metricCompact)
+                    SomaNumber(genotype.map { Self.slashed($0) }, theme.typography.metricCompact)
                         .foregroundStyle(theme.colors.inkPrimary.color)
                     Text(meaning?.headline ?? "Not in this file")
                         .somaFont(theme.typography.body)

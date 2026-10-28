@@ -17,23 +17,28 @@ struct PulseWording {
 
     // MARK: - Numbers
 
-    /// Seconds as hours and minutes on a clock face: 7:12.
+    /// Seconds since midnight as a time of day on a clock face: 7:12. Only
+    /// for a time of day (a bedtime, a wake time); a length of time is a
+    /// ``duration(_:)``.
     func clock(_ seconds: TimeInterval) -> String {
         let minutes = Int((seconds / 60).rounded())
         return "\(minutes / 60):" + String(format: "%02d", minutes % 60)
     }
 
-    /// Seconds as whole minutes: 68 min.
-    func minutes(_ seconds: TimeInterval) -> String {
-        "\(whole(seconds / 60)) min"
+    /// A duration in the app's one spelling, through ``SomaFormat``: 7h 12m,
+    /// 46m, 2h. Never a clock face, so it never reads as a time of day.
+    func duration(_ seconds: TimeInterval) -> String {
+        SomaFormat.duration(seconds, locale: locale)
     }
 
-    /// A gap between two durations: 46 min, or 1 h 24 min once it passes the
-    /// hour, so it never reads as a time of day.
+    /// Seconds as a duration, kept for its callers: 68 minutes read 1h 8m.
+    func minutes(_ seconds: TimeInterval) -> String {
+        duration(seconds)
+    }
+
+    /// A gap between two durations, written like any other: 46m, 1h 24m.
     func span(_ seconds: TimeInterval) -> String {
-        let minutes = Int((seconds / 60).rounded())
-        guard minutes >= 60 else { return "\(minutes) min" }
-        return minutes % 60 == 0 ? "\(minutes / 60) h" : "\(minutes / 60) h \(minutes % 60) min"
+        duration(seconds)
     }
 
     func whole(_ value: Double) -> String {
@@ -99,20 +104,19 @@ struct PulseWording {
     // MARK: - Events
 
     func wokeUp(_ night: PulseNight) -> String {
-        guard let deep = night.deep else { return "Slept \(clock(night.asleep))." }
-        return "Slept \(clock(night.asleep)), \(minutes(deep)) of deep sleep."
+        guard let deep = night.deep else { return "Slept \(duration(night.asleep))." }
+        return "Slept \(duration(night.asleep)), \(duration(deep)) of deep sleep."
     }
 
     func workout(_ workout: PulseWorkout) -> String {
-        let length = "\(whole(workout.minutes)) min"
+        let length = duration(workout.minutes * 60)
         if let steps = workout.steps {
             return "\(length), \(whole(steps)) steps."
         }
         if let zone = workout.zoneThreeMinutes {
-            let inZone = Int(zone.rounded())
-            return inZone == 0
+            return Int(zone.rounded()) == 0
                 ? "\(length), all of it under zone 3."
-                : "\(length), \(inZone) of them in zone 3 and above."
+                : "\(length), \(duration(zone * 60)) in zone 3 and above."
         }
         if let average = workout.averageHeartRate {
             return "\(length), \(whole(average)) bpm on average."
@@ -127,11 +131,11 @@ struct PulseWording {
     func now(steps: Double?, exercise: Double?) -> String {
         switch (steps, exercise) {
         case let (steps?, exercise?):
-            "\(whole(steps)) steps and \(whole(exercise)) min of exercise so far."
+            "\(whole(steps)) steps and \(duration(exercise * 60)) of exercise so far."
         case let (steps?, nil):
             "\(whole(steps)) steps so far."
         case let (nil, exercise?):
-            "\(whole(exercise)) min of exercise so far."
+            "\(duration(exercise * 60)) of exercise so far."
         case (nil, nil):
             "Nothing recorded yet today."
         }
@@ -141,9 +145,9 @@ struct PulseWording {
 
     func sleepSummary(_ night: PulseNight?, week: [PulseNight]) -> String {
         guard let night else { return "No night recorded yet." }
-        let deep = night.deep.map { ", \(minutes($0)) deep." } ?? "."
+        let deep = night.deep.map { ", \(duration($0)) deep." } ?? "."
         let others = week.filter { $0.day != night.day }
-        guard others.count >= 2 else { return "Asleep \(clock(night.asleep))" + deep }
+        guard others.count >= 2 else { return "Asleep \(duration(night.asleep))" + deep }
         if night.asleep >= (others.map(\.asleep).max() ?? 0) {
             return "Your longest night this week" + deep
         }
@@ -169,10 +173,11 @@ struct PulseWording {
         return line
     }
 
-    func bodySummary(age: Int?) -> String {
-        let base = "Measured at the pod. No visit yet."
-        guard let age else { return base }
-        return base + " You are \(age)."
+    /// The fitness age needs a VO2 max reading beside the age. With the age
+    /// known that reading is what is missing, so the line says so; with
+    /// neither there is nothing to ask for yet.
+    func bodySummary(age: Int?) -> String? {
+        age == nil ? nil : "Needs a VO2 max reading."
     }
 
     /// A 0 to 100 score as the row prints it.

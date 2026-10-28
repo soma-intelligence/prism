@@ -103,7 +103,7 @@ private struct StrainZonesCard: View {
                                 }
                             }
                             .frame(height: theme.metrics.bodyRowBarHeight)
-                            Text("\(Int(zone.minutes.rounded())) min")
+                            Text(verbatim: SomaFormat.duration(zone.minutes * 60))
                                 .somaFont(type.rowValue)
                                 .foregroundStyle(colors.inkPrimary.color)
                                 .frame(width: theme.metrics.bodyRowValueWidth, alignment: .trailing)

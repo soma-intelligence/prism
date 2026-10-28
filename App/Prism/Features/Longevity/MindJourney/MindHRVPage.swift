@@ -43,7 +43,7 @@ struct MindHRVPage: View {
             navigationTitle: "HRV",
             title: headline(signals),
             stats: [
-                SomaStat("Now", value: MindFormat.whole(signals.hrvToday), trend: MindMath.trend(signals.hrvToday, against: signals.hrvBaseline, by: (signals.hrvBaseline ?? 0) * 0.07)),
+                SomaStat("Now", value: MindFormat.whole(signals.hrvToday), trend: MindMath.trend(signals.hrvToday, against: signals.hrvBaseline, by: (signals.hrvBaseline ?? 0) * 0.07), better: .higher),
                 SomaStat("Last night", value: MindFormat.whole(signals.hrvLastNight)),
                 SomaStat("Baseline", value: MindFormat.whole(signals.hrvBaseline)),
             ]

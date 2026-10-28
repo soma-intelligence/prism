@@ -43,10 +43,4 @@ public extension SomaMetrics {
     /// The ground over the photograph at its top, a third of the way down
     /// and two thirds of the way down; it is whole at the foot.
     var backdropVeilOpacities: (top: Double, third: Double, lower: Double) { (0.08, 0.5, 0.82) }
-    var backdropFieldOpacityLight: Double { 0.55 }
-    var backdropFieldOpacityDark: Double { 0.7 }
-    var backdropFieldBlur: CGFloat { 30 }
-    /// The field's fade at its middle stop, from whole at the top to none
-    /// at the foot.
-    var backdropFadeMiddleOpacity: Double { 0.8 }
 }

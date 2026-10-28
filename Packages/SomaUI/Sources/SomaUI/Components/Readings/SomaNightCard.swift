@@ -61,16 +61,16 @@ public struct SomaNightCard: View {
                         SomaAspectGlyph(.sleep, style: .caption)
                         Text("Last night")
                             .somaFont(type.eyebrow)
-                            .textCase(.uppercase)
                             .foregroundStyle(colors.inkSecondary.color)
                     }
                     HStack(alignment: .firstTextBaseline, spacing: metrics.identityDotSpacing) {
-                        Text(verbatim: asleep.map(SomaSleepClock.short) ?? "-")
-                            .somaFont(type.metricCompact)
+                        SomaNumber(asleep.map(SomaSleepClock.short), type.metricCompact)
                             .foregroundStyle(colors.inkPrimary.color)
-                        Text("asleep")
-                            .somaFont(type.caption)
-                            .foregroundStyle(colors.inkSecondary.color)
+                        if asleep != nil {
+                            Text("asleep")
+                                .somaFont(type.caption)
+                                .foregroundStyle(colors.inkSecondary.color)
+                        }
                     }
                     if let line {
                         Text(verbatim: line)

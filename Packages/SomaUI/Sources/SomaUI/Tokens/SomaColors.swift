@@ -43,7 +43,10 @@ public struct SomaColors: Sendable, Equatable {
     /// A reading inside its normal range: the green dot and word under a
     /// metric, and the band behind its chart.
     public var statusNormal: SomaColorValue
-    /// A reading above or below its normal range: worth a look, not alarming.
+    /// A reading on the side of its usual worth watching: an amber, worth a
+    /// look and not alarming. Kept clear of `statusAlert`'s red in both
+    /// appearances, so "out of your usual" never reads as a warning, and at
+    /// 4.5:1 or better on the card, the page and the recessed well.
     public var statusOut: SomaColorValue
     /// A reading far out of range, a blood pressure stage, say.
     public var statusAlert: SomaColorValue
@@ -62,7 +65,7 @@ public struct SomaColors: Sendable, Equatable {
         record: SomaColorValue = SomaColorValue(light: 0xFF3B30, dark: 0xFF453A),
         onOrb: SomaColorValue = SomaColorValue(0xFFFFFF),
         statusNormal: SomaColorValue = SomaColorValue(light: 0x1F7F38, dark: 0x34C759),
-        statusOut: SomaColorValue = SomaColorValue(light: 0xC93400, dark: 0xFF9F0A),
+        statusOut: SomaColorValue = SomaColorValue(light: 0xA05A00, dark: 0xFF9F0A),
         statusAlert: SomaColorValue = SomaColorValue(light: 0xD70015, dark: 0xFF6961),
         sleepStages: SomaSleepStagePalette = .standard
     ) {

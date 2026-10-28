@@ -74,7 +74,8 @@ enum PulseRoute: Hashable {
 }
 
 /// A card that opens a page: the whole tile is the target, it dips a little
-/// under the finger, and the page zooms out of it.
+/// under the finger (`somaGlassPress`, the one press style), and the page
+/// zooms out of it.
 struct TileLink<Value: Hashable, Label: View>: View {
     let value: Value
     let label: Label
@@ -90,20 +91,6 @@ struct TileLink<Value: Hashable, Label: View>: View {
                 .contentShape(.rect)
                 .zoomSource(value)
         }
-        .buttonStyle(TilePressStyle())
-    }
-}
-
-/// A tile under the finger: a short dip in scale, no dim, so the card stays
-/// readable while it is held and the zoom starts from where it sat.
-struct TilePressStyle: ButtonStyle {
-    @Environment(\.somaTheme) private var theme
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.97 : 1)
-            .animation(theme.motion.press, value: configuration.isPressed)
-            .sensoryFeedback(.impact(weight: .light, intensity: 0.7), trigger: configuration.isPressed) { _, pressed in pressed }
+        .buttonStyle(.somaGlassPress)
     }
 }

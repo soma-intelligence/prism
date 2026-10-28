@@ -54,7 +54,7 @@ struct CardiometabolicRiskPage: View {
             }
             if let report, report.inputs != nil {
                 LabRowGroup(heading: "Every estimate", rows: report.estimates.map { estimate in
-                    LabRow(estimateTitle(estimate), detail: estimate.percent.map { "\(LabMath.format($0, decimals: 1) ?? "-")%" } ?? refusal(estimate.refusal))
+                    LabRow(estimateTitle(estimate), detail: estimate.percent.map { "\(SomaFormat.number($0, decimals: 1))%" } ?? refusal(estimate.refusal))
                 })
             }
             lever
@@ -108,7 +108,7 @@ struct CardiometabolicRiskPage: View {
             items.append(LabBandItem(
                 id: "waist", title: "Waist",
                 detail: height == nil ? "under 94" : "under \(Int(limit)), half your height",
-                value: "\(LabMath.format(waist, decimals: 0) ?? "-") cm",
+                value: "\(SomaFormat.number(waist)) cm",
                 band: position(60, 60, 130)...position(limit, 60, 130),
                 position: position(waist, 60, 130),
                 isFlagged: waist > limit, route: .measurements))
@@ -120,11 +120,11 @@ struct CardiometabolicRiskPage: View {
 
     private func row(_ missing: MissingRiskInput) -> LabRow {
         if let question = missing.question {
-            return LabRow(question.title, detail: "-", action: { self.question = question })
+            return LabRow(question.title, detail: String(localized: "Add"), action: { self.question = question })
         }
         switch missing {
-        case .sex: return LabRow(missing.title, detail: "-", action: { isAskingSex = true })
-        case .systolicBP: return LabRow(missing.title, detail: "-", route: .bloodPressure)
+        case .sex: return LabRow(missing.title, detail: String(localized: "Add"), action: { isAskingSex = true })
+        case .systolicBP: return LabRow(missing.title, detail: String(localized: "Add"), route: .bloodPressure)
         case .age: return LabRow(missing.title, detail: "In Health")
         default: return LabRow(missing.title, detail: "from a panel", action: { isAdding = true })
         }
@@ -142,7 +142,7 @@ struct CardiometabolicRiskPage: View {
             SomaActionCard(
                 eyebrow: "The lever",
                 title: driver.label,
-                detail: "Bringing it to its optimum takes \(LabMath.format(driver.deltaPercent, decimals: 1) ?? "-") points off the ten year risk."
+                detail: "Bringing it to its optimum takes \(SomaFormat.number(driver.deltaPercent, decimals: 1)) points off the ten year risk."
             ) {
                 SomaObjectIcon(aspect: .heart, size: .row)
             }
@@ -176,7 +176,7 @@ struct CardiometabolicRiskPage: View {
     private func reason(_ headline: CardiometabolicRisk.Estimate?) -> String {
         guard let report else { return "Reading your panel and Health." }
         if let percent = headline?.percent {
-            let text = "About \(LabMath.format(percent, decimals: 1) ?? "-") in 100 people with your numbers have a heart attack or stroke in the next ten years."
+            let text = "About \(SomaFormat.number(percent, decimals: 1)) in 100 people with your numbers have a heart attack or stroke in the next ten years."
             if let driver = report.drivers.first { return text + " \(driver.label) is the input with the most room to move." }
             return text
         }
@@ -202,7 +202,7 @@ struct CardiometabolicRiskPage: View {
         case .systolicBPOutsideValidatedRange: "pressure outside its range"
         case .bodyMassIndexUnavailable: "needs weight and height"
         case .egfrOutsideValidatedRange: "kidney value outside its range"
-        default: "-"
+        default: "not read yet"
         }
     }
 

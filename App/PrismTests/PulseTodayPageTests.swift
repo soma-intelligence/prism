@@ -40,11 +40,12 @@ struct PulseTodayPageTests {
         #expect(loading.summary == "Reading last night from Apple Health.")
     }
 
-    @Test("Durations hold one line and read as hours and minutes")
+    @Test("Durations read as hours and minutes, the way every page writes them")
     func durations() {
-        #expect(TodayFormat.duration(seconds: 7 * 3600 + 12 * 60) == "7\u{00A0}h\u{00A0}12")
-        #expect(TodayFormat.duration(text: "7:05") == "7\u{00A0}h\u{00A0}05")
-        #expect(TodayFormat.span(seconds: 28 * 60) == "28 min")
+        #expect(TodayFormat.duration(seconds: 7 * 3600 + 12 * 60) == SomaFormat.duration(7 * 3600 + 12 * 60))
+        #expect(TodayFormat.duration(text: "7:05") == SomaFormat.duration(7 * 3600 + 5 * 60))
+        #expect(TodayFormat.duration(text: "7h 5m") == "7h 5m")
+        #expect(TodayFormat.span(seconds: 28 * 60) == SomaFormat.duration(28 * 60))
         #expect(TodayFormat.like("14.2", 13.6) == "13.6")
         #expect(TodayFormat.like("52", 51.4) == "51")
         #expect(TodayFormat.sentence("resting heart rate is above your usual") == "Resting heart rate is above your usual.")

@@ -84,8 +84,11 @@ public struct SomaScaleBar: View {
                         Circle()
                             .fill(scale.value(at: value).color)
                             .overlay(Circle().strokeBorder(colors.surface.color, lineWidth: 3))
+                            // A hairline round the ring, not a shadow, keeps the
+                            // marker off a track of the same colour.
+                            .overlay(Circle().strokeBorder(colors.inkPrimary.color.opacity(theme.metrics.hairlineOpacity),
+                                                           lineWidth: theme.metrics.glyphStroke))
                             .frame(width: marker, height: marker)
-                            .shadow(color: .black.opacity(0.18), radius: 2, y: 1)
                             .offset(x: min(max(width * share - marker / 2, 0), width - marker))
                     }
                 }
@@ -315,8 +318,8 @@ private struct SunTime: View {
         HStack(spacing: 4) {
             Image(systemName: symbol)
                 .foregroundStyle(theme.colors.inkSecondary.color)
-            Text(verbatim: time ?? "-")
-                .foregroundStyle(time == nil ? theme.colors.inkSecondary.color : theme.colors.inkPrimary.color)
+            SomaNumber(time, theme.typography.captionValue)
+                .foregroundStyle(theme.colors.inkPrimary.color)
         }
         .somaFont(theme.typography.captionValue)
     }
@@ -356,10 +359,16 @@ public struct SomaThermometerPill: View {
             Image(systemName: "thermometer.medium")
                 .somaFont(theme.typography.body)
                 .foregroundStyle(now.map { scale.value(at: $0).color } ?? colors.inkSecondary.color)
-            Text(verbatim: now.map(Self.degrees) ?? "-")
-                .somaFont(theme.typography.metricCompact)
-                .foregroundStyle(now == nil ? colors.inkSecondary.color : colors.inkPrimary.color)
-                .somaRollingNumber(now.map(Self.degrees))
+            Group {
+                if let now {
+                    Text(verbatim: Self.degrees(now))
+                        .somaFont(theme.typography.metricCompact)
+                        .foregroundStyle(colors.inkPrimary.color)
+                        .somaRollingNumber(Self.degrees(now))
+                } else {
+                    SomaMissingValue(theme.typography.metricCompact)
+                }
+            }
                 .frame(minWidth: 44, alignment: .leading)
 
             VStack(spacing: theme.metrics.spaceXS) {
@@ -393,11 +402,9 @@ public struct SomaThermometerPill: View {
                 .frame(height: metrics.environmentMarkerDiameter)
 
                 HStack {
-                    Text(verbatim: "L \(low.map(Self.degrees) ?? "-")")
-                        .somaRollingNumber(low.map(Self.degrees))
+                    bound("L", low)
                     Spacer(minLength: 0)
-                    Text(verbatim: "H \(high.map(Self.degrees) ?? "-")")
-                        .somaRollingNumber(high.map(Self.degrees))
+                    bound("H", high)
                 }
                 .somaFont(theme.typography.captionValue)
                 .foregroundStyle(colors.inkSecondary.color)
@@ -409,7 +416,21 @@ public struct SomaThermometerPill: View {
         .overlay(Capsule().strokeBorder(colors.inkPrimary.color.opacity(metrics.hairlineOpacity), lineWidth: 0.5))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text("Temperature"))
-        .accessibilityValue(Text(verbatim: now.map(Self.degrees) ?? "-"))
+        .accessibilityValue(Text(verbatim: now.map(Self.degrees) ?? SomaFormat.notMeasured))
+    }
+
+    /// The day's low or high after its letter, or the missing mark alone.
+    @ViewBuilder
+    private func bound(_ letter: String, _ value: Double?) -> some View {
+        if let value {
+            Text(verbatim: "\(letter) \(Self.degrees(value))")
+                .somaRollingNumber(Self.degrees(value))
+        } else {
+            HStack(spacing: theme.metrics.numberUnitGap) {
+                Text(verbatim: letter)
+                SomaMissingValue(theme.typography.captionValue)
+            }
+        }
     }
 
     static func degrees(_ value: Double) -> String { "\(Int(value.rounded()))°" }
@@ -418,7 +439,8 @@ public struct SomaThermometerPill: View {
 // MARK: - Weather pill
 
 /// The weather pill: a disc with the sky's glyph, the reading, and the
-/// place under it. Missing values read as a dash.
+/// place under it. A missing reading draws the missing mark; a missing place
+/// is left out rather than drawn as a second mark under the first.
 public struct SomaWeatherPill: View {
     private let symbol: String
     private let value: String?
@@ -442,14 +464,20 @@ public struct SomaWeatherPill: View {
                 .frame(width: metrics.environmentPillDisc, height: metrics.environmentPillDisc)
                 .background(Circle().fill(colors.surfaceRecessed.color))
             VStack(alignment: .leading, spacing: 1) {
-                Text(verbatim: value ?? "-")
-                    .somaFont(theme.typography.body)
-                    .foregroundStyle(colors.inkPrimary.color)
-                    .somaRollingNumber(value)
-                Text(verbatim: place ?? "-")
-                    .somaFont(theme.typography.caption)
-                    .foregroundStyle(colors.inkSecondary.color)
-                    .lineLimit(1)
+                if let value {
+                    Text(verbatim: value)
+                        .somaFont(theme.typography.body)
+                        .foregroundStyle(colors.inkPrimary.color)
+                        .somaRollingNumber(value)
+                } else {
+                    SomaMissingValue(theme.typography.body)
+                }
+                if let place {
+                    Text(verbatim: place)
+                        .somaFont(theme.typography.caption)
+                        .foregroundStyle(colors.inkSecondary.color)
+                        .lineLimit(1)
+                }
             }
         }
         .padding(.leading, theme.metrics.spaceM)

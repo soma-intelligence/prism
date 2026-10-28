@@ -40,10 +40,14 @@ public struct SomaSunCurve: View {
         VStack(alignment: .leading, spacing: metrics.sunPathSpacing) {
             HStack(alignment: .firstTextBaseline) {
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
-                    Text(verbatim: day.map { SomaSunGeometry.duration($0.length) } ?? "-")
-                        .somaFont(type.metricCompact)
-                        .foregroundStyle(day == nil ? colors.inkSecondary.color : colors.inkPrimary.color)
-                        .somaRollingNumber(day.map { SomaSunGeometry.duration($0.length) }, holdsWidth: true)
+                    if let day {
+                        Text(verbatim: SomaSunGeometry.duration(day.length))
+                            .somaFont(type.metricCompact)
+                            .foregroundStyle(colors.inkPrimary.color)
+                            .somaRollingNumber(SomaSunGeometry.duration(day.length), holdsWidth: true)
+                    } else {
+                        SomaMissingValue(type.metricCompact)
+                    }
                     Text("of daylight")
                         .somaFont(type.caption)
                         .foregroundStyle(colors.inkSecondary.color)
@@ -75,12 +79,10 @@ public struct SomaSunCurve: View {
                     }
                 } else {
                     HStack {
-                        Text(verbatim: "-")
+                        SomaMissingValue(type.captionValue)
                         Spacer()
-                        Text(verbatim: "-")
+                        SomaMissingValue(type.captionValue)
                     }
-                    .somaFont(type.captionValue)
-                    .foregroundStyle(colors.inkSecondary.color)
                     .padding(.horizontal, width * 0.22)
                 }
             }
@@ -88,7 +90,7 @@ public struct SomaSunCurve: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text("Sun"))
-        .accessibilityValue(Text(day.map { accessibilityValue($0) } ?? "-"))
+        .accessibilityValue(Text(day.map { accessibilityValue($0) } ?? SomaFormat.notMeasured))
     }
 
     private func accessibilityValue(_ day: SomaSunGeometry) -> String {
@@ -236,10 +238,8 @@ public struct SomaSunGeometry: Equatable, Sendable {
     }
 
     /// A span as hours and minutes: "11h 6m", "45m".
-    public static func duration(_ seconds: TimeInterval) -> String {
-        let minutes = max(0, Int((seconds / 60).rounded()))
-        if minutes < 60 { return "\(minutes)m" }
-        return "\(minutes / 60)h \(minutes % 60)m"
+    public static func duration(_ seconds: TimeInterval, locale: Locale = .autoupdatingCurrent) -> String {
+        SomaFormat.duration(seconds, locale: locale)
     }
 }
 

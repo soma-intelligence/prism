@@ -205,7 +205,7 @@ struct HomeMarkerSheet: View {
                 let worse = direction == (marker.higherIsWorse ? "Rising" : "Falling")
                 HStack {
                     Text("\(change.days) days").frame(maxWidth: .infinity, alignment: .leading)
-                    Text(change.change.map { HomeFormat.signed($0, max(marker.decimals, 1)) } ?? "-")
+                    SomaNumber(change.change.map { HomeFormat.signed($0, max(marker.decimals, 1)) }, type.rowValue)
                         .frame(maxWidth: .infinity, alignment: .trailing)
                         .foregroundStyle(worse ? colors.danger.color : colors.inkPrimary.color)
                     Text(direction)

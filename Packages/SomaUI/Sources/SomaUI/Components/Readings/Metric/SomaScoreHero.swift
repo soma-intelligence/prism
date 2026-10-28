@@ -38,6 +38,7 @@ public struct SomaScoreHero: View {
     private let tone: SomaCueTone
     private let dial: Dial
     private let usual: ClosedRange<Double>?
+    private let duration: TimeInterval?
 
     @Environment(\.somaTheme) private var theme
 
@@ -47,6 +48,10 @@ public struct SomaScoreHero: View {
     ///   - meaning: the score's word ("Restored"), led by the tone's dot.
     ///   - detail: what follows it in the secondary ink ("8 below last week").
     ///   - usual: the person's usual as shares of the ring's turn, 0 to 1.
+    ///   - duration: when the value is a length of time, its seconds: the
+    ///     figures are then set large and the units smaller, as
+    ///     ``SomaDurationText`` sets them ("7h 54m"), rather than `value`
+    ///     in one size. `value` still says whether there is one.
     public init(
         aspect: SomaAspect,
         caption: String?,
@@ -56,7 +61,8 @@ public struct SomaScoreHero: View {
         detail: String? = nil,
         tone: SomaCueTone = .neutral,
         dial: Dial,
-        usual: ClosedRange<Double>? = nil
+        usual: ClosedRange<Double>? = nil,
+        duration: TimeInterval? = nil
     ) {
         self.aspect = aspect
         self.caption = caption
@@ -67,6 +73,7 @@ public struct SomaScoreHero: View {
         self.tone = tone
         self.dial = dial
         self.usual = usual
+        self.duration = duration
     }
 
     /// A reading's place on a ``Dial/marker`` ring and its usual, as shares
@@ -80,7 +87,8 @@ public struct SomaScoreHero: View {
         let metrics = theme.metrics
 
         HStack(alignment: .center, spacing: metrics.cardSpacing) {
-            SomaHeroText(caption: caption, value: value, unit: unit, meaning: meaning, detail: detail, tone: tone)
+            SomaHeroText(caption: caption, value: value, unit: unit, meaning: meaning, detail: detail, tone: tone,
+                         duration: duration)
 
             if dial != .none {
                 SomaScoreDial(aspect: aspect, dial: dial, usual: usual)
@@ -105,6 +113,8 @@ struct SomaHeroText: View {
     let meaning: String?
     let detail: String?
     let tone: SomaCueTone
+    /// A length of time behind `value`: set as ``SomaDurationText``.
+    var duration: TimeInterval? = nil
 
     @Environment(\.somaTheme) private var theme
 
@@ -117,22 +127,36 @@ struct SomaHeroText: View {
             if let caption {
                 Text(caption)
                     .somaFont(type.eyebrow)
-                    .textCase(.uppercase)
                     .foregroundStyle(colors.inkSecondary.color)
                     .lineLimit(1)
             }
             HStack(alignment: .firstTextBaseline, spacing: metrics.metricHeroSpacing * 1.5) {
-                Text(value ?? "-")
-                    .somaFont(type.metricHero)
-                    .foregroundStyle(colors.inkPrimary.color)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.6)
-                    .somaRollingNumber(value, holdsWidth: unit != nil)
-                if let unit, value != nil {
-                    Text(unit)
-                        .somaFont(type.metricHeroUnit)
-                        .foregroundStyle(colors.inkSecondary.color)
-                        .lineLimit(1)
+                if let value {
+                    if let duration {
+                        // A duration: figures large, units small, as
+                        // everywhere a duration is set large.
+                        SomaDurationText(duration, figures: type.metricHero, units: type.metricHeroUnit)
+                            .foregroundStyle(colors.inkPrimary.color)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.6)
+                    } else {
+                        Text(value)
+                            .somaFont(type.metricHero)
+                            .foregroundStyle(colors.inkPrimary.color)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.6)
+                            .somaRollingNumber(value, holdsWidth: unit != nil)
+                    }
+                    if let unit {
+                        Text(unit)
+                            .somaFont(type.metricHeroUnit)
+                            .foregroundStyle(colors.inkSecondary.color)
+                            .lineLimit(1)
+                    }
+                } else {
+                    // Nothing measured: the drawn mark alone, never a unit
+                    // beside it.
+                    SomaMissingValue(type.metricHero)
                 }
             }
             if meaning != nil || detail != nil {
@@ -274,6 +298,9 @@ enum SomaScoreDialMath {
             SomaScoreHero(aspect: .heart, caption: "Resting today", value: "66", unit: "bpm",
                           meaning: "Above your usual", tone: .watch,
                           dial: .marker(0.7), usual: 0.31...0.56)
+            SomaScoreHero(aspect: .sleep, caption: nil, value: "7h 54m", unit: "asleep",
+                          meaning: "Within your usual", detail: "Need 8h", tone: .good,
+                          dial: .fill(0.98), usual: 0.85...0.97, duration: 28_440)
             SomaScoreHero(aspect: .activity, caption: "Today", value: nil, unit: "of 100",
                           meaning: "Waiting for a first reading", dial: .fill(nil))
         }

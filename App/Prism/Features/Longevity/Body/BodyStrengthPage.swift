@@ -22,7 +22,7 @@ struct BodyStrengthPage: View {
             title: page.headline,
             reason: page.reason,
             stats: [
-                SomaStat("Lean mass", value: page.leanMass, unit: "kg", trend: page.leanTrend),
+                SomaStat("Lean mass", value: page.leanMass, unit: "kg", trend: page.leanTrend, better: .higher),
                 SomaStat("Sessions", value: page.sessionsPerWeek, unit: "a week"),
             ]
         ) {
@@ -65,23 +65,31 @@ private struct BodySessionsCard: View {
     @Environment(\.somaTheme) private var theme
 
     var body: some View {
+        if page.weeks.reduce(0, +) == 0 {
+            // No session in eight weeks: one line on what fills the chart,
+            // rather than 300 points of empty columns.
+            BodyWaitingCard(title: "Strength sessions, 8 weeks", line: page.sessionsNote)
+        } else {
+            chart
+        }
+    }
+
+    private var chart: some View {
         let type = theme.typography
         let colors = theme.colors
 
-        SomaChartCard(
+        return SomaChartCard(
             eyebrow: "Strength sessions, 8 weeks",
             value: page.sessionsPerWeek,
             unit: "a week on average",
             note: page.sessionsNote
         ) {
             VStack(spacing: theme.metrics.spaceS) {
-                BodyDotColumns(counts: page.weeks.isEmpty ? Array(repeating: 0, count: BodyMath.trendWeeks) : page.weeks)
+                BodyDotColumns(counts: page.weeks)
                     .frame(height: theme.metrics.bodySessionPlotHeight)
                 HStack {
                     if let first = page.firstWeek {
                         Text(first, format: .dateTime.month(.abbreviated).day())
-                    } else {
-                        Text(verbatim: "-")
                     }
                     Spacer()
                     Text("This week")

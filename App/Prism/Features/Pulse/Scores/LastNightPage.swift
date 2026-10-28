@@ -43,14 +43,16 @@ struct LastNightPage: View {
         ScorePageScaffold(aspect: .sleep, title: "Last night") {
             SomaScoreHero(
                 aspect: .sleep,
-                caption: "Last night",
+                // The bar already names the page.
+                caption: nil,
                 value: hero.value,
                 unit: hero.value == nil ? nil : "asleep",
                 meaning: hero.meaning,
                 detail: hero.detail,
                 tone: hero.tone,
                 dial: .fill(hero.share),
-                usual: hero.usual
+                usual: hero.usual,
+                duration: hero.asleep
             )
             SleepLastNightSection(night: summary, calendar: calendar)
             LastNightHeartCard(beats: inputs?.lastNightBeats ?? [], night: inputs?.nights.last ?? nil)
@@ -62,9 +64,9 @@ struct LastNightPage: View {
             }
             LastNightDisturbances(stages: stages, isRead: isRead, calendar: calendar)
             ScoreLinks(links: [
-                ScoreLink(title: "Night dip", detail: page.dip ?? "-") { sheet = .dip },
-                ScoreLink(title: "Breathing", detail: page.breathing ?? "-") { sheet = .breathing },
-                ScoreLink(title: "Sleep environment", detail: page.sound ?? "-") { sheet = .environment },
+                ScoreLink(title: "Night dip", detail: page.dip) { sheet = .dip },
+                ScoreLink(title: "Breathing", detail: page.breathing) { sheet = .breathing },
+                ScoreLink(title: "Sleep environment", detail: page.sound) { sheet = .environment },
             ])
             ScorePageLinks(routes: [(.sleep, "Sleep over time", scores?.sleep.map(String.init))])
         }
@@ -92,22 +94,24 @@ struct LastNightPage: View {
 /// the night's share of the need, and the usual nights marked on it.
 struct LastNightHero: Equatable {
     var value: String?
+    /// The time asleep in seconds, set as a duration; nil with `value`.
+    var asleep: TimeInterval?
     var meaning: String?
     var detail: String?
     var tone: SomaCueTone
     var share: Double?
     var usual: ClosedRange<Double>?
 
-    /// Hours as "7h 54m", the way the sleep totals write them.
+    /// Hours as "7h 54m", the way the sleep totals write them: through
+    /// ``SomaFormat``.
     static func span(_ hours: Double) -> String {
-        let minutes = Int((hours * 60).rounded())
-        return minutes % 60 == 0 ? "\(minutes / 60)h" : "\(minutes / 60)h \(minutes % 60)m"
+        SomaFormat.duration(hours * 3600)
     }
 
     static func make(asleep: TimeInterval?, need: Double?, nights: [Double?]) -> LastNightHero {
         let usualHours = AspectPageMath.usual(nights)
         guard let asleep, asleep > 0 else {
-            return LastNightHero(value: nil, meaning: "Waiting for a night your watch records", detail: nil,
+            return LastNightHero(value: nil, asleep: nil, meaning: "Waiting for a night your watch records", detail: nil,
                                  tone: .neutral, share: nil, usual: nil)
         }
         let hours = asleep / 3600
@@ -117,6 +121,7 @@ struct LastNightHero: Equatable {
                                               risingIsGood: true, format: ScoreMath.hoursMinutes, unit: nil)
         return LastNightHero(
             value: span(hours),
+            asleep: asleep,
             meaning: meaning?.text,
             detail: "Need \(span(need))",
             tone: meaning?.tone ?? .neutral,

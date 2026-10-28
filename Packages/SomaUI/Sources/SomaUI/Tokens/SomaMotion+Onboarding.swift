@@ -18,10 +18,6 @@ public extension SomaMotion {
     var onboardingStep: Animation { .smooth(duration: 0.4) }
     /// The same change with Reduce Motion on: a cross fade, nothing travels.
     var onboardingStepStill: Animation { fade }
-    /// The ground behind the orb fading from one aspect's colour to the next.
-    /// A spring rather than the 0.7 second ease it was: a quick reader tapping
-    /// through used to stack one long fade on another.
-    var onboardingGround: Animation { .smooth(duration: 0.5) }
     /// One line of a screen arriving: a fade and a rise of a few points.
     var onboardingArrival: Animation { .smooth(duration: 0.34) }
     /// The pause before the first line of a screen arrives, so the words

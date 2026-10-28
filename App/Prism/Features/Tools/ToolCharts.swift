@@ -62,7 +62,9 @@ struct ToolGauge: View {
                     }
                     if let delta {
                         HStack(spacing: metrics.trendMarkSpacing) {
-                            SomaTrendMark(trend: deltaIsWorse ? .down : .up)
+                            // The mark points down when the move is the worse one, so the
+                            // higher side is the better one by construction.
+                            SomaTrendMark(trend: deltaIsWorse ? .down : .up, better: .higher)
                             Text(delta)
                                 .somaFont(type.caption)
                                 .foregroundStyle(colors.inkSecondary.color)

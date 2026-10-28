@@ -335,7 +335,6 @@ struct AspectReadings: View {
         VStack(alignment: .leading, spacing: theme.metrics.cardSpacing) {
             Text("Readings")
                 .somaFont(theme.typography.eyebrow)
-                .textCase(.uppercase)
                 .foregroundStyle(theme.colors.inkSecondary.color)
                 .accessibilityAddTraits(.isHeader)
             SomaBrowseGroup(rows, hasGlyphs: false) { row in

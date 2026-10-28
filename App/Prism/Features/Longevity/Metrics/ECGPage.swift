@@ -52,7 +52,6 @@ struct ECGPage: View {
                 VStack(alignment: .leading, spacing: theme.metrics.chartLabelGap * 2) {
                     Text("Trace, lead I")
                         .somaFont(theme.typography.eyebrow)
-                        .textCase(.uppercase)
                         .foregroundStyle(theme.colors.inkSecondary.color)
                     ECGTrace(voltages: trace, samplingFrequency: latest?.samplingFrequency)
                 }

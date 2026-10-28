@@ -94,7 +94,6 @@ struct VaultRecordSheet: View {
         VStack(alignment: .leading, spacing: theme.metrics.cardSpacing) {
             Text(title)
                 .somaFont(theme.typography.eyebrow)
-                .textCase(.uppercase)
                 .foregroundStyle(theme.colors.inkSecondary.color)
                 .accessibilityAddTraits(.isHeader)
             content()
@@ -125,9 +124,10 @@ struct VaultRecordSheet: View {
     }
 
     /// What wrote it and on what; a field Health left empty is left out, and
-    /// a record typed in says so.
+    /// a record typed in says so. The app is always listed: one Health did
+    /// not name reads "Unknown", in words rather than a hyphen.
     static func source(_ reading: HealthReading) -> [Field] {
-        var fields: [Field] = [Field(title: String(localized: "App"), value: reading.source ?? "-")]
+        var fields: [Field] = [Field(title: String(localized: "App"), value: reading.source ?? String(localized: "Unknown"))]
         if let device = reading.device, !device.isEmpty {
             fields.append(Field(title: String(localized: "Device"), value: device))
         }

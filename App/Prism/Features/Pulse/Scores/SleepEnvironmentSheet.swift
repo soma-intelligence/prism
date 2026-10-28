@@ -79,8 +79,8 @@ struct SleepEnvironmentSheet: View {
                                     Text("\(row.nights) nights").somaFont(type.caption).foregroundStyle(colors.inkSecondary.color)
                                 }
                                 Spacer()
-                                Text(row.nights >= 3 ? row.score.map { "\(Int($0.rounded()))" } ?? "-" : "-")
-                                    .somaFont(type.rowValue).foregroundStyle(colors.inkPrimary.color)
+                                SomaNumber(row.nights >= 3 ? row.score.map { "\(Int($0.rounded()))" } : nil, type.rowValue)
+                                    .foregroundStyle(colors.inkPrimary.color)
                             }
                             .accessibilityElement(children: .combine)
                         }
@@ -136,8 +136,9 @@ private struct BedroomTemperatureRow: View {
                     Text("best 16 to 19 °C").somaFont(type.caption).foregroundStyle(colors.inkSecondary.color)
                 }
                 Spacer()
-                Text(bedroom.temperature.map { "\(ScoreMath.number($0, decimals: 1)) °C" } ?? "-")
-                    .somaFont(type.rowValue).foregroundStyle(colors.inkPrimary.color)
+                SomaNumber(bedroom.temperature.map { ScoreMath.number($0, decimals: 1) }, type.rowValue, unit: "°C",
+                           unitSpec: type.rowValue)
+                    .foregroundStyle(colors.inkPrimary.color)
             }
         }
         .padding(.vertical, theme.metrics.scoreRowSpacing)
@@ -201,8 +202,8 @@ struct SleepPlaceLedgerSheet: View {
                     SomaBrowseRow(title: night.day == today ? "Last night" : night.day.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day()),
                                   detail: nil, action: { picking = PickedNight(day: night.day) }) {
                         VStack(alignment: .trailing, spacing: 2) {
-                            Text(night.score.map { "\(Int($0.rounded()))" } ?? "-")
-                                .somaFont(type.rowValue).foregroundStyle(colors.inkPrimary.color)
+                            SomaNumber(night.score.map { "\(Int($0.rounded()))" }, type.rowValue)
+                                .foregroundStyle(colors.inkPrimary.color)
                             let place = places.place(forNightEnding: night.day)
                             Text(place.map { "\($0.name) · \($0.wasDetected ? "detected" : "set by you")" } ?? "not set")
                                 .somaFont(type.caption).foregroundStyle(colors.inkSecondary.color)

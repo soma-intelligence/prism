@@ -122,8 +122,8 @@ struct MindLensStack: View {
 
         VStack(alignment: .leading, spacing: metrics.leadSpacing) {
             SomaStatRow([
-                SomaStat("HRV", value: model.hrv.map(MindLensFormat.whole), unit: "ms", trend: model.hrvTrend),
-                SomaStat("Resting HR", value: model.resting.map(MindLensFormat.whole), unit: "bpm", trend: model.restingTrend),
+                SomaStat("HRV", value: model.hrv.map(MindLensFormat.whole), unit: "ms", trend: model.hrvTrend, better: .higher),
+                SomaStat("Resting HR", value: model.resting.map(MindLensFormat.whole), unit: "bpm", trend: model.restingTrend, better: .lower),
                 SomaStat("Mindful", value: model.mindfulToday.map(MindLensFormat.whole), unit: "min"),
             ], onSelect: onStat)
             .padding(.top, metrics.heroTopPadding)
@@ -140,7 +140,7 @@ struct MindLensStack: View {
                             .contentShape(.rect)
                     }
                     .zoomSource(ScoreRoute.stress)
-                    .buttonStyle(TilePressStyle())
+                    .buttonStyle(.somaGlassPress)
                 }
 
                 MindSection("Mood", route: MindRoute.innerMap) {

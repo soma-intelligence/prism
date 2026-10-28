@@ -58,20 +58,6 @@ public extension SomaMetrics {
 public extension SomaMetrics {
     /// The battery's body, nub left out.
     var bankBatteryWidth: CGFloat { 236 }
-    var bankBatteryHeight: CGFloat { 112 }
-    var bankBatteryCornerRadius: CGFloat { 30 }
-    /// The rim round the body.
-    var bankBatteryRim: CGFloat { 3 }
-    /// The gap between the rim and the charge inside it.
-    var bankBatteryInset: CGFloat { 7 }
-    /// The terminal at the battery's end.
-    var bankBatteryNubWidth: CGFloat { 9 }
-    var bankBatteryNubHeight: CGFloat { 38 }
-    var bankBatteryNubGap: CGFloat { 4 }
-    /// How far the charge's glow spreads.
-    var bankBatteryGlow: CGFloat { 12 }
-    /// How strongly the glow shows.
-    var bankBatteryGlowOpacity: Double { 0.25 }
     /// The day's plot, axis and glyph row left out.
     var bankChartHeight: CGFloat { 200 }
     /// The column on the trailing edge that holds the level labels.

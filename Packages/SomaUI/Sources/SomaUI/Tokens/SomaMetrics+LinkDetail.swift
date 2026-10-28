@@ -19,14 +19,6 @@ public extension SomaMetrics {
     var linkDetailLabelWidth: CGFloat { 64 }
     /// One day's dot in the large comparison.
     var linkDetailDot: CGFloat { 7 }
-    /// A day's dot against its row's mean, which is drawn solid.
-    var linkDetailDotOpacity: Double { 0.5 }
-    /// The mean mark's width.
-    var linkDetailMeanWidth: CGFloat { 3 }
-    /// The fill of the box from the first to the third quartile.
-    var linkDetailBoxOpacity: Double { 0.14 }
-    /// A driver day's shading behind the outcome's line.
-    var linkDetailHighlightOpacity: Double { 0.16 }
     /// Gap between the sheet's sections.
     var linkDetailSpacing: CGFloat { 20 }
 
