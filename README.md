@@ -9,6 +9,15 @@ Prism reads what Apple Health holds, including what the Oura, Whoop and Withings
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
 [![Platforms: iOS, iPadOS, macOS, visionOS](https://img.shields.io/badge/platforms-iOS%20%7C%20iPadOS%20%7C%20macOS%20%7C%20visionOS-lightgrey)](#build-it)
 [![Swift 6 toolchain](https://img.shields.io/badge/Swift-6%20toolchain-orange)](https://www.swift.org)
+[![TestFlight](https://img.shields.io/badge/TestFlight-join%20the%20beta-0D96F6?logo=apple&logoColor=white)](https://testflight.apple.com/join/15Bvq8Dr)
+[![Website](https://img.shields.io/badge/web-somalabs.me%2Fprism-1D1D2B)](https://somalabs.me/prism)
+
+## Try it
+
+- **TestFlight (iPhone, iPad):** [join the public beta](https://testflight.apple.com/join/15Bvq8Dr). It ships as Soma Health, the Soma Labs build of Prism.
+- **App Store:** Soma Health 1.0 is in review. This line will link to it once it is live.
+- **Website:** [somalabs.me/prism](https://somalabs.me/prism) · [Privacy policy](https://somalabs.me/legal/privacy)
+- **From source:** see [Build it](#build-it).
 
 | Today | Longevity | Track | Ask | Tools | iPad |
 |---|---|---|---|---|---|
@@ -81,6 +90,11 @@ Direct Oura, Whoop and Withings connections are written and switched off in this
 ## Contributing
 
 Issues and pull requests are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) first, and report security problems privately as [SECURITY.md](SECURITY.md) describes.
+
+## More from Soma Labs
+
+- [OnePass](https://github.com/soma-intelligence/onepass): open source, post-quantum password manager.
+- [Soma Flight](https://github.com/soma-intelligence/Soma_Flight): flight tracker with a log of every trip.
 
 ## License and trademarks
 
