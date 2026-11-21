@@ -1,0 +1,21 @@
+cff-version: 1.2.0
+message: "If you use Prism in your work, please cite it as below."
+title: "Prism"
+type: software
+authors:
+  - name: "Soma Labs"
+version: "1.0"
+license: AGPL-3.0
+repository-code: "https://github.com/soma-intelligence/prism"
+url: "https://somalabs.me/prism"
+abstract: >-
+  Prism is an open source health and wellness app for iPhone, iPad, Mac and
+  Apple Vision Pro. It reads Apple Health and works out daily sleep, recovery,
+  strain, stress and energy scores on the device.
+keywords:
+  - apple-health
+  - healthkit
+  - swiftui
+  - wellness
+  - sleep
+  - recovery
