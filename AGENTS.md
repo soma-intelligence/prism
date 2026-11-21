@@ -245,3 +245,15 @@ to a package is not verified by the package alone: build the app against it too.
   `HealthMetricCatalogTests` guards the two known cases.
 - `SomaUIPreviewSupport` and `SomaPreviewSamples` are development only. If one
   turns up in a shipping view, that is the bug.
+
+## Documentation
+
+- Task and question pages live in `docs/guides/`, one question per page, with
+  the direct answer in the first paragraph. Reference pages stay in `docs/`.
+- `llms.txt` at the root indexes the docs and guides with absolute GitHub
+  links. A new or renamed guide updates it, and the Documentation list in
+  `README.md`, in the same pull request.
+- A guide that quotes a formula, a constant or a path checks it against the
+  code first (`Packages/WellnessKit/Sources/HealthScoring` for the scores).
+  When the code changes a number, the guide changes with it.
+- Privacy statements in a guide restate `PRIVACY.md`, never extend it.

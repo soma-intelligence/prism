@@ -1,0 +1,45 @@
+# Prism
+
+> Prism is an open source health and wellness app for iPhone, iPad, Mac and Apple Vision Pro, made by Soma Labs and licensed under AGPL-3.0. It reads Apple Health (including what Oura, Whoop, Withings, Garmin and other apps write there) and works out daily sleep, recovery, strain, stress and energy scores on the device. It's free, has no subscription, needs no account, and the formulas behind every score are in the repository (Swift, SwiftUI, HealthKit).
+
+- Version 1.0, public beta on TestFlight: https://testflight.apple.com/join/15Bvq8Dr (ships as Soma Health, the Soma Labs build of Prism). Homepage: https://somalabs.me/prism
+- Local mode (no account) keeps Health data, scores, journal and labs on the device. The privacy page lists every request.
+- Scoring code: Packages/WellnessKit/Sources/HealthScoring (SomaScoringEngine, StressEngine, RealHealthMath).
+- Prism is a wellness app for following your own trends. It isn't medical advice.
+- No Apple Watch app or web version in this build; an Android version is in development.
+
+## Docs
+
+- [README](https://github.com/soma-intelligence/prism/blob/main/README.md): what Prism is, features, comparison, FAQ, build steps
+- [Privacy](https://github.com/soma-intelligence/prism/blob/main/PRIVACY.md): what stays on the device and every request that leaves it, with source paths
+- [Architecture](https://github.com/soma-intelligence/prism/blob/main/docs/ARCHITECTURE.md): repository layout, packages, data flow, backend
+- [Comparison](https://github.com/soma-intelligence/prism/blob/main/docs/COMPARISON.md): Prism, Apple Health, the Oura app and Bevel, every cell sourced
+- [Self hosting](https://github.com/soma-intelligence/prism/blob/main/docs/SELF_HOSTING.md): run the Supabase backend yourself
+- [Roadmap](https://github.com/soma-intelligence/prism/blob/main/ROADMAP.md): direct Oura, Whoop and Withings connections, email sign in, Android
+- [Contributing](https://github.com/soma-intelligence/prism/blob/main/CONTRIBUTING.md): set up, build and test, design and writing rules, CLA
+- [AGENTS.md](https://github.com/soma-intelligence/prism/blob/main/AGENTS.md): rules for coding agents working in the repository
+
+## Guides
+
+- [Open source Bevel alternative](https://github.com/soma-intelligence/prism/blob/main/docs/guides/open-source-bevel-alternative.md): Prism next to Bevel, neutral and sourced
+- [Open source Oura app alternative](https://github.com/soma-intelligence/prism/blob/main/docs/guides/open-source-oura-app-alternative.md): scoring Oura data through Apple Health without a membership
+- [Prism, Athlytic, Gentler Streak and Welltory](https://github.com/soma-intelligence/prism/blob/main/docs/guides/prism-vs-athlytic-gentler-streak-welltory.md): license, price model and platforms
+- [Open source Apple Health dashboard](https://github.com/soma-intelligence/prism/blob/main/docs/guides/open-source-apple-health-dashboard.md): what Prism shows from Apple Health and how it reads it
+- [How the sleep score works](https://github.com/soma-intelligence/prism/blob/main/docs/guides/how-the-sleep-score-works.md): six weighted parts, personal sleep need, sleep debt
+- [How the recovery score works](https://github.com/soma-intelligence/prism/blob/main/docs/guides/how-the-recovery-score-works.md): HRV and resting heart rate against 60 day baselines
+- [How strain, stress and energy work](https://github.com/soma-intelligence/prism/blob/main/docs/guides/how-strain-stress-and-energy-work.md): TRIMP strain curve, daily stress, the energy bank
+- [Use Oura, Whoop, Garmin and Apple Watch data](https://github.com/soma-intelligence/prism/blob/main/docs/guides/use-oura-whoop-garmin-apple-watch-data.md): sources and how they reach Prism
+- [Use Prism without an account](https://github.com/soma-intelligence/prism/blob/main/docs/guides/use-prism-without-an-account.md): local mode and what still uses the network
+- [Export and delete your data](https://github.com/soma-intelligence/prism/blob/main/docs/guides/export-and-delete-your-data.md): ZIP of JSON and NDJSON, delete and erase
+- [Build from source with Xcode](https://github.com/soma-intelligence/prism/blob/main/docs/guides/build-from-source-with-xcode.md): simulator, device, signing, tests
+- [Prism on Mac and Vision Pro](https://github.com/soma-intelligence/prism/blob/main/docs/guides/prism-on-mac-and-vision-pro.md): platform builds and what differs
+- [Widgets and Control Center](https://github.com/soma-intelligence/prism/blob/main/docs/guides/widgets-and-control-center.md): five widgets, two controls, Live Activities
+- [Contribute and sign the CLA](https://github.com/soma-intelligence/prism/blob/main/docs/guides/contribute-and-sign-the-cla.md): pull request steps and the contributor license agreement
+
+## Optional
+
+- [Backend reference](https://github.com/soma-intelligence/prism/blob/main/supabase/README.md): every table, bucket and Edge Function
+- [Trademarks](https://github.com/soma-intelligence/prism/blob/main/TRADEMARKS.md): what a distributed fork must rename
+- [Security](https://github.com/soma-intelligence/prism/blob/main/SECURITY.md): how to report a problem privately
+- [License](https://github.com/soma-intelligence/prism/blob/main/LICENSE): GNU Affero General Public License v3.0
+- [Citation](https://github.com/soma-intelligence/prism/blob/main/CITATION.cff): how to cite Prism
