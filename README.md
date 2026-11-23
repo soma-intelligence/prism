@@ -12,6 +12,21 @@ Prism reads what Apple Health holds, including what the Oura, Whoop and Withings
 [![TestFlight](https://img.shields.io/badge/TestFlight-join%20the%20beta-0D96F6?logo=apple&logoColor=white)](https://testflight.apple.com/join/15Bvq8Dr)
 [![Website](https://img.shields.io/badge/web-somalabs.me%2Fprism-1D1D2B)](https://somalabs.me/prism)
 
+## Quick start
+
+1. On your iPhone or iPad, [join the TestFlight public beta](https://testflight.apple.com/join/15Bvq8Dr). It's the Soma Labs build of Prism, listed on TestFlight as Karla Health.
+2. Open it, tap "Not now" to keep everything on the device, and let it read Apple Health.
+3. Today shows your daily scores. Sleep and recovery wait for seven recorded nights, so you'll see a dash until then.
+
+From source, with Xcode 27:
+
+```bash
+git clone https://github.com/soma-intelligence/prism.git
+open prism/App/Prism.xcodeproj
+```
+
+Then run the `Prism` scheme on an iPhone simulator. The simulator has no Health data, so values show as a dash there. For devices, signing and the Mac, see [Try it](#try-it) and [Build it](#build-it).
+
 ## At a glance
 
 | | |
